@@ -11,4 +11,7 @@ AlignConsecutiveDeclarations: false
 AlignConsecutiveMacros: false
 SpaceAfterCStyleCast: false
 AlignTrailingComments: true
+DerivePointerAlignment: false
+SpaceBeforeParens: ControlStatements
+ContinuationIndentWidth: 8
 ...
