@@ -34,11 +34,10 @@ static long read_sysfs_long(const char *path)
 	int32_t parsed_val = pascal_gov_parse_i32((const uint8_t *)buf,
 						  (size_t)bytes, &has_digits);
 
-	return has_digits ? (long)parsed_val : -1;
+	return (int)has_digits ? (long)parsed_val : -1;
 }
 
-static bool build_little_cpuset(long num_cores, const char *fmt,
-				cpu_set_t *cpuset)
+static bool build_cpuset(long num_cores, const char *fmt, cpu_set_t *cpuset)
 {
 	long min_val = LONG_MAX;
 	bool found = false;
@@ -76,8 +75,8 @@ int pascal_gov_topology_apply_little_core(void)
 	cpu_set_t little_cpuset;
 
 	bool success =
-		build_little_cpuset(num_cores, CPU_CAPACITY, &little_cpuset) ||
-		build_little_cpuset(num_cores, CPU_MAX_FREQ, &little_cpuset);
+		(bool)(build_cpuset(num_cores, CPU_CAPACITY, &little_cpuset) ||
+		       build_cpuset(num_cores, CPU_MAX_FREQ, &little_cpuset));
 
 	if (!success) {
 		LOGW("topology: detection failed, binding to all cores");

@@ -98,7 +98,7 @@ pascal_gov_parse_u64(const uint8_t *PASCAL_GOV_RESTRICT buffer, size_t len,
 
 		if (byte >= '0' && byte <= '9') {
 			parsed_val =
-				parsed_val * 10ULL + (uint64_t)(byte - '0');
+				(parsed_val * 10ULL) + (uint64_t)(byte - '0');
 
 			pos++;
 			continue;
@@ -128,10 +128,10 @@ pascal_gov_parse_f32(const uint8_t *PASCAL_GOV_RESTRICT buffer, size_t len,
 			float digit = (float)(byte - '0');
 
 			if (in_fraction) {
-				fraction_val = fraction_val * 10.0F + digit;
+				fraction_val = (fraction_val * 10.0F) + digit;
 				fraction_divisor *= 10.0F;
 			} else {
-				parsed_val = parsed_val * 10.0F + digit;
+				parsed_val = (parsed_val * 10.0F) + digit;
 			}
 
 			pos++;

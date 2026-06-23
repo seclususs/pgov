@@ -18,7 +18,7 @@ static inline __attribute__((always_inline, const)) float
 pascal_gov_sigmoid_param(float val, float k, float mid)
 {
 	float x = k * (val - mid);
-	return 0.5F * (x / (1.0F + fabsf(x)) + 1.0F);
+	return 0.5F * ((x / (1.0F + fabsf(x))) + 1.0F);
 }
 
 static inline __attribute__((always_inline, const)) float
@@ -28,13 +28,13 @@ pascal_gov_decay(float val, float coeff)
 	if (PASCAL_GOV_UNLIKELY(x < 0.0F))
 		return 1.0F;
 
-	return 1.0F / (1.0F + x + 0.5F * x * x);
+	return 1.0F / (1.0F + x + (0.5F * x * x));
 }
 
 static inline __attribute__((always_inline, const)) float
 pascal_gov_tanh_approx(float x)
 {
-	return x / sqrtf(1.0F + x * x);
+	return x / sqrtf(1.0F + (x * x));
 }
 
 static inline __attribute__((always_inline, const)) uint64_t

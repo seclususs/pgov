@@ -49,25 +49,25 @@ float pascal_gov_kalman_update(
 	float dt3 = dt2 * dt;
 	float dt4 = dt2 * dt2;
 
-	float x_pos_pred = state->x_pos + state->x_vel * dt;
+	float x_pos_pred = state->x_pos + (state->x_vel * dt);
 	float x_vel_pred = state->x_vel;
 
 	float q_scale = state->config.q_vel;
-	float q00 = q_scale * dt4 * 0.25F + state->config.q_pos * dt;
+	float q00 = (q_scale * dt4 * 0.25F) + (state->config.q_pos * dt);
 	float q01 = q_scale * dt3 * 0.5F;
 	float q10 = q01;
-	float q11 = q_scale * dt2 + state->config.q_vel * dt;
+	float q11 = (q_scale * dt2) + (state->config.q_vel * dt);
 
-	float f_p00 = state->p00 + state->p10 * dt;
-	float f_p01 = state->p01 + state->p11 * dt;
+	float f_p00 = state->p00 + (state->p10 * dt);
+	float f_p01 = state->p01 + (state->p11 * dt);
 	float f_p10 = state->p10;
 	float f_p11 = state->p11;
 
 	float alpha = state->config.fading_factor;
-	float p00_pred = (f_p00 + f_p01 * dt) * alpha + q00;
-	float p01_pred = f_p01 * alpha + q01;
-	float p10_pred = (f_p10 + f_p11 * dt) * alpha + q10;
-	float p11_pred = f_p11 * alpha + q11;
+	float p00_pred = ((f_p00 + (f_p01 * dt)) * alpha) + q00;
+	float p01_pred = (f_p01 * alpha) + q01;
+	float p10_pred = ((f_p10 + (f_p11 * dt)) * alpha) + q10;
+	float p11_pred = (f_p11 * alpha) + q11;
 
 	float y = z - x_pos_pred;
 	float s = p00_pred + state->config.r_meas;
@@ -77,13 +77,13 @@ float pascal_gov_kalman_update(
 	float k0 = p00_pred * inv_s;
 	float k1 = p10_pred * inv_s;
 
-	state->x_pos = x_pos_pred + k0 * y;
-	state->x_vel = x_vel_pred + k1 * y;
+	state->x_pos = x_pos_pred + (k0 * y);
+	state->x_vel = x_vel_pred + (k1 * y);
 
 	state->p00 = (1.0F - k0) * p00_pred;
 	state->p01 = (1.0F - k0) * p01_pred;
-	state->p10 = -k1 * p00_pred + p10_pred;
-	state->p11 = -k1 * p01_pred + p11_pred;
+	state->p10 = (-k1 * p00_pred) + p10_pred;
+	state->p11 = (-k1 * p01_pred) + p11_pred;
 
 	state->last_nis = y * y * inv_s;
 

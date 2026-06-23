@@ -43,13 +43,14 @@ static inline float pascal_gov_thermal_lead_lag_update(
 		return state->prev_y;
 	}
 
-	float denom = 2.0F * t_lag + dt;
-	float coeff_prev_y = 2.0F * t_lag - dt;
-	float coeff_input = gain * (2.0F * t_lead + dt);
-	float coeff_prev_u = gain * (2.0F * t_lead - dt);
+	float denom = (2.0F * t_lag) + dt;
+	float coeff_prev_y = (2.0F * t_lag) - dt;
+	float coeff_input = gain * ((2.0F * t_lead) + dt);
+	float coeff_prev_u = gain * ((2.0F * t_lead) - dt);
 
-	float numerator = coeff_input * input - coeff_prev_u * state->prev_u +
-			  coeff_prev_y * state->prev_y;
+	float numerator = (coeff_input * input) -
+			  (coeff_prev_u * state->prev_u) +
+			  (coeff_prev_y * state->prev_y);
 
 	float output = numerator / denom;
 
@@ -67,8 +68,8 @@ static inline void pascal_gov_thermal_smith_update(
 	float *PASCAL_GOV_RESTRICT out_delayed)
 {
 	float alpha = dt / (tau + dt);
-	float y_no_delay = alpha * (u_control * k_gain) +
-			   (1.0F - alpha) * state->model_output_no_delay;
+	float y_no_delay = (alpha * (u_control * k_gain)) +
+			   ((1.0F - alpha) * state->model_output_no_delay);
 
 	state->model_output_no_delay = y_no_delay;
 
@@ -122,13 +123,13 @@ float pascal_gov_thermal_update(
 		0.0F, 1.0F);
 
 	float k_p = tunables->kp_base +
-		    sigma * (tunables->kp_fast - tunables->kp_base);
+		    (sigma * (tunables->kp_fast - tunables->kp_base));
 
 	float k_i = tunables->ki_base +
-		    sigma * (tunables->ki_fast - tunables->ki_base);
+		    (sigma * (tunables->ki_fast - tunables->ki_base));
 
 	float k_d = tunables->kd_base +
-		    sigma * (tunables->kd_fast - tunables->kd_base);
+		    (sigma * (tunables->kd_fast - tunables->kd_base));
 
 	float bat_margin = fmaxf(tunables->hard_limit_bat - bat_temp, 0.0F);
 	float control_margin = (bat_margin < 5.0F) ? (5.0F - bat_margin) : 0.0F;
@@ -162,14 +163,14 @@ float pascal_gov_thermal_update(
 
 	float t_d = (k_p > 1e-6F) ? (k_d / k_p) : 0.0F;
 	float n = tunables->deriv_filter_n;
-	float denominator = t_d + n * dt_safe;
+	float denominator = t_d + (n * dt_safe);
 
 	float d_term = 0.0F;
 	if (denominator > 1e-6F) {
 		float alpha = t_d / denominator;
 		float beta = (k_d * n) / denominator;
 		float delta_pv = adjusted_pv - state->prev_adjusted_pv;
-		d_term = alpha * state->prev_deriv_output + beta * delta_pv;
+		d_term = (alpha * state->prev_deriv_output) + (beta * delta_pv);
 	}
 
 	state->prev_adjusted_pv = adjusted_pv;

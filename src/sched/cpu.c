@@ -16,7 +16,7 @@ bool pascal_gov_cpu_is_transient(
 	bool diff_exceeded = fabsf(state->psi_value - target_psi) >
 			     math_config->transient_diff_threshold;
 
-	return rate_exceeded || diff_exceeded;
+	return (rate_exceeded || diff_exceeded) != 0;
 }
 
 void pascal_gov_cpu_update_integral_params(
@@ -88,7 +88,7 @@ float pascal_gov_cpu_calculate_load_demand(
 	float crit_damp = 2.0F * sqrtf(k_final);
 	float base_damp = crit_damp * math_config->stability_ratio;
 
-	float rate_sq = load_rate * load_rate + 0.001F;
+	float rate_sq = (load_rate * load_rate) + 0.001F;
 
 	float damping_numerator = 0.5F * fabsf(input->integral_dot) *
 				  (state->psi_value * state->psi_value);
@@ -135,7 +135,7 @@ float pascal_gov_cpu_calculate_effective_pressure(
 	const pascal_gov_cpu_math_config *PASCAL_GOV_RESTRICT math_config)
 {
 	float trend_multiplier =
-		1.0F + trend_factor * math_config->trend_amplification;
+		1.0F + (trend_factor * math_config->trend_amplification);
 
 	return load_demand * trend_multiplier;
 }

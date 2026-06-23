@@ -19,24 +19,27 @@ void pascal_gov_sensor_init_cpu_thermal(
 	pascal_gov_thermal_sensor *PASCAL_GOV_RESTRICT sensor, const char *path)
 {
 	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (sensor->fd < 0)
-		LOGW("sensor: failed to open cpu thermal node %s", path);
+	if (sensor->fd < 0) {
+		LOGW("sensor: failed to open node %s err=%d", path, errno);
+	}
 }
 
 void pascal_gov_sensor_init_bat_thermal(
 	pascal_gov_thermal_sensor *PASCAL_GOV_RESTRICT sensor, const char *path)
 {
 	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (sensor->fd < 0)
-		LOGW("sensor: failed to open bat thermal node %s", path);
+	if (sensor->fd < 0) {
+		LOGW("sensor: failed to open node %s err=%d", path, errno);
+	}
 }
 
 void pascal_gov_sensor_init_battery(
 	pascal_gov_battery_sensor *PASCAL_GOV_RESTRICT sensor, const char *path)
 {
 	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (sensor->fd < 0)
-		LOGW("sensor: failed to open battery node %s", path);
+	if (sensor->fd < 0) {
+		LOGW("sensor: failed to open node %s err=%d", path, errno);
+	}
 }
 
 void pascal_gov_sensor_destroy_thermal(
@@ -133,7 +136,8 @@ int pascal_gov_sensor_read_battery(
 	int32_t parsed_val = pascal_gov_parse_i32(
 		sensor->buffer, (size_t)bytes_read, &has_digits);
 
-	*out_capacity = has_digits ? (float)parsed_val : FALLBACK_BAT_CAPACITY;
+	*out_capacity =
+		(int)has_digits ? (float)parsed_val : FALLBACK_BAT_CAPACITY;
 
 	return 0;
 }

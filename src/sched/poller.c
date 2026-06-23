@@ -21,7 +21,7 @@ void pascal_gov_poller_init(
 
 	struct timespec real_now;
 	clock_gettime(CLOCK_REALTIME, &real_now);
-	state->rng_state = (uint64_t)real_now.tv_sec * 1000000000ULL +
+	state->rng_state = ((uint64_t)real_now.tv_sec * 1000000000ULL) +
 			   (uint64_t)real_now.tv_nsec;
 }
 
@@ -31,7 +31,7 @@ static inline uint64_t pascal_gov_poller_next_random(
 	if (PASCAL_GOV_UNLIKELY(range == 0))
 		return 0;
 
-	state->rng_state = state->rng_state * 6364136223846793005ULL + 1ULL;
+	state->rng_state = (state->rng_state * 6364136223846793005ULL) + 1ULL;
 
 	uint64_t limit = range * 2;
 	uint64_t limit_plus_one = limit + 1;
