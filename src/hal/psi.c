@@ -44,15 +44,51 @@ int pascal_gov_psi_register_trigger(const char *path, int32_t threshold_us,
 	return fd;
 }
 
+void pascal_gov_psi_unregister_trigger(int fd)
+{
+	if (fd >= 0) {
+		close(fd);
+	}
+}
+
+int pascal_gov_psi_recover(pascal_gov_psi_monitor *PASCAL_GOV_RESTRICT monitor,
+			   const char *path)
+{
+	if (monitor->fd >= 0) {
+		close(monitor->fd);
+		monitor->fd = -1;
+	}
+
+	monitor->fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (monitor->fd < 0) {
+		return -errno;
+	}
+
+	pascal_gov_kalman_reset(&monitor->filter_some);
+	monitor->first_run = true;
+	return 0;
+}
+
 void pascal_gov_psi_init(
-	pascal_gov_psi_monitor *PASCAL_GOV_RESTRICT monitor, int fd,
+	pascal_gov_psi_monitor *PASCAL_GOV_RESTRICT monitor, const char *path,
 	const pascal_gov_kalman_config *PASCAL_GOV_RESTRICT config)
 {
-	monitor->fd = fd;
+	monitor->fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (monitor->fd < 0)
+		LOGE("psi: failed to open node %s", path);
+
 	clock_gettime(CLOCK_MONOTONIC, &monitor->last_read_time);
 	monitor->last_some_total = 0;
 	monitor->first_run = true;
 	pascal_gov_kalman_init(&monitor->filter_some, config);
+}
+
+void pascal_gov_psi_destroy(pascal_gov_psi_monitor *PASCAL_GOV_RESTRICT monitor)
+{
+	if (monitor->fd >= 0) {
+		close(monitor->fd);
+		monitor->fd = -1;
+	}
 }
 
 static inline int buffer_cmp(const uint8_t *buf, const char *str, size_t len)

@@ -34,9 +34,17 @@ typedef struct {
 int pascal_gov_psi_register_trigger(const char *path, int32_t threshold_us,
 				    int32_t window_us);
 
+void pascal_gov_psi_unregister_trigger(int fd);
+
+int pascal_gov_psi_recover(pascal_gov_psi_monitor *PASCAL_GOV_RESTRICT monitor,
+			   const char *path);
+
 void pascal_gov_psi_init(
-	pascal_gov_psi_monitor *PASCAL_GOV_RESTRICT monitor, int fd,
+	pascal_gov_psi_monitor *PASCAL_GOV_RESTRICT monitor, const char *path,
 	const pascal_gov_kalman_config *PASCAL_GOV_RESTRICT config);
+
+void pascal_gov_psi_destroy(
+	pascal_gov_psi_monitor *PASCAL_GOV_RESTRICT monitor);
 
 int pascal_gov_psi_read_state(
 	pascal_gov_psi_monitor *PASCAL_GOV_RESTRICT monitor,
