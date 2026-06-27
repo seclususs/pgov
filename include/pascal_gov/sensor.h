@@ -20,21 +20,19 @@ typedef struct {
 
 void pascal_gov_sensor_init_cpu_thermal(
 	pascal_gov_thermal_sensor *PASCAL_GOV_RESTRICT sensor,
-	const char *path);
+	const char *PASCAL_GOV_RESTRICT path);
 
 void pascal_gov_sensor_init_bat_thermal(
 	pascal_gov_thermal_sensor *PASCAL_GOV_RESTRICT sensor,
-	const char *path);
+	const char *PASCAL_GOV_RESTRICT path);
 
 void pascal_gov_sensor_init_battery(
 	pascal_gov_battery_sensor *PASCAL_GOV_RESTRICT sensor,
-	const char *path);
+	const char *PASCAL_GOV_RESTRICT path);
 
-void pascal_gov_sensor_destroy_thermal(
-	pascal_gov_thermal_sensor *PASCAL_GOV_RESTRICT sensor);
+void pascal_gov_sensor_destroy_thermal(pascal_gov_thermal_sensor *sensor);
 
-void pascal_gov_sensor_destroy_battery(
-	pascal_gov_battery_sensor *PASCAL_GOV_RESTRICT sensor);
+void pascal_gov_sensor_destroy_battery(pascal_gov_battery_sensor *sensor);
 
 int pascal_gov_sensor_read_cpu_temp(
 	pascal_gov_thermal_sensor *PASCAL_GOV_RESTRICT sensor,

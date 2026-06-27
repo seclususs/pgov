@@ -16,7 +16,8 @@
 #define FALLBACK_BAT_CAPACITY 100.0F
 
 void pascal_gov_sensor_init_cpu_thermal(
-	pascal_gov_thermal_sensor *PASCAL_GOV_RESTRICT sensor, const char *path)
+	pascal_gov_thermal_sensor *PASCAL_GOV_RESTRICT sensor,
+	const char *PASCAL_GOV_RESTRICT path)
 {
 	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
 	sensor->scale_multiplier = SCALE_MILLI;
@@ -26,7 +27,8 @@ void pascal_gov_sensor_init_cpu_thermal(
 }
 
 void pascal_gov_sensor_init_bat_thermal(
-	pascal_gov_thermal_sensor *PASCAL_GOV_RESTRICT sensor, const char *path)
+	pascal_gov_thermal_sensor *PASCAL_GOV_RESTRICT sensor,
+	const char *PASCAL_GOV_RESTRICT path)
 {
 	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
 	sensor->scale_multiplier = SCALE_DECI;
@@ -36,7 +38,8 @@ void pascal_gov_sensor_init_bat_thermal(
 }
 
 void pascal_gov_sensor_init_battery(
-	pascal_gov_battery_sensor *PASCAL_GOV_RESTRICT sensor, const char *path)
+	pascal_gov_battery_sensor *PASCAL_GOV_RESTRICT sensor,
+	const char *PASCAL_GOV_RESTRICT path)
 {
 	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (sensor->fd < 0) {
@@ -44,8 +47,7 @@ void pascal_gov_sensor_init_battery(
 	}
 }
 
-void pascal_gov_sensor_destroy_thermal(
-	pascal_gov_thermal_sensor *PASCAL_GOV_RESTRICT sensor)
+void pascal_gov_sensor_destroy_thermal(pascal_gov_thermal_sensor *sensor)
 {
 	if (sensor->fd >= 0) {
 		close(sensor->fd);
@@ -53,8 +55,7 @@ void pascal_gov_sensor_destroy_thermal(
 	}
 }
 
-void pascal_gov_sensor_destroy_battery(
-	pascal_gov_battery_sensor *PASCAL_GOV_RESTRICT sensor)
+void pascal_gov_sensor_destroy_battery(pascal_gov_battery_sensor *sensor)
 {
 	if (sensor->fd >= 0) {
 		close(sensor->fd);
