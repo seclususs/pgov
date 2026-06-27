@@ -13,7 +13,7 @@ void pascal_gov_kalman_init(
 	pascal_gov_kalman_reset(state);
 }
 
-void pascal_gov_kalman_reset(pascal_gov_kalman_state *PASCAL_GOV_RESTRICT state)
+void pascal_gov_kalman_reset(pascal_gov_kalman_state *state)
 {
 	state->first_run = true;
 	state->x_pos = 0.0F;
@@ -25,9 +25,8 @@ void pascal_gov_kalman_reset(pascal_gov_kalman_state *PASCAL_GOV_RESTRICT state)
 	state->last_nis = 0.0F;
 }
 
-float pascal_gov_kalman_update(
-	pascal_gov_kalman_state *PASCAL_GOV_RESTRICT state, float z_meas,
-	float dt_sec)
+float pascal_gov_kalman_update(pascal_gov_kalman_state *state, float z_meas,
+			       float dt_sec)
 {
 	if (PASCAL_GOV_UNLIKELY(!__builtin_isfinite(z_meas)))
 		return state->x_pos;

@@ -30,11 +30,9 @@ void pascal_gov_kalman_init(
 	pascal_gov_kalman_state *PASCAL_GOV_RESTRICT state,
 	const pascal_gov_kalman_config *PASCAL_GOV_RESTRICT config);
 
-void pascal_gov_kalman_reset(
-	pascal_gov_kalman_state *PASCAL_GOV_RESTRICT state);
+void pascal_gov_kalman_reset(pascal_gov_kalman_state *state);
 
-float pascal_gov_kalman_update(
-	pascal_gov_kalman_state *PASCAL_GOV_RESTRICT state, float z_meas,
-	float dt_sec);
+float pascal_gov_kalman_update(pascal_gov_kalman_state *state, float z_meas,
+			       float dt_sec);
 
 #endif // PASCAL_GOV_FILTER_H
