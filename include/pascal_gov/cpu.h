@@ -93,11 +93,10 @@ __attribute__((pure)) float pascal_gov_cpu_calculate_trend_gain(float velocity);
 
 __attribute__((pure)) float pascal_gov_cpu_calculate_effective_pressure(
 	float load_demand, float trend_factor,
-	const pascal_gov_cpu_math_config *PASCAL_GOV_RESTRICT math_config);
+	const pascal_gov_cpu_math_config *math_config);
 
 __attribute__((pure)) float pascal_gov_cpu_calculate_thermal_latency_limit(
-	float thermal_scale,
-	const pascal_gov_cpu_limits *PASCAL_GOV_RESTRICT kernel_limits);
+	float thermal_scale, const pascal_gov_cpu_limits *kernel_limits);
 
 void pascal_gov_cpu_calculate_latency_and_granularity(
 	float p_eff, float load_demand, float thermal_min_latency_ns,
@@ -113,11 +112,11 @@ __attribute__((pure)) float pascal_gov_cpu_calculate_wakeup_granularity(
 
 __attribute__((pure)) float pascal_gov_cpu_calculate_migration_cost(
 	float velocity, float p_eff,
-	const pascal_gov_cpu_limits *PASCAL_GOV_RESTRICT kernel_limits);
+	const pascal_gov_cpu_limits *kernel_limits);
 
-__attribute__((pure)) float pascal_gov_cpu_calculate_walt_init(
-	float pressure,
-	const pascal_gov_cpu_limits *PASCAL_GOV_RESTRICT kernel_limits);
+__attribute__((pure)) float
+pascal_gov_cpu_calculate_walt_init(float pressure,
+				   const pascal_gov_cpu_limits *kernel_limits);
 
 __attribute__((pure)) float pascal_gov_cpu_calculate_uclamp_min(
 	float pressure, float thermal_scale,

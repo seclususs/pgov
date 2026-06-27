@@ -132,7 +132,7 @@ float pascal_gov_cpu_calculate_trend_gain(float velocity)
 
 float pascal_gov_cpu_calculate_effective_pressure(
 	float load_demand, float trend_factor,
-	const pascal_gov_cpu_math_config *PASCAL_GOV_RESTRICT math_config)
+	const pascal_gov_cpu_math_config *math_config)
 {
 	float trend_multiplier =
 		1.0F + (trend_factor * math_config->trend_amplification);
@@ -141,8 +141,7 @@ float pascal_gov_cpu_calculate_effective_pressure(
 }
 
 float pascal_gov_cpu_calculate_thermal_latency_limit(
-	float thermal_scale,
-	const pascal_gov_cpu_limits *PASCAL_GOV_RESTRICT kernel_limits)
+	float thermal_scale, const pascal_gov_cpu_limits *kernel_limits)
 {
 	float limit_ratio = pascal_gov_clampf(1.0F - thermal_scale, 0.0F, 1.0F);
 	float latency_range =
@@ -209,8 +208,7 @@ float pascal_gov_cpu_calculate_wakeup_granularity(
 }
 
 float pascal_gov_cpu_calculate_migration_cost(
-	float velocity, float p_eff,
-	const pascal_gov_cpu_limits *PASCAL_GOV_RESTRICT kernel_limits)
+	float velocity, float p_eff, const pascal_gov_cpu_limits *kernel_limits)
 {
 	float x = pascal_gov_clampf(p_eff / 100.0F, 0.0F, 1.0F);
 	float factor = 1.0F - x;
@@ -232,8 +230,7 @@ float pascal_gov_cpu_calculate_migration_cost(
 }
 
 float pascal_gov_cpu_calculate_walt_init(
-	float pressure,
-	const pascal_gov_cpu_limits *PASCAL_GOV_RESTRICT kernel_limits)
+	float pressure, const pascal_gov_cpu_limits *kernel_limits)
 {
 	float ratio = pressure / 100.0F;
 	float load_curve = ratio * ratio;
