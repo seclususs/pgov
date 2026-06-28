@@ -72,7 +72,7 @@ typedef struct {
 	bool first_run;
 } pascal_gov_load_state;
 
-__attribute__((pure)) bool pascal_gov_cpu_is_transient(
+PASCAL_GOV_PURE bool pascal_gov_cpu_is_transient(
 	const pascal_gov_load_state *PASCAL_GOV_RESTRICT state,
 	float target_psi,
 	const pascal_gov_cpu_math_config *PASCAL_GOV_RESTRICT math_config);
@@ -89,13 +89,13 @@ float pascal_gov_cpu_calculate_load_demand(
 	const pascal_gov_demand_input *PASCAL_GOV_RESTRICT input,
 	const pascal_gov_cpu_math_config *PASCAL_GOV_RESTRICT math_config);
 
-__attribute__((pure)) float pascal_gov_cpu_calculate_trend_gain(float velocity);
+PASCAL_GOV_PURE float pascal_gov_cpu_calculate_trend_gain(float velocity);
 
-__attribute__((pure)) float pascal_gov_cpu_calculate_effective_pressure(
+PASCAL_GOV_PURE float pascal_gov_cpu_calculate_effective_pressure(
 	float load_demand, float trend_factor,
 	const pascal_gov_cpu_math_config *math_config);
 
-__attribute__((pure)) float pascal_gov_cpu_calculate_thermal_latency_limit(
+PASCAL_GOV_PURE float pascal_gov_cpu_calculate_thermal_latency_limit(
 	float thermal_scale, const pascal_gov_cpu_limits *kernel_limits);
 
 void pascal_gov_cpu_calculate_latency_and_granularity(
@@ -105,20 +105,20 @@ void pascal_gov_cpu_calculate_latency_and_granularity(
 	float *PASCAL_GOV_RESTRICT out_latency,
 	float *PASCAL_GOV_RESTRICT out_granularity);
 
-__attribute__((pure)) float pascal_gov_cpu_calculate_wakeup_granularity(
+PASCAL_GOV_PURE float pascal_gov_cpu_calculate_wakeup_granularity(
 	float p_eff,
 	const pascal_gov_cpu_math_config *PASCAL_GOV_RESTRICT math_config,
 	const pascal_gov_cpu_limits *PASCAL_GOV_RESTRICT kernel_limits);
 
-__attribute__((pure)) float pascal_gov_cpu_calculate_migration_cost(
+PASCAL_GOV_PURE float pascal_gov_cpu_calculate_migration_cost(
 	float velocity, float p_eff,
 	const pascal_gov_cpu_limits *kernel_limits);
 
-__attribute__((pure)) float
+PASCAL_GOV_PURE float
 pascal_gov_cpu_calculate_walt_init(float pressure,
 				   const pascal_gov_cpu_limits *kernel_limits);
 
-__attribute__((pure)) float pascal_gov_cpu_calculate_uclamp_min(
+PASCAL_GOV_PURE float pascal_gov_cpu_calculate_uclamp_min(
 	float pressure, float thermal_scale,
 	const pascal_gov_cpu_math_config *PASCAL_GOV_RESTRICT math_config,
 	const pascal_gov_cpu_limits *PASCAL_GOV_RESTRICT kernel_limits);
