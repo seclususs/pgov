@@ -8,21 +8,12 @@
 #include <sys/file.h>
 #include <unistd.h>
 
-#ifndef LOCK_FILE_PATH
-#define LOCK_FILE_PATH "/data/local/tmp/pascal_gov.lock"
-#endif
-
-int pascal_gov_lockfile_acquire(void)
+int pascal_gov_lockfile_acquire(const char *path)
 {
-#ifdef __INTELLISENSE__
-	int fd = open(LOCK_FILE_PATH, O_CREAT | O_RDWR | O_CLOEXEC);
-#else
-	int fd = open(LOCK_FILE_PATH, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
-#endif
-
+	int fd = open(path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
 	if (fd < 0) {
 		int err = errno;
-		LOGE("lockfile: failed to open lockfile err=%d", err);
+		LOGE("lockfile: failed to open lockfile %s err=%d", path, err);
 		return -err;
 	}
 

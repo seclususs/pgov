@@ -47,7 +47,7 @@ int pascal_gov_signal_init(void)
 	return sfd;
 }
 
-void pascal_gov_signal_crash(void)
+void pascal_gov_signal_catch_crashes(void)
 {
 	struct sigaction sa = {0};
 	sa.sa_flags = SA_SIGINFO | SA_RESTART;

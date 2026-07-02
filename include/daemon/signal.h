@@ -5,7 +5,7 @@
 #define PASCAL_GOV_DAEMON_SIGNAL_H
 
 int pascal_gov_signal_init(void);
-void pascal_gov_signal_crash(void);
+void pascal_gov_signal_catch_crashes(void);
 void pascal_gov_signal_destroy(int fd);
 
 #endif // PASCAL_GOV_DAEMON_SIGNAL_H

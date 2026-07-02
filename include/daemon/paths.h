@@ -4,6 +4,8 @@
 #ifndef PASCAL_GOV_DAEMON_PATHS_H
 #define PASCAL_GOV_DAEMON_PATHS_H
 
+#define PASCAL_GOV_LOCK_PATH "/data/local/tmp/pascal_gov.lock"
+
 #define PASCAL_GOV_PATH_PSI_CPU "/proc/pressure/cpu"
 
 #define PASCAL_GOV_PATH_SCHED_LATENCY_NS "/proc/sys/kernel/sched_latency_ns"

@@ -4,6 +4,6 @@
 #ifndef PASCAL_GOV_DAEMON_LOCKFILE_H
 #define PASCAL_GOV_DAEMON_LOCKFILE_H
 
-int pascal_gov_lockfile_acquire(void);
+int pascal_gov_lockfile_acquire(const char *path);
 
 #endif // PASCAL_GOV_DAEMON_LOCKFILE_H
