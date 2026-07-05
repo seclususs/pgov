@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "daemon/rlimit.h"
-#include "daemon/logger.h"
+#include "rlimit.h"
+#include "pg/log.h"
 #include <errno.h>
 #include <sys/resource.h>
 
-int pascal_gov_rlimit_set_max_fd(void)
+int pg_rlimit_set_max_fd(void)
 {
-	struct rlimit rl_fd = {0};
+	struct rlimit rl_fd = { 0 };
 	if (getrlimit(RLIMIT_NOFILE, &rl_fd) != 0)
 		return -errno;
 
@@ -24,9 +24,9 @@ int pascal_gov_rlimit_set_max_fd(void)
 	return 0;
 }
 
-int pascal_gov_rlimit_set_stack(size_t bytes)
+int pg_rlimit_set_stack(size_t bytes)
 {
-	struct rlimit rl_stack = {0};
+	struct rlimit rl_stack = { 0 };
 	if (getrlimit(RLIMIT_STACK, &rl_stack) != 0)
 		return -errno;
 

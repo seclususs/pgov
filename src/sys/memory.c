@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "daemon/memory.h"
-#include "daemon/logger.h"
+#include "memory.h"
+#include "pg/log.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/mman.h>
@@ -15,7 +15,7 @@
 #define OOM_SCORE_ADJ "/proc/self/oom_score_adj"
 #define OOM_SCORE_MIN "-1000\n"
 
-void pascal_gov_memory_lock(void)
+void pg_memory_lock(void)
 {
 	if (mlockall(MCL_CURRENT | MCL_FUTURE | MCL_ONFAULT) == 0) {
 		LOGD("memory: smart ram locking enabled");
@@ -32,7 +32,7 @@ void pascal_gov_memory_lock(void)
 	LOGE("memory: failed to lock memory err=%d, gc latency risk", errno);
 }
 
-void pascal_gov_memory_shield(void)
+void pg_memory_shield(void)
 {
 	int fd = open(OOM_SCORE_ADJ, O_WRONLY | O_CLOEXEC);
 	if (fd < 0) {

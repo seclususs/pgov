@@ -1,14 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "daemon/lockfile.h"
-#include "daemon/logger.h"
+#include "lockfile.h"
+#include "pg/log.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <sys/file.h>
 #include <unistd.h>
 
-int pascal_gov_lockfile_acquire(const char *path)
+int pg_lockfile_acquire(const char *path)
 {
 	int fd = open(path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
 	if (fd < 0) {

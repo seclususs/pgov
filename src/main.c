@@ -1,9 +1,9 @@
-#include "daemon/daemon.h"
-#include "pascal_gov/compiler.h"
+#include "daemon.h"
+#include "compiler.h"
 
 int main(int argc, char *argv[])
 {
-	PASCAL_GOV_UNUSED(argc);
-	PASCAL_GOV_UNUSED(argv);
-	return pascal_gov_daemon_init();
+	UNUSED(argc);
+	UNUSED(argv);
+	return pg_daemon_init();
 }

@@ -2,9 +2,9 @@
 // Copyright (C) 2026 seclususs
 
 #define _GNU_SOURCE
-#include "daemon/task.h"
-#include "daemon/logger.h"
-#include "daemon/topology.h"
+#include "task.h"
+#include "pg/log.h"
+#include "topo.h"
 #include <errno.h>
 #include <sched.h>
 #include <stdint.h>
@@ -40,7 +40,7 @@
 #define SCHED_FLAG_UTIL_CLAMP_MAX 0x40
 #endif
 
-struct pascal_gov_sched_attr {
+struct pg_sched_attr {
 	uint32_t size;
 	uint32_t sched_policy;
 	uint64_t sched_flags;
@@ -53,9 +53,9 @@ struct pascal_gov_sched_attr {
 	uint32_t sched_util_max;
 };
 
-int pascal_gov_task_set_realtime(int priority)
+int pg_task_set_rt_prio(int priority)
 {
-	struct sched_param param = {0};
+	struct sched_param param = { 0 };
 	param.sched_priority = priority;
 
 	if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
@@ -68,7 +68,7 @@ int pascal_gov_task_set_realtime(int priority)
 	return 0;
 }
 
-int pascal_gov_task_set_io_priority(int ioprio_class, int ioprio_data)
+int pg_task_set_io_prio(int ioprio_class, int ioprio_data)
 {
 	const int ioprio_val = (ioprio_class << 13) | ioprio_data;
 
@@ -82,9 +82,9 @@ int pascal_gov_task_set_io_priority(int ioprio_class, int ioprio_data)
 	return 0;
 }
 
-int pascal_gov_task_enforce_efficiency(void)
+int pg_task_set_core_efficiency(void)
 {
-	if (pascal_gov_topology_apply_little_core() == -1) {
+	if (pg_topo_apply_little_core() == -1) {
 		int err = errno;
 		LOGE("task: failed to apply topology affinity err=%d", err);
 		return -err;
@@ -94,7 +94,7 @@ int pascal_gov_task_enforce_efficiency(void)
 	return 0;
 }
 
-int pascal_gov_task_maximize_timer_slack(unsigned long slack_ns)
+int pg_task_set_timer_slack(unsigned long slack_ns)
 {
 	if (prctl(PR_SET_TIMERSLACK, slack_ns) == -1) {
 		int err = errno;
@@ -106,9 +106,9 @@ int pascal_gov_task_maximize_timer_slack(unsigned long slack_ns)
 	return 0;
 }
 
-int pascal_gov_task_limit_uclamp(uint32_t util_max)
+int pg_task_set_uclamp(uint32_t util_max)
 {
-	struct pascal_gov_sched_attr attr = {0};
+	struct pg_sched_attr attr = { 0 };
 	attr.size = sizeof(attr);
 	attr.sched_flags = SCHED_FLAG_KEEP_POLICY | SCHED_FLAG_UTIL_CLAMP_MAX;
 	attr.sched_util_max = util_max;

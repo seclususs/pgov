@@ -2,151 +2,120 @@
 // Copyright (C) 2026 seclususs
 
 #define _GNU_SOURCE
-#include "daemon/daemon.h"
-#include "daemon/config.h"
-#include "daemon/detect.h"
-#include "daemon/epoll.h"
-#include "daemon/lockfile.h"
-#include "daemon/logger.h"
-#include "daemon/memory.h"
-#include "daemon/paths.h"
-#include "daemon/properties.h"
-#include "daemon/rlimit.h"
-#include "daemon/scan.h"
-#include "daemon/signal.h"
-#include "daemon/state.h"
-#include "daemon/task.h"
-#include "pascal_gov/governor.h"
-#include "pascal_gov/poller.h"
-#include "pascal_gov/psi.h"
-#include "pascal_gov/sensor.h"
-#include "pascal_gov/sysfs.h"
-#include "pascal_gov/thermal.h"
+#include "daemon.h"
+#include "pg/config.h"
+#include "detect.h"
+#include "epoll.h"
+#include "lockfile.h"
+#include "pg/log.h"
+#include "memory.h"
+#include "paths.h"
+#include "prop.h"
+#include "rlimit.h"
+#include "scan.h"
+#include "pg/signal.h"
+#include "pg/state.h"
+#include "task.h"
+#include "pg/gov.h"
+#include "pg/poll.h"
+#include "psi.h"
+#include "sensor.h"
+#include "sysfs.h"
+#include "pg/thermal.h"
 #include <fcntl.h>
 #include <unistd.h>
 
-static pascal_gov_context context;
+static struct pg_context context;
 
 static void init_os_environment(void)
 {
-	pascal_gov_signal_catch_crashes();
-	pascal_gov_memory_shield();
-	pascal_gov_memory_lock();
-	pascal_gov_rlimit_set_max_fd();
-	pascal_gov_rlimit_set_stack(PASCAL_GOV_STACK_SIZE);
-	pascal_gov_task_enforce_efficiency();
-	pascal_gov_task_set_realtime(PASCAL_GOV_RT_PRIORITY);
-	pascal_gov_task_maximize_timer_slack(PASCAL_GOV_TIMER_SLACK_NS);
-	pascal_gov_task_limit_uclamp(PASCAL_GOV_UCLAMP_MAX);
-	pascal_gov_task_set_io_priority(PASCAL_GOV_IOPRIO_CLASS,
-					PASCAL_GOV_IOPRIO_DATA);
+	pg_signal_catch_crash();
+	pg_memory_shield();
+	pg_memory_lock();
+	pg_rlimit_set_max_fd();
+	pg_rlimit_set_stack(PG_STACK_SIZE);
+	pg_task_set_core_efficiency();
+	pg_task_set_rt_prio(PG_RT_PRIORITY);
+	pg_task_set_timer_slack(PG_TIMER_SLACK_NS);
+	pg_task_set_uclamp(PG_UCLAMP_MAX);
+	pg_task_set_io_prio(PG_IOPRIO_CLASS, PG_IOPRIO_DATA);
 }
 
-static void init_sysfs_caches(pascal_gov_context *ctx)
+static void init_sysfs_caches(struct pg_context *ctx)
 {
-	pascal_gov_sysfs_cache_init(&ctx->sched_latency,
-				    PASCAL_GOV_PATH_SCHED_LATENCY_NS);
-
-	pascal_gov_sysfs_cache_init(&ctx->sched_min_granularity,
-				    PASCAL_GOV_PATH_SCHED_MIN_GRANULARITY_NS);
-
-	pascal_gov_sysfs_cache_init(
-		&ctx->sched_wakeup_granularity,
-		PASCAL_GOV_PATH_SCHED_WAKEUP_GRANULARITY_NS);
-
-	pascal_gov_sysfs_cache_init(&ctx->sched_migration_cost,
-				    PASCAL_GOV_PATH_SCHED_MIGRATION_COST_NS);
-
-	pascal_gov_sysfs_cache_init(&ctx->sched_walt_init,
-				    PASCAL_GOV_PATH_SCHED_WALT_INIT);
-
-	pascal_gov_sysfs_cache_init(&ctx->sched_uclamp_min,
-				    PASCAL_GOV_PATH_SCHED_UCLAMP_MIN);
+	pg_sysfs_cache_init(&ctx->sched_lat, PG_PATH_SCHED_LAT);
+	pg_sysfs_cache_init(&ctx->sched_gran, PG_PATH_SCHED_GRAN);
+	pg_sysfs_cache_init(&ctx->sched_wake, PG_PATH_SCHED_WAKEUP);
+	pg_sysfs_cache_init(&ctx->sched_mig, PG_PATH_SCHED_MIG);
+	pg_sysfs_cache_init(&ctx->sched_walt, PG_PATH_SCHED_WALT);
+	pg_sysfs_cache_init(&ctx->sched_uclamp, PG_PATH_SCHED_UCLAMP);
 }
 
-static int init_sensors_and_triggers(pascal_gov_context *ctx)
+static int init_sensors_and_triggers(struct pg_context *ctx)
 {
 	char cpu_thermal_path[256];
-	pascal_gov_scan_thermal_zone(cpu_thermal_path,
-				     sizeof(cpu_thermal_path));
-
+	pg_scan_thermal_zone(cpu_thermal_path, sizeof(cpu_thermal_path));
 	LOGD("daemon: cpu thermal sensor mapped to %s", cpu_thermal_path);
+	pg_sensor_init_cpu_temp(&ctx->cpu_temp_sensor, cpu_thermal_path);
+	pg_sensor_init_bat_temp(&ctx->bat_temp_sensor, PG_PATH_BATTERY_TEMP);
+	pg_sensor_init_bat_cap(&ctx->bat_cap_sensor, PG_PATH_BATTERY_CAP);
 
-	pascal_gov_sensor_init_cpu_thermal(&ctx->cpu_temp_sensor,
-					   cpu_thermal_path);
+	ctx->trg_fd = pg_psi_open_trg(PG_PATH_PSI_CPU, PG_CFG_CTRL.thresh_us,
+				      PG_CFG_CTRL.win_us);
 
-	pascal_gov_sensor_init_bat_thermal(&ctx->bat_temp_sensor,
-					   PASCAL_GOV_PATH_BATTERY_TEMP);
-
-	pascal_gov_sensor_init_battery(&ctx->bat_capacity_sensor,
-				       PASCAL_GOV_PATH_BATTERY_CAPACITY);
-
-	ctx->trigger_fd = pascal_gov_psi_register_trigger(
-		PASCAL_GOV_PATH_PSI_CPU,
-		PASCAL_GOV_CONFIG_CONTROLLER.psi_threshold_us,
-		PASCAL_GOV_CONFIG_CONTROLLER.psi_window_us);
-
-	if (ctx->trigger_fd < 0) {
-		LOGE("daemon: failed inject err=%d", ctx->trigger_fd);
+	if (ctx->trg_fd < 0) {
+		LOGE("daemon: failed inject err=%d", ctx->trg_fd);
 		return -1;
 	}
 
-	pascal_gov_psi_init(&ctx->psi_monitor, PASCAL_GOV_PATH_PSI_CPU,
-			    &PASCAL_GOV_CONFIG_KALMAN);
+	pg_psi_init(&ctx->psi, PG_PATH_PSI_CPU, &PG_CFG_KALMAN);
 
-	ctx->signal_fd = pascal_gov_signal_init();
-	if (ctx->signal_fd < 0) {
+	ctx->sig_fd = pg_signal_init();
+	if (ctx->sig_fd < 0)
 		return -1;
-	}
 
-	pascal_gov_thermal_init(&ctx->thermal_state);
-
-	pascal_gov_poller_init(
-		&ctx->poller_state,
-		PASCAL_GOV_CONFIG_CONTROLLER.poll_weight_pressure,
-		PASCAL_GOV_CONFIG_CONTROLLER.poll_weight_derivative,
-		&PASCAL_GOV_CONFIG_POLLER);
+	pg_thermal_init(&ctx->thermal_state);
+	pg_poll_init(&ctx->poll_state, PG_CFG_CTRL.press_wt,
+		     PG_CFG_CTRL.deriv_wt, &PG_CFG_POLL);
 
 	return 0;
 }
 
-int pascal_gov_daemon_init(void)
+int pg_daemon_init(void)
 {
 	int status = 0;
 
 	LOGI("daemon: initiating daemon sequence");
 
-	if (pascal_gov_detect_privilege() != 0)
+	if (pg_detect_privilege() != 0)
 		return 1;
 
-	if (pascal_gov_lockfile_acquire(PASCAL_GOV_LOCK_PATH) != 0)
+	if (pg_lockfile_acquire(PG_PATH_LOCK) != 0)
 		return 1;
 
 	LOGD("daemon: waiting for android subsystem");
-	pascal_gov_properties_wait_boot();
+	pg_prop_wait_boot();
 
 	LOGD("daemon: configuring os parameters");
 	init_os_environment();
 
-	if (!pascal_gov_detect_cpu_psi()) {
-		LOGE("daemon: abort, cpu psi node is strictly required");
+	if (!pg_detect_cpu_psi())
 		return 1;
-	}
 
 	LOGD("daemon: initializing state context");
-	context.shutdown_requested = false;
-	context.next_wake_ms = PASCAL_GOV_MIN_POLLING_MS;
-	context.cpu_load_state.first_run = true;
-	context.cpu_load_state.psi_value = 0.0F;
-	context.cpu_load_state.rate = 0.0F;
-	context.cpu_load_state.prev_integral = 0.0F;
+	context.shutdown_req = false;
+	context.next_wake = PG_MIN_POLL_MS;
+	context.load_state.first_run = true;
+	context.load_state.psi_val = 0.0F;
+	context.load_state.rate = 0.0F;
+	context.load_state.prev_integ = 0.0F;
 	context.epoll_fd = -1;
-	context.signal_fd = -1;
-	context.trigger_fd = -1;
-	context.psi_monitor.fd = -1;
+	context.sig_fd = -1;
+	context.trg_fd = -1;
+	context.psi.fd = -1;
 	context.cpu_temp_sensor.fd = -1;
 	context.bat_temp_sensor.fd = -1;
-	context.bat_capacity_sensor.fd = -1;
+	context.bat_cap_sensor.fd = -1;
 	context.on_trigger = NULL;
 	context.on_timeout = NULL;
 
@@ -157,42 +126,35 @@ int pascal_gov_daemon_init(void)
 		goto cleanup;
 	}
 
-	clock_gettime(CLOCK_MONOTONIC, &context.last_battery_check);
+	clock_gettime(CLOCK_MONOTONIC, &context.last_bat);
+	pg_sensor_read_bat_cap(&context.bat_cap_sensor, &context.bat_lvl);
+	pg_sensor_read_bat_temp(&context.bat_temp_sensor, &context.bat_temp);
 
-	pascal_gov_sensor_read_battery(&context.bat_capacity_sensor,
-				       &context.cached_battery_level);
-
-	pascal_gov_sensor_read_bat_temp(&context.bat_temp_sensor,
-					&context.cached_battery_temp);
-
-	pascal_gov_governor_init(&context);
-
-	context.on_trigger = pascal_gov_governor_process_cpu;
-	context.on_timeout = pascal_gov_governor_process_cpu;
-
+	pg_gov_init(&context);
+	context.on_trigger = pg_gov_process_cpu;
+	context.on_timeout = pg_gov_process_cpu;
 	LOGI("daemon: entering epoll reactor loop");
-	status = pascal_gov_epoll_run(&context);
+	status = pg_epoll_run(&context);
 
 	LOGI("daemon: reactor shutdown cleanly status=%d", status);
 
 cleanup:
-	if (context.trigger_fd >= 0)
-		pascal_gov_psi_unregister_trigger(context.trigger_fd);
+	if (context.trg_fd >= 0)
+		pg_psi_close_trg(context.trg_fd);
 
-	if (context.signal_fd >= 0)
-		pascal_gov_signal_destroy(context.signal_fd);
+	if (context.sig_fd >= 0)
+		pg_signal_close(context.sig_fd);
 
-	pascal_gov_psi_destroy(&context.psi_monitor);
-	pascal_gov_sensor_destroy_thermal(&context.cpu_temp_sensor);
-	pascal_gov_sensor_destroy_thermal(&context.bat_temp_sensor);
-	pascal_gov_sensor_destroy_battery(&context.bat_capacity_sensor);
-
-	pascal_gov_sysfs_cache_destroy(&context.sched_latency);
-	pascal_gov_sysfs_cache_destroy(&context.sched_min_granularity);
-	pascal_gov_sysfs_cache_destroy(&context.sched_wakeup_granularity);
-	pascal_gov_sysfs_cache_destroy(&context.sched_migration_cost);
-	pascal_gov_sysfs_cache_destroy(&context.sched_walt_init);
-	pascal_gov_sysfs_cache_destroy(&context.sched_uclamp_min);
+	pg_psi_cleanup(&context.psi);
+	pg_sensor_temp_close(&context.cpu_temp_sensor);
+	pg_sensor_temp_close(&context.bat_temp_sensor);
+	pg_sensor_bat_close(&context.bat_cap_sensor);
+	pg_sysfs_cache_cleanup(&context.sched_lat);
+	pg_sysfs_cache_cleanup(&context.sched_gran);
+	pg_sysfs_cache_cleanup(&context.sched_gran);
+	pg_sysfs_cache_cleanup(&context.sched_mig);
+	pg_sysfs_cache_cleanup(&context.sched_walt);
+	pg_sysfs_cache_cleanup(&context.sched_uclamp);
 
 	return status;
 }
