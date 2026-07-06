@@ -14,6 +14,7 @@
 #include "rlimit.h"
 #include "scan.h"
 #include "pg/signal.h"
+#include "pg/tune.h"
 #include "pg/state.h"
 #include "task.h"
 #include "pg/gov.h"
@@ -120,6 +121,9 @@ int pg_daemon_init(void)
 	context.on_timeout = NULL;
 
 	init_sysfs_caches(&context);
+
+	LOGD("daemon: executing limits tuning");
+	pg_tune_limits();
 
 	if (init_sensors_and_triggers(&context) != 0) {
 		status = 1;

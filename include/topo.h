@@ -4,6 +4,10 @@
 #ifndef PGOV_TOPO_H
 #define PGOV_TOPO_H
 
-int pg_topo_apply_little_core(void);
+#include <stdint.h>
+
+int pg_topo_set_little_core(void);
+int32_t pg_topo_get_core_count(void);
+int32_t pg_topo_get_max_freq_khz(void);
 
 #endif // PGOV_TOPO_H

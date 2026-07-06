@@ -5,15 +5,34 @@
 #include "topo.h"
 #include "pg/log.h"
 #include "compiler.h"
+#include "parser.h"
 #include "sysfs.h"
 #include <fcntl.h>
 #include <sched.h>
 #include <stdbool.h>
-#include <stdio.h>
 #include <unistd.h>
 
 #define CPU_CAPACITY "/sys/devices/system/cpu/cpu%d/cpu_capacity"
 #define CPU_MAX_FREQ "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq"
+
+static void format_path(char *RESTRICT buf, const char *RESTRICT fmt,
+			int32_t cpu)
+{
+	size_t pos = 0;
+	size_t i = 0;
+
+	while (fmt[i] != '\0') {
+		if (fmt[i] == '%' && fmt[i + 1] == 'd') {
+			pos += pg_fmt_u32(cpu, buf + pos);
+			i += 2;
+			continue;
+		}
+
+		buf[pos++] = fmt[i++];
+	}
+
+	buf[pos] = '\0';
+}
 
 static bool build_cpuset(long num_cores, const char *RESTRICT fmt,
 			 cpu_set_t *RESTRICT cpuset)
@@ -21,48 +40,82 @@ static bool build_cpuset(long num_cores, const char *RESTRICT fmt,
 	long min_val = INT32_MAX;
 	bool found = false;
 	char buf[128];
+	int i;
 
 	CPU_ZERO(cpuset);
 
-	for (int i = 0; i < num_cores; ++i) {
-		(void)snprintf(buf, sizeof(buf), fmt, i);
+	for (i = 0; i < num_cores; ++i) {
+		int32_t val;
 
-		int32_t val = pg_sysfs_read_i32(buf);
+		format_path(buf, fmt, i);
+		val = pg_sysfs_read_i32(buf);
 		if (val <= 0)
 			continue;
 
 		found = true;
 
+		if (val > min_val)
+			continue;
+
 		if (val < min_val) {
 			min_val = val;
 			CPU_ZERO(cpuset);
-			CPU_SET(i, cpuset);
-		} else if (val == min_val)
-			CPU_SET(i, cpuset);
+		}
+
+		CPU_SET(i, cpuset);
 	}
 
 	return found;
 }
 
-int pg_topo_apply_little_core(void)
+int pg_topo_set_little_core(void)
 {
 	long num_cores = sysconf(_SC_NPROCESSORS_CONF);
+	cpu_set_t little_cpuset;
+	int i;
+
 	if (num_cores <= 0)
 		return -1;
 
-	cpu_set_t little_cpuset;
+	if (build_cpuset(num_cores, CPU_CAPACITY, &little_cpuset))
+		return sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset);
 
-	bool success =
-		(bool)(build_cpuset(num_cores, CPU_CAPACITY, &little_cpuset) ||
-		       build_cpuset(num_cores, CPU_MAX_FREQ, &little_cpuset));
+	if (build_cpuset(num_cores, CPU_MAX_FREQ, &little_cpuset))
+		return sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset);
 
-	if (!success) {
-		LOGW("topology: detection failed, binding to all cores");
+	LOGW("topology: detection failed, binding to all cores");
 
-		CPU_ZERO(&little_cpuset);
-		for (int i = 0; i < num_cores; ++i)
-			CPU_SET(i, &little_cpuset);
-	}
+	CPU_ZERO(&little_cpuset);
+	for (i = 0; i < num_cores; ++i)
+		CPU_SET(i, &little_cpuset);
 
 	return sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset);
+}
+
+int32_t pg_topo_get_core_count(void)
+{
+	long cores = sysconf(_SC_NPROCESSORS_CONF);
+	return (cores > 0) ? (int32_t)cores : 0;
+}
+
+int32_t pg_topo_get_max_freq_khz(void)
+{
+	long num_cores = sysconf(_SC_NPROCESSORS_CONF);
+	int32_t freq = 0;
+	char buf[128];
+	int i;
+
+	if (num_cores <= 0)
+		return 0;
+
+	for (i = 0; i < num_cores; ++i) {
+		int32_t val;
+
+		format_path(buf, CPU_MAX_FREQ, i);
+		val = pg_sysfs_read_i32(buf);
+		if (val > freq)
+			freq = val;
+	}
+
+	return freq;
 }

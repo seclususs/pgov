@@ -179,4 +179,10 @@ static ALWAYS_INLINE CONST uint64_t pg_math_san_quant_u64(q16_t val,
 	return val_ns - remainder;
 }
 
+static ALWAYS_INLINE CONST q16_t pg_math_lerp(q16_t min, q16_t max, q16_t v)
+{
+	q16_t range = max - min;
+	return min + q16_mul(range, v);
+}
+
 #endif // PG_MATH_H

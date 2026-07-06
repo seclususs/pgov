@@ -30,18 +30,7 @@
 #define PG_IOPRIO_CLASS 2
 #define PG_IOPRIO_DATA 0
 
-static const struct pg_cpu_lim LIM_CPU = { .min_lat = FLOAT_TO_Q16(8.0F),
-					   .max_lat = FLOAT_TO_Q16(20.0F),
-					   .min_gran = FLOAT_TO_Q16(2.5F),
-					   .max_gran = FLOAT_TO_Q16(6.5F),
-					   .min_wake = FLOAT_TO_Q16(1.5F),
-					   .max_wake = FLOAT_TO_Q16(6.5F),
-					   .min_mig = FLOAT_TO_Q16(0.2F),
-					   .max_mig = FLOAT_TO_Q16(0.6F),
-					   .min_walt = FLOAT_TO_Q16(10.0F),
-					   .max_walt = FLOAT_TO_Q16(40.0F),
-					   .min_uclamp = FLOAT_TO_Q16(0.0F),
-					   .max_uclamp = FLOAT_TO_Q16(384.0F) };
+extern struct pg_cpu_lim LIM_CPU;
 
 static const struct pg_cpu_cfg PG_CFG_CPU = {
 	.lat_gran_rat = FLOAT_TO_Q16(0.34F),
