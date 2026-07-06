@@ -1,4 +1,4 @@
-name: Build Pascal Governor
+name: Build PGOV
 
 on:
   push:
@@ -8,8 +8,12 @@ on:
 
 jobs:
   build:
-    name: Compile for Android (arm64-v8a)
+    name: Compile ${{ matrix.arch }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, arm32]
 
     steps:
       - name: Checkout Code
@@ -28,19 +32,19 @@ jobs:
       - name: Configure CMake Release
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-        run: cmake --preset android-release
+        run: cmake --preset ${{ matrix.arch }}-release
 
-      - name: Build Project
+      - name: Build Release
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-        run: cmake --build --preset release
+        run: cmake --build --preset ${{ matrix.arch }}-release
 
       - name: Configure CMake Debug
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-        run: cmake --preset android-debug
+        run: cmake --preset ${{ matrix.arch }}-debug
 
-      - name: Build Debug Version
+      - name: Build Debug
         env:
           ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
-        run: cmake --build --preset debug
+        run: cmake --build --preset ${{ matrix.arch }}-debug
