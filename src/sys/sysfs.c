@@ -29,7 +29,7 @@ void pg_sysfs_cache_cleanup(struct pg_sysfs_cache *cache)
 	cache->active = false;
 }
 
-long pg_sysfs_read_long(const char *path)
+int32_t pg_sysfs_read_i32(const char *path)
 {
 	int fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0)
@@ -46,7 +46,7 @@ long pg_sysfs_read_long(const char *path)
 	bool valid;
 	int32_t val = pg_parse_i32((const uint8_t *)buf, (size_t)bytes, &valid);
 
-	return (int)valid ? (long)val : -1;
+	return (int)valid ? val : -1;
 }
 
 int pg_sysfs_write_strm(int fd, uint64_t value)

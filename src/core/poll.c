@@ -27,6 +27,7 @@ static inline uint64_t poll_next_random(struct pg_poll_state *state,
 	if (UNLIKELY(range == 0))
 		return 0;
 
+#if defined(__SIZEOF_INT128__)
 	state->rng_state = (state->rng_state * 6364136223846793005ULL) + 1ULL;
 
 	uint64_t limit = range * 2;
@@ -36,6 +37,15 @@ static inline uint64_t poll_next_random(struct pg_poll_state *state,
 				    (unsigned __int128)limit_plus_one;
 
 	return (uint64_t)(product >> 64);
+#else
+	uint64_t x = state->rng_state;
+	x ^= x << 13;
+	x ^= x >> 7;
+	x ^= x << 17;
+	state->rng_state = x;
+
+	return x % range;
+#endif
 }
 
 static inline uint64_t poll_discrete(struct pg_poll_state *state, uint64_t ivl,

@@ -41,10 +41,36 @@ static ALWAYS_INLINE q16_t q16_div(q16_t a, q16_t b)
 	return (q16_t)((((q32_t)a) << Q16_SHIFT) / b);
 }
 
+#if defined(__SIZEOF_INT128__)
 static ALWAYS_INLINE q32_t q32_mul(q32_t a, q32_t b)
 {
 	return (q32_t)(((unsigned __int128)a * (unsigned __int128)b) >> 32);
 }
+#else
+static ALWAYS_INLINE q32_t q32_mul(q32_t a, q32_t b)
+{
+	uint64_t al = (uint32_t)a;
+	uint64_t ah = (uint64_t)a >> 32;
+	uint64_t bl = (uint32_t)b;
+	uint64_t bh = (uint64_t)b >> 32;
+
+	uint64_t al_bl = al * bl;
+	uint64_t ah_bl = ah * bl;
+	uint64_t al_bh = al * bh;
+	uint64_t ah_bh = ah * bh;
+
+	uint64_t mid = ah_bl + al_bh + (al_bl >> 32);
+	uint64_t res = (ah_bh << 32) + mid;
+
+	if (a < 0)
+		res -= (uint64_t)b << 32;
+
+	if (b < 0)
+		res -= (uint64_t)a << 32;
+
+	return (q32_t)res;
+}
+#endif
 
 static ALWAYS_INLINE CONST q16_t pg_math_clamp(q16_t val, q16_t min, q16_t max)
 {

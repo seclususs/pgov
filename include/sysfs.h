@@ -26,7 +26,7 @@ void pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
 
 void pg_sysfs_cache_cleanup(struct pg_sysfs_cache *cache);
 
-long pg_sysfs_read_long(const char *path);
+int32_t pg_sysfs_read_i32(const char *path);
 
 int pg_sysfs_write_strm(int fd, uint64_t value);
 

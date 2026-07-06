@@ -15,6 +15,8 @@
 #ifndef __NR_ioprio_set
 #if defined(__aarch64__)
 #define __NR_ioprio_set 30
+#elif defined(__arm__)
+#define __NR_ioprio_set 314
 #else
 #define __NR_ioprio_set 251
 #endif
@@ -23,6 +25,8 @@
 #ifndef __NR_sched_setattr
 #if defined(__aarch64__)
 #define __NR_sched_setattr 274
+#elif defined(__arm__)
+#define __NR_sched_setattr 381
 #else
 #define __NR_sched_setattr 380
 #endif

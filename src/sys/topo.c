@@ -7,7 +7,6 @@
 #include "compiler.h"
 #include "sysfs.h"
 #include <fcntl.h>
-#include <limits.h>
 #include <sched.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -19,7 +18,7 @@
 static bool build_cpuset(long num_cores, const char *RESTRICT fmt,
 			 cpu_set_t *RESTRICT cpuset)
 {
-	long min_val = LONG_MAX;
+	long min_val = INT32_MAX;
 	bool found = false;
 	char buf[128];
 
@@ -28,7 +27,7 @@ static bool build_cpuset(long num_cores, const char *RESTRICT fmt,
 	for (int i = 0; i < num_cores; ++i) {
 		(void)snprintf(buf, sizeof(buf), fmt, i);
 
-		long val = pg_sysfs_read_long(buf);
+		int32_t val = pg_sysfs_read_i32(buf);
 		if (val <= 0)
 			continue;
 

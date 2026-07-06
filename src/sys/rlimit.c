@@ -19,8 +19,8 @@ int pg_rlimit_set_max_fd(void)
 		return -err;
 	}
 
-	LOGD("rlimit: fd limit maximized to %lu",
-	     (unsigned long)rl_fd.rlim_cur);
+	LOGD("rlimit: fd limit maximized to %llu",
+	     (unsigned long long)rl_fd.rlim_cur);
 	return 0;
 }
 
@@ -41,7 +41,7 @@ int pg_rlimit_set_stack(size_t bytes)
 		return -err;
 	}
 
-	LOGD("rlimit: stack bounded to %lu bytes",
-	     (unsigned long)rl_stack.rlim_cur);
+	LOGD("rlimit: stack bounded to %llu bytes",
+	     (unsigned long long)rl_stack.rlim_cur);
 	return 0;
 }
