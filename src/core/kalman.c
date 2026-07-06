@@ -2,8 +2,6 @@
 // Copyright (C) 2026 seclususs
 
 #include "pg/kalman.h"
-#include "pg/math.h"
-#include <math.h>
 
 void pg_kalman_init(struct pg_kalman_state *RESTRICT state,
 		    const struct pg_kalman_cfg *RESTRICT cfg)
@@ -15,75 +13,82 @@ void pg_kalman_init(struct pg_kalman_state *RESTRICT state,
 void pg_kalman_reset(struct pg_kalman_state *state)
 {
 	state->first_run = true;
-	state->x_pos = 0.0F;
-	state->x_vel = 0.0F;
-	state->p00 = 100.0F;
-	state->p01 = 0.0F;
-	state->p10 = 0.0F;
-	state->p11 = 100.0F;
-	state->nis = 0.0F;
+	state->x_pos = 0;
+	state->x_vel = 0;
+
+	state->p00 = Q16_TO_Q32(INT_TO_Q16(100));
+	state->p01 = 0;
+	state->p10 = 0;
+	state->p11 = Q16_TO_Q32(INT_TO_Q16(100));
+
+	state->nis = 0;
 }
 
-float pg_kalman_update(struct pg_kalman_state *state, float z_meas,
-		       float dt_sec)
+q16_t pg_kalman_update(struct pg_kalman_state *state, q16_t z_meas,
+		       q16_t dt_sec)
 {
-	if (UNLIKELY(!__builtin_isfinite(z_meas)))
-		return state->x_pos;
+	q16_t z = pg_math_clamp(z_meas, 0, INT_TO_Q16(500));
 
-	float z = pg_math_clampf(z_meas, 0.0F, 500.0F);
-
-	if (UNLIKELY(dt_sec > 5.0F))
+	if (UNLIKELY(dt_sec > INT_TO_Q16(5)))
 		pg_kalman_reset(state);
 
 	if (UNLIKELY(state->first_run)) {
 		state->x_pos = z;
-		state->x_vel = 0.0F;
+		state->x_vel = 0;
 		state->first_run = false;
 		return z;
 	}
 
-	float dt = fmaxf(dt_sec, 0.0001F);
-	float dt2 = dt * dt;
-	float dt3 = dt2 * dt;
-	float dt4 = dt2 * dt2;
+	q16_t dt = (dt_sec > FLOAT_TO_Q16(0.0001F)) ? dt_sec :
+						      FLOAT_TO_Q16(0.0001F);
 
-	float x_pos_pred = state->x_pos + (state->x_vel * dt);
-	float x_vel_pred = state->x_vel;
+	q32_t dt_q32 = Q16_TO_Q32(dt);
+	q32_t dt2 = q32_mul(dt_q32, dt_q32);
+	q32_t dt3 = q32_mul(dt2, dt_q32);
+	q32_t dt4 = q32_mul(dt3, dt_q32);
 
-	float q_scale = state->cfg.q_vel;
-	float q00 = (q_scale * dt4 * 0.25F) + (state->cfg.q_pos * dt);
-	float q01 = q_scale * dt3 * 0.5F;
-	float q10 = q01;
-	float q11 = (q_scale * dt2) + (state->cfg.q_vel * dt);
+	q16_t x_pos_pred = state->x_pos + q16_mul(state->x_vel, dt);
+	q16_t x_vel_pred = state->x_vel;
 
-	float f_p00 = state->p00 + (state->p10 * dt);
-	float f_p01 = state->p01 + (state->p11 * dt);
-	float f_p10 = state->p10;
-	float f_p11 = state->p11;
+	q32_t q_pos_q32 = Q16_TO_Q32(state->cfg.q_pos);
+	q32_t q_vel_q32 = Q16_TO_Q32(state->cfg.q_vel);
 
-	float alpha = state->cfg.fade_fact;
-	float p00_pred = ((f_p00 + (f_p01 * dt)) * alpha) + q00;
-	float p01_pred = (f_p01 * alpha) + q01;
-	float p10_pred = ((f_p10 + (f_p11 * dt)) * alpha) + q10;
-	float p11_pred = (f_p11 * alpha) + q11;
+	q32_t q00 = (q32_mul(q_vel_q32, dt4) / 4) + q32_mul(q_pos_q32, dt_q32);
+	q32_t q01 = q32_mul(q_vel_q32, dt3) / 2;
+	q32_t q10 = q01;
+	q32_t q11 = q32_mul(q_vel_q32, dt2) + q32_mul(q_pos_q32, dt_q32);
 
-	float y = z - x_pos_pred;
-	float s = p00_pred + state->cfg.r_meas;
+	q32_t f_p00 = state->p00 + q32_mul(state->p10, dt_q32);
+	q32_t f_p01 = state->p01 + q32_mul(state->p11, dt_q32);
+	q32_t f_p10 = state->p10;
+	q32_t f_p11 = state->p11;
 
-	float inv_s = (fabsf(s) > 1e-9F) ? (1.0F / s) : 0.0F;
+	q32_t alpha = Q16_TO_Q32(state->cfg.f_fac);
+	q32_t p00_pred = q32_mul(f_p00 + q32_mul(f_p01, dt_q32), alpha) + q00;
+	q32_t p01_pred = q32_mul(f_p01, alpha) + q01;
+	q32_t p10_pred = q32_mul(f_p10 + q32_mul(f_p11, dt_q32), alpha) + q10;
+	q32_t p11_pred = q32_mul(f_p11, alpha) + q11;
 
-	float k0 = p00_pred * inv_s;
-	float k1 = p10_pred * inv_s;
+	q16_t y = z - x_pos_pred;
+	q16_t p00_q16 = Q32_TO_Q16(p00_pred);
+	q16_t s = p00_q16 + state->cfg.r_meas;
+	q16_t inv_s = (s > 0) ? q16_div(Q16_ONE, s) : 0;
 
-	state->x_pos = x_pos_pred + (k0 * y);
-	state->x_vel = x_vel_pred + (k1 * y);
+	q16_t k0 = q16_mul(p00_q16, inv_s);
+	q16_t k1 = q16_mul(Q32_TO_Q16(p10_pred), inv_s);
 
-	state->p00 = (1.0F - k0) * p00_pred;
-	state->p01 = (1.0F - k0) * p01_pred;
-	state->p10 = (-k1 * p00_pred) + p10_pred;
-	state->p11 = (-k1 * p01_pred) + p11_pred;
+	state->x_pos = x_pos_pred + q16_mul(k0, y);
+	state->x_vel = x_vel_pred + q16_mul(k1, y);
 
-	state->nis = y * y * inv_s;
+	q16_t term_k0 = Q16_ONE - k0;
+	state->p00 = q32_mul(Q16_TO_Q32(term_k0), p00_pred);
+	state->p01 = q32_mul(Q16_TO_Q32(term_k0), p01_pred);
 
-	return fmaxf(state->x_pos, 0.0F);
+	state->p10 = p10_pred - q32_mul(Q16_TO_Q32(k1), p00_pred);
+	state->p11 = p11_pred - q32_mul(Q16_TO_Q32(k1), p01_pred);
+
+	q32_t y_q32 = Q16_TO_Q32(y);
+	q32_t y_sq = q32_mul(y_q32, y_q32);
+	state->nis = Q32_TO_Q16(q32_mul(y_sq, Q16_TO_Q32(inv_s)));
+	return (state->x_pos > 0) ? state->x_pos : 0;
 }

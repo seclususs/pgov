@@ -55,21 +55,24 @@ static inline void pg_str_build_path(char *RESTRICT out, size_t len,
 				     const char *RESTRICT sub,
 				     const char *RESTRICT file)
 {
+	if (UNLIKELY(len == 0))
+		return;
+
 	size_t i = 0;
 
-	while (*dir && i < len - 1)
+	while (*dir && i + 1 < len)
 		out[i++] = *dir++;
 
-	if (i < len - 1)
+	if (i + 1 < len)
 		out[i++] = '/';
 
-	while (*sub && i < len - 1)
+	while (*sub && i + 1 < len)
 		out[i++] = *sub++;
 
-	if (i < len - 1)
+	if (i + 1 < len)
 		out[i++] = '/';
 
-	while (*file && i < len - 1)
+	while (*file && i + 1 < len)
 		out[i++] = *file++;
 
 	out[i] = '\0';

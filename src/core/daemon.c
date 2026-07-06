@@ -48,7 +48,7 @@ static void init_sysfs_caches(struct pg_context *ctx)
 	pg_sysfs_cache_init(&ctx->sched_wake, PG_PATH_SCHED_WAKEUP);
 	pg_sysfs_cache_init(&ctx->sched_mig, PG_PATH_SCHED_MIG);
 	pg_sysfs_cache_init(&ctx->sched_walt, PG_PATH_SCHED_WALT);
-	pg_sysfs_cache_init(&ctx->sched_uclamp, PG_PATH_SCHED_UCLAMP);
+	pg_sysfs_cache_init(&ctx->sched_ucl, PG_PATH_SCHED_UCLAMP);
 }
 
 static int init_sensors_and_triggers(struct pg_context *ctx)
@@ -106,9 +106,9 @@ int pg_daemon_init(void)
 	context.shutdown_req = false;
 	context.next_wake = PG_MIN_POLL_MS;
 	context.load_state.first_run = true;
-	context.load_state.psi_val = 0.0F;
-	context.load_state.rate = 0.0F;
-	context.load_state.prev_integ = 0.0F;
+	context.load_state.psi_val = 0;
+	context.load_state.rate = 0;
+	context.load_state.prev_integ = 0;
 	context.epoll_fd = -1;
 	context.sig_fd = -1;
 	context.trg_fd = -1;
@@ -151,10 +151,10 @@ cleanup:
 	pg_sensor_bat_close(&context.bat_cap_sensor);
 	pg_sysfs_cache_cleanup(&context.sched_lat);
 	pg_sysfs_cache_cleanup(&context.sched_gran);
-	pg_sysfs_cache_cleanup(&context.sched_gran);
+	pg_sysfs_cache_cleanup(&context.sched_wake);
 	pg_sysfs_cache_cleanup(&context.sched_mig);
 	pg_sysfs_cache_cleanup(&context.sched_walt);
-	pg_sysfs_cache_cleanup(&context.sched_uclamp);
+	pg_sysfs_cache_cleanup(&context.sched_ucl);
 
 	return status;
 }

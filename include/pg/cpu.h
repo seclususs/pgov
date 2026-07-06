@@ -5,108 +5,109 @@
 #define PG_CPU_H
 
 #include "compiler.h"
+#include "pg/math.h"
 #include <stdbool.h>
 #include <stdint.h>
 
 struct pg_cpu_lim {
-	float min_lat;
-	float max_lat;
-	float min_gran;
-	float max_gran;
-	float min_wake;
-	float max_wake;
-	float min_mig;
-	float max_mig;
-	float min_walt;
-	float max_walt;
-	float min_uclamp;
-	float max_uclamp;
+	q16_t min_lat;
+	q16_t max_lat;
+	q16_t min_gran;
+	q16_t max_gran;
+	q16_t min_wake;
+	q16_t max_wake;
+	q16_t min_mig;
+	q16_t max_mig;
+	q16_t min_walt;
+	q16_t max_walt;
+	q16_t min_uclamp;
+	q16_t max_uclamp;
 };
 
 struct pg_cpu_cfg {
-	float lat_gran_rat;
-	float decay;
-	float uclamp_k;
-	float uclamp_mid;
-	float resp_gain;
-	float stab_rat;
-	float stab_marg;
-	float gain_alpha;
-	float sigmoid_k;
-	float sigmoid_mid;
-	float lookahead;
-	float trend_amp;
-	float surge_thresh;
-	float surge_gain;
-	float trans_rate;
-	float trans_diff;
-	float trans_poll;
-	float nis_thresh;
-	float bat_wt;
+	q16_t lat_gran_rat;
+	q16_t decay;
+	q16_t uclamp_k;
+	q16_t uclamp_mid;
+	q16_t resp_gain;
+	q16_t stab_rat;
+	q16_t stab_marg;
+	q16_t gain_alpha;
+	q16_t sigmoid_k;
+	q16_t sigmoid_mid;
+	q16_t lookahead;
+	q16_t trend_amp;
+	q16_t surge_thresh;
+	q16_t surge_gain;
+	q16_t trans_rate;
+	q16_t trans_diff;
+	q16_t trans_poll;
+	q16_t nis_thresh;
+	q16_t bat_wt;
 };
 
 struct pg_ctrl_cfg {
-	float press_wt;
-	float deriv_wt;
+	q16_t press_wt;
+	q16_t deriv_wt;
 	uint64_t bat_chk_sec;
 	int32_t thresh_us;
 	int32_t win_us;
 };
 
 struct pg_demand_input {
-	float tgt_psi;
-	float vel;
-	float dt_real;
-	float dt_safe;
-	float therm_scale;
-	float trend_fact;
-	float integ;
-	float integ_dt;
+	q16_t tgt_psi;
+	q16_t vel;
+	q16_t dt_real;
+	q16_t dt_safe;
+	q16_t therm_scale;
+	q16_t trend_fact;
+	q16_t integ;
+	q16_t integ_dt;
 	bool struct_break;
 };
 
 struct pg_load_state {
-	float psi_val;
-	float rate;
-	float prev_integ;
+	q16_t psi_val;
+	q16_t rate;
+	q16_t prev_integ;
 	bool first_run;
 };
 
 PURE bool pg_cpu_trans(const struct pg_load_state *RESTRICT state,
-		       float target_psi, const struct pg_cpu_cfg *RESTRICT cfg);
+		       q16_t target_psi, const struct pg_cpu_cfg *RESTRICT cfg);
 
 void pg_cpu_upd_integ_params(struct pg_load_state *RESTRICT state,
-			     float bat_level, float dt_safe,
+			     q16_t bat_level, q16_t dt_safe,
 			     const struct pg_cpu_cfg *RESTRICT cfg,
-			     float *RESTRICT integ, float *RESTRICT integ_dt);
+			     q16_t *RESTRICT integ, q16_t *RESTRICT integ_dt);
 
-float pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
+q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
 			      const struct pg_demand_input *RESTRICT input,
 			      const struct pg_cpu_cfg *RESTRICT cfg);
 
-PURE float pg_cpu_calc_trend_gain(float velocity);
+PURE q16_t pg_cpu_calc_trend_gain(q16_t velocity);
 
-PURE float pg_cpu_calc_eff_press(float load_demand, float trend_fact,
+PURE q16_t pg_cpu_calc_eff_press(q16_t l_dem, q16_t trend_fact,
 				 const struct pg_cpu_cfg *cfg);
 
-PURE float pg_cpu_calc_therm_lat(float therm_scale,
+PURE q16_t pg_cpu_calc_therm_lat(q16_t therm_scale,
 				 const struct pg_cpu_lim *lim);
 
-void pg_cpu_calc_lat_gran(float p_eff, float load_demand, float therm_lat,
+void pg_cpu_calc_lat_gran(q16_t p_eff, q16_t l_dem, q16_t therm_lat,
 			  const struct pg_cpu_cfg *RESTRICT cfg,
 			  const struct pg_cpu_lim *RESTRICT lim,
-			  float *RESTRICT lat, float *RESTRICT gran);
+			  q16_t *RESTRICT lat, q16_t *RESTRICT gran);
 
-PURE float pg_cpu_calc_wakeup(float p_eff,
+PURE q16_t pg_cpu_calc_wakeup(q16_t p_eff,
 			      const struct pg_cpu_cfg *RESTRICT cfg,
 			      const struct pg_cpu_lim *RESTRICT lim);
 
-PURE float pg_cpu_calc_migration(float velocity, float p_eff,
+PURE q16_t pg_cpu_calc_migration(q16_t velocity, q16_t p_eff,
 				 const struct pg_cpu_lim *lim);
 
-PURE float pg_cpu_calc_walt(float pressure, const struct pg_cpu_lim *lim);
+PURE q16_t pg_cpu_calc_walt(q16_t pressure, const struct pg_cpu_lim *lim);
 
-PURE float pg_cpu_calc_uclamp(float pressure, float therm_scale,
+PURE q16_t pg_cpu_calc_uclamp(q16_t pressure, q16_t therm_scale,
 			      const struct pg_cpu_cfg *RESTRICT cfg,
 			      const struct pg_cpu_lim *RESTRICT lim);
 

@@ -9,11 +9,11 @@
 #include <stdbool.h>
 #include <unistd.h>
 
-#define SCALE_MILLI 0.001F
-#define SCALE_DECI 0.1F
-#define FALLBACK_TEMP_CPU 65.0F
-#define FALLBACK_TEMP_BAT 35.0F
-#define FALLBACK_BAT_CAP 100.0F
+#define SCALE_MILLI 1000
+#define SCALE_DECI 10
+#define FALLBACK_TEMP_CPU INT_TO_Q16(65)
+#define FALLBACK_TEMP_BAT INT_TO_Q16(35)
+#define FALLBACK_BAT_CAP INT_TO_Q16(100)
 
 void pg_sensor_init_cpu_temp(struct pg_temp_sensor *RESTRICT sensor,
 			     const char *RESTRICT path)
@@ -58,7 +58,7 @@ void pg_sensor_bat_close(struct pg_bat_sensor *sensor)
 }
 
 static inline int read_temp(struct pg_temp_sensor *RESTRICT sensor,
-			    float *RESTRICT temp, float fallback)
+			    q16_t *RESTRICT temp, q16_t fallback)
 {
 	if (sensor->fd < 0) {
 		*temp = fallback;
@@ -78,24 +78,24 @@ static inline int read_temp(struct pg_temp_sensor *RESTRICT sensor,
 		return -EINVAL;
 	}
 
-	*temp = (float)val * sensor->scale;
+	*temp = (q16_t)(((q32_t)val << 16) / sensor->scale);
 	return 0;
 }
 
 int pg_sensor_read_cpu_temp(struct pg_temp_sensor *RESTRICT sensor,
-			    float *RESTRICT temp)
+			    q16_t *RESTRICT temp)
 {
 	return read_temp(sensor, temp, FALLBACK_TEMP_CPU);
 }
 
 int pg_sensor_read_bat_temp(struct pg_temp_sensor *RESTRICT sensor,
-			    float *RESTRICT temp)
+			    q16_t *RESTRICT temp)
 {
 	return read_temp(sensor, temp, FALLBACK_TEMP_BAT);
 }
 
 int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
-			   float *RESTRICT cap)
+			   q16_t *RESTRICT cap)
 {
 	if (sensor->fd < 0) {
 		*cap = FALLBACK_BAT_CAP;
@@ -110,7 +110,6 @@ int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 
 	bool valid;
 	int32_t val = pg_parse_i32(sensor->buf, (size_t)sz, &valid);
-	*cap = (int)valid ? (float)val : FALLBACK_BAT_CAP;
-
+	*cap = (int)valid ? INT_TO_Q16(val) : FALLBACK_BAT_CAP;
 	return 0;
 }

@@ -3,16 +3,14 @@
 
 #include "pg/poll.h"
 #include "pg/config.h"
-#include "pg/math.h"
 #include "pg/time.h"
-#include <math.h>
 
-void pg_poll_init(struct pg_poll_state *RESTRICT state, float press_wt,
-		  float deriv_wt, const struct pg_poll_cfg *RESTRICT cfg)
+void pg_poll_init(struct pg_poll_state *RESTRICT state, q16_t press_wt,
+		  q16_t deriv_wt, const struct pg_poll_cfg *RESTRICT cfg)
 {
 	state->cur_ivl = PG_MIN_POLL_MS;
 	clock_gettime(CLOCK_MONOTONIC, &state->last_tick);
-	state->tgt_ivl = PG_MIN_POLL_MS;
+	state->tgt_ivl = INT_TO_Q16(PG_MIN_POLL_MS);
 	state->press_wt = press_wt;
 	state->deriv_wt = deriv_wt;
 	state->cfg = *cfg;
@@ -75,14 +73,14 @@ static inline uint64_t poll_discrete(struct pg_poll_state *state, uint64_t ivl,
 	return final;
 }
 
-uint64_t pg_poll_calc_next(struct pg_poll_state *state, float cur_press,
-			   float avg300, float press_vel)
+uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
+			   q16_t avg300, q16_t press_vel)
 {
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
-	float elapsed = pg_dt_sec(&state->last_tick, &now);
-	uint64_t ms = (uint64_t)(elapsed * 1000.0F);
+	q16_t elapsed = pg_dt_sec(&state->last_tick, &now);
+	uint64_t ms = (uint64_t)((((q32_t)elapsed) * 1000) >> Q16_SHIFT);
 	if (UNLIKELY(ms > (state->cur_ivl + state->cfg.sleep_tol))) {
 		state->last_tick = now;
 		state->cur_ivl = PG_MIN_POLL_MS;
@@ -91,10 +89,10 @@ uint64_t pg_poll_calc_next(struct pg_poll_state *state, float cur_press,
 
 	uint64_t min;
 	uint64_t max;
-	if (avg300 < 2.0F && cur_press < 10.0F) {
+	if (avg300 < INT_TO_Q16(2) && cur_press < INT_TO_Q16(10)) {
 		min = 6000;
 		max = PG_MAX_POLL_MS;
-	} else if (avg300 > 20.0F) {
+	} else if (avg300 > INT_TO_Q16(20)) {
 		min = PG_MIN_POLL_MS;
 		max = 5000;
 	} else {
@@ -102,37 +100,38 @@ uint64_t pg_poll_calc_next(struct pg_poll_state *state, float cur_press,
 		max = PG_MAX_POLL_MS;
 	}
 
-	float dv = press_vel;
-	float pred = cur_press + (dv * 0.5F);
+	q16_t dv = press_vel;
+	q16_t pred = cur_press + q16_mul(dv, Q16_HALF);
+	q16_t p_term = q16_mul(pred, state->press_wt);
+	q16_t d_term = q16_mul(ABS_Q16(dv), state->deriv_wt);
+	q16_t score = pg_math_clamp(p_term + d_term, 0, INT_TO_Q16(100));
 
-	float p_term = pred * state->press_wt;
-	float d_term = fabsf(dv) * state->deriv_wt;
+	q16_t range = INT_TO_Q16(max - min);
+	q16_t raw_ivl = INT_TO_Q16(max) -
+			q16_mul(q16_div(score, INT_TO_Q16(100)), range);
 
-	float score = pg_math_clampf(p_term + d_term, 0.0F, 100.0F);
-	float range = (float)(max - min);
-	float raw_ivl = (float)max - ((score / 100.0F) * range);
-
-	float target = (float)state->tgt_ivl;
-	float next;
-
+	q16_t target = state->tgt_ivl;
+	q16_t next;
 	if (raw_ivl < target) {
-		float alpha = state->cfg.fall_fact;
-		next = (alpha * raw_ivl) + ((1.0F - alpha) * target);
+		q16_t alpha = state->cfg.fall_fact;
+		next = q16_mul(alpha, raw_ivl) +
+		       q16_mul(Q16_ONE - alpha, target);
 	} else {
-		float alpha = state->cfg.rise_fact;
-		next = (alpha * raw_ivl) + ((1.0F - alpha) * target);
+		q16_t alpha = state->cfg.rise_fact;
+		next = q16_mul(alpha, raw_ivl) +
+		       q16_mul(Q16_ONE - alpha, target);
 	}
 
-	state->tgt_ivl = (uint64_t)next;
+	state->tgt_ivl = next;
 	state->last_tick = now;
 
-	uint64_t diff = (state->tgt_ivl > state->cur_ivl) ?
-				(state->tgt_ivl - state->cur_ivl) :
-				(state->cur_ivl - state->tgt_ivl);
+	uint64_t tgt_ms = (uint64_t)Q16_TO_INT(state->tgt_ivl);
+	uint64_t diff = (tgt_ms > state->cur_ivl) ? (tgt_ms - state->cur_ivl) :
+						    (state->cur_ivl - tgt_ms);
 
 	if (diff < state->cfg.hyst)
 		return poll_discrete(state, state->cur_ivl, min, max);
 
-	state->cur_ivl = state->tgt_ivl;
+	state->cur_ivl = tgt_ms;
 	return poll_discrete(state, state->cur_ivl, min, max);
 }

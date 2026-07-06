@@ -10,6 +10,7 @@
 #include "sensor.h"
 #include "sysfs.h"
 #include "pg/thermal.h"
+#include "pg/math.h"
 #include <stdbool.h>
 #include <time.h>
 
@@ -26,13 +27,13 @@ struct ALIGNED(64) pg_context {
 	struct pg_sysfs_cache sched_wake;
 	struct pg_sysfs_cache sched_mig;
 	struct pg_sysfs_cache sched_walt;
-	struct pg_sysfs_cache sched_uclamp;
+	struct pg_sysfs_cache sched_ucl;
 	struct pg_thermal_state thermal_state;
 	struct pg_load_state load_state;
 	struct pg_poll_state poll_state;
 
-	float bat_lvl;
-	float bat_temp;
+	q16_t bat_lvl;
+	q16_t bat_temp;
 
 	struct timespec last_bat;
 	struct timespec last_tick;

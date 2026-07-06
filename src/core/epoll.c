@@ -22,8 +22,8 @@ handle_epoll_error(struct pg_context *RESTRICT ctx,
 		struct timespec wait_end;
 		clock_gettime(CLOCK_MONOTONIC, &wait_end);
 
-		float dt = pg_dt_sec(wait_start, &wait_end);
-		int elapsed = (int)(dt * 1000.0F);
+		q16_t dt = pg_dt_sec(wait_start, &wait_end);
+		int elapsed = (int)((((q32_t)dt) * 1000) >> Q16_SHIFT);
 
 		ctx->next_wake -= elapsed;
 		if (ctx->next_wake < 1)
@@ -51,11 +51,6 @@ static inline void handle_epoll_events(struct pg_context *RESTRICT ctx,
 				ctx->shutdown_req = true;
 
 		} else if (ev_fd == ctx->trg_fd) {
-			char dummy_buf[8];
-
-			ssize_t MAYBE_UNUSED unused_ret =
-				read(ctx->trg_fd, dummy_buf, sizeof(dummy_buf));
-
 			if (LIKELY(ctx->on_trigger != NULL))
 				ctx->on_trigger(ctx);
 		}

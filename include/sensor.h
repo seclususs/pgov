@@ -5,11 +5,12 @@
 #define PGOV_SENSOR_H
 
 #include "compiler.h"
+#include "pg/math.h"
 #include <stdint.h>
 
 struct pg_temp_sensor {
 	int fd;
-	float scale;
+	q16_t scale;
 	uint8_t buf[16];
 };
 
@@ -32,12 +33,12 @@ void pg_sensor_init_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 void pg_sensor_bat_close(struct pg_bat_sensor *sensor);
 
 int pg_sensor_read_cpu_temp(struct pg_temp_sensor *RESTRICT sensor,
-			    float *RESTRICT temp);
+			    q16_t *RESTRICT temp);
 
 int pg_sensor_read_bat_temp(struct pg_temp_sensor *RESTRICT sensor,
-			    float *RESTRICT temp);
+			    q16_t *RESTRICT temp);
 
 int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
-			   float *RESTRICT cap);
+			   q16_t *RESTRICT cap);
 
 #endif // PGOV_SENSOR_H

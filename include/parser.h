@@ -5,6 +5,7 @@
 #define PGOV_PARSER_H
 
 #include "compiler.h"
+#include "pg/math.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -106,27 +107,26 @@ static ALWAYS_INLINE uint64_t pg_parse_u64(const uint8_t *RESTRICT buf,
 	return val;
 }
 
-static ALWAYS_INLINE float pg_parse_f32(const uint8_t *RESTRICT buffer,
+static ALWAYS_INLINE q16_t pg_parse_q16(const uint8_t *RESTRICT buffer,
 					size_t len, size_t start_pos,
 					size_t *RESTRICT next)
 {
 	size_t pos = start_pos;
-	float val = 0.0F;
-	float frac_val = 0.0F;
-	float frac_div = 1.0F;
+	q16_t val = 0;
+	uint32_t frac_val = 0;
+	uint32_t frac_div = 1;
 	bool frac = false;
 
 	while (pos < len) {
 		uint8_t byte = buffer[pos];
 
 		if (byte >= '0' && byte <= '9') {
-			float digit = (float)(byte - '0');
-
 			if (frac) {
-				frac_val = (frac_val * 10.0F) + digit;
-				frac_div *= 10.0F;
+				frac_val = (frac_val * 10) + (byte - '0');
+				frac_div *= 10;
 			} else {
-				val = (val * 10.0F) + digit;
+				val = q16_mul(val, INT_TO_Q16(10)) +
+				      INT_TO_Q16(byte - '0');
 			}
 
 			pos++;
@@ -143,7 +143,13 @@ static ALWAYS_INLINE float pg_parse_f32(const uint8_t *RESTRICT buffer,
 	}
 
 	*next = pos;
-	return val + (frac_val / frac_div);
+
+	if (frac && frac_div > 1) {
+		q16_t f_frac = (q16_t)(((uint64_t)frac_val << 16) / frac_div);
+		return val + f_frac;
+	}
+
+	return val;
 }
 
 #endif // PGOV_PARSER_H

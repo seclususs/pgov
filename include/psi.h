@@ -6,16 +6,17 @@
 
 #include "compiler.h"
 #include "pg/kalman.h"
+#include "pg/math.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>
 
 struct pg_psi_trend {
-	float cur;
-	float vel;
-	float avg10;
-	float avg300;
-	float nis;
+	q16_t cur;
+	q16_t vel;
+	q16_t avg10;
+	q16_t avg300;
+	q16_t nis;
 };
 
 struct pg_psi_data {
@@ -26,9 +27,9 @@ struct pg_psi_monitor {
 	int fd;
 	uint8_t buf[512];
 	struct timespec last_read_ts;
-	uint64_t last_some_total;
+	uint64_t last_tot;
 	bool first_run;
-	struct pg_kalman_state filter_some;
+	struct pg_kalman_state filter;
 };
 
 int pg_psi_open_trg(const char *path, int32_t threshold_us, int32_t window_us);

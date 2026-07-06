@@ -61,7 +61,7 @@ int pg_psi_recov(struct pg_psi_monitor *RESTRICT monitor,
 	if (monitor->fd < 0)
 		return -errno;
 
-	pg_kalman_reset(&monitor->filter_some);
+	pg_kalman_reset(&monitor->filter);
 	monitor->first_run = true;
 	return 0;
 }
@@ -75,9 +75,9 @@ void pg_psi_init(struct pg_psi_monitor *RESTRICT monitor,
 		LOGE("psi: failed to open node %s", path);
 
 	clock_gettime(CLOCK_MONOTONIC, &monitor->last_read_ts);
-	monitor->last_some_total = 0;
+	monitor->last_tot = 0;
 	monitor->first_run = true;
-	pg_kalman_init(&monitor->filter_some, cfg);
+	pg_kalman_init(&monitor->filter, cfg);
 }
 
 void pg_psi_cleanup(struct pg_psi_monitor *monitor)
@@ -113,33 +113,28 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT monitor,
 		return -EIO;
 	}
 
-	float dt_sec;
-	float dt_calc;
-
-	if (monitor->first_run) {
-		dt_sec = 1.0F;
-		dt_calc = 1000000.0F;
-	} else {
+	q16_t dt_sec;
+	if (monitor->first_run)
+		dt_sec = Q16_ONE;
+	else {
 		dt_sec = pg_dt_sec(&monitor->last_read_ts, now);
-		if (dt_sec < 0.001F)
-			dt_sec = 0.001F;
-
-		dt_calc = dt_sec * 1000000.0F;
+		if (dt_sec < FLOAT_TO_Q16(0.001F))
+			dt_sec = FLOAT_TO_Q16(0.001F);
 	}
 
-	struct pg_psi_trend some_trend = { 0 };
-	uint64_t cur_tot = monitor->last_some_total;
+	struct pg_psi_trend trend = { 0 };
+	uint64_t cur_tot = monitor->last_tot;
 
 	size_t pos = 0;
 	size_t len = (size_t)sz;
 
-	bool found_some = false;
+	bool found = false;
 
 	while (pos < len) {
 		if (pos + 5 <= len &&
 		    buffer_cmp(&monitor->buf[pos], "some ", 5) == 0) {
 			pos += 5;
-			found_some = true;
+			found = true;
 			break;
 		}
 
@@ -149,7 +144,7 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT monitor,
 		pos++;
 	}
 
-	if (found_some) {
+	if (found) {
 		while (pos < len && monitor->buf[pos] != '\n') {
 			if (monitor->buf[pos] == ' ') {
 				pos++;
@@ -170,9 +165,8 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT monitor,
 				}
 
 				size_t next_pos;
-
-				some_trend.avg10 = pg_parse_f32(
-					monitor->buf, len, pos + 6, &next_pos);
+				trend.avg10 = pg_parse_q16(monitor->buf, len,
+							   pos + 6, &next_pos);
 
 				pos = next_pos;
 				continue;
@@ -182,8 +176,8 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT monitor,
 			    buffer_cmp(&monitor->buf[pos], "avg300=", 7) == 0) {
 				size_t next_pos;
 
-				some_trend.avg300 = pg_parse_f32(
-					monitor->buf, len, pos + 7, &next_pos);
+				trend.avg300 = pg_parse_q16(monitor->buf, len,
+							    pos + 7, &next_pos);
 
 				pos = next_pos;
 				continue;
@@ -210,33 +204,35 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT monitor,
 	}
 
 	if (monitor->first_run) {
-		some_trend.cur = some_trend.avg10;
-		some_trend.vel = 0.0F;
-
-		pg_kalman_reset(&monitor->filter_some);
-		pg_kalman_update(&monitor->filter_some, some_trend.avg10, 1.0F);
-
+		trend.cur = trend.avg10;
+		trend.vel = 0;
+		pg_kalman_reset(&monitor->filter);
+		pg_kalman_update(&monitor->filter, trend.avg10, Q16_ONE);
 		monitor->first_run = false;
 	} else {
-		float delta = 0.0F;
+		q16_t raw_some = 0;
 
-		if (LIKELY(cur_tot > monitor->last_some_total))
-			delta = (float)(cur_tot - monitor->last_some_total);
+		if (LIKELY(cur_tot > monitor->last_tot)) {
+			uint64_t delta = cur_tot - monitor->last_tot;
 
-		float inv_dt = 1.0F / dt_calc;
-		float raw_some = delta * inv_dt * 100.0F;
+			uint64_t dt_us = ((uint64_t)dt_sec * 1000000ULL) >> 16;
+			if (dt_us == 0)
+				dt_us = 1;
 
-		some_trend.cur = pg_kalman_update(&monitor->filter_some,
-						  raw_some, dt_sec);
+			uint64_t raw_some_u64 = (delta * 100ULL << 16) / dt_us;
+			raw_some = (q16_t)raw_some_u64;
+		}
 
-		some_trend.vel = monitor->filter_some.x_vel;
-		some_trend.nis = monitor->filter_some.nis;
+		trend.cur =
+			pg_kalman_update(&monitor->filter, raw_some, dt_sec);
+
+		trend.vel = monitor->filter.x_vel;
+		trend.nis = monitor->filter.nis;
 	}
 
 	monitor->last_read_ts = *now;
-	monitor->last_some_total = cur_tot;
-
-	data->some = some_trend;
+	monitor->last_tot = cur_tot;
+	data->some = trend;
 
 	return 0;
 }
