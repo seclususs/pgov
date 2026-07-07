@@ -13,7 +13,7 @@ build.ninja
 *.a
 *.so
 
-/pascal_gov
+pgovd
 
 .vscode/
 .idea/
@@ -25,3 +25,19 @@ build.ninja
 
 .DS_Store
 Thumbs.db
+
+*.zip
+*.log
+core
+core.*
+vgcore.*
+
+__pycache__/
+*.py[cod]
+*$py.class
+.venv/
+venv/
+env/
+.env/
+.pytest_cache/
+.mypy_cache/

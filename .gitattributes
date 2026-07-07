@@ -3,6 +3,9 @@
 *.c text eol=lf diff=c
 *.h text eol=lf diff=c
 
+*.py text eol=lf diff=python
+*.json text eol=lf
+
 CMakeLists.txt text eol=lf diff=c
 CMakePresets.json text eol=lf
 *.cmake text eol=lf
@@ -16,3 +19,11 @@ CMakePresets.json text eol=lf
 .github/**/*.yaml text eol=lf
 
 *.md text eol=lf diff=markdown
+
+*.bp text eol=lf
+*.rc text eol=lf
+*.te text eol=lf
+*.prop text eol=lf
+
+modules/META-INF/**/update-binary text eol=lf executable
+modules/META-INF/**/updater-script text eol=lf
