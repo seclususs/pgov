@@ -29,6 +29,7 @@ Thumbs.db
 *.zip
 *.log
 core
+!src/core/
 core.*
 vgcore.*
 
