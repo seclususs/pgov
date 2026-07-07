@@ -1,0 +1,7 @@
+id=pgovd
+name=PGOV
+version=v1.0
+versionCode=1
+author=seclususs
+description=Native scheduler daemon
+updateJson=https://raw.githubusercontent.com/seclususs/pgov/main/modules/update.json
