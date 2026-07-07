@@ -39,6 +39,7 @@ list(REMOVE_ITEM PG_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.c")
 add_library(pgov STATIC ${PG_SOURCES})
 target_include_directories(pgov PUBLIC "${CMAKE_SOURCE_DIR}/include")
 target_compile_options(pgov PRIVATE -Wall -Wextra -Werror)
+target_compile_definitions(pgov PUBLIC NDK_BUILD)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_compile_options(

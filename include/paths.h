@@ -4,7 +4,12 @@
 #ifndef PGOV_PATHS_H
 #define PGOV_PATHS_H
 
+#if defined(NDK_BUILD)
 #define PG_PATH_LOCK "/data/local/tmp/pgovd.lock"
+#else
+#define PG_PATH_LOCK "/data/vendor/pgovd/pgovd.lock"
+#endif
+
 #define PG_PATH_PSI_CPU "/proc/pressure/cpu"
 #define PG_PATH_THERMAL_BASE "/sys/class/thermal"
 #define PG_PATH_SCHED_LAT "/proc/sys/kernel/sched_latency_ns"
