@@ -12,6 +12,7 @@
 
 #define PG_PATH_PSI_CPU "/proc/pressure/cpu"
 #define PG_PATH_THERMAL_BASE "/sys/class/thermal"
+#define PG_PATH_BACKLIGHT_BASE "/sys/class/backlight"
 #define PG_PATH_SCHED_LAT "/proc/sys/kernel/sched_latency_ns"
 #define PG_PATH_SCHED_GRAN "/proc/sys/kernel/sched_min_granularity_ns"
 #define PG_PATH_SCHED_WAKEUP "/proc/sys/kernel/sched_wakeup_granularity_ns"

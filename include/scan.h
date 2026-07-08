@@ -7,5 +7,6 @@
 #include <stddef.h>
 
 int pg_scan_thermal_zone(char *path, size_t len);
+int pg_scan_backlight(char *path, size_t len);
 
 #endif // PGOV_SCAN_H

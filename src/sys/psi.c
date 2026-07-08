@@ -236,3 +236,35 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT monitor,
 
 	return 0;
 }
+
+int pg_psi_read_raw(const char *RESTRICT path, q16_t *RESTRICT avg10)
+{
+	int fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0)
+		return -errno;
+
+	char buf[256];
+	ssize_t sz = read(fd, buf, sizeof(buf));
+	close(fd);
+
+	if (sz <= 0)
+		return -EIO;
+
+	size_t pos = 0;
+	size_t len = (size_t)sz;
+
+	while (pos + 6 <= len) {
+		if (buffer_cmp((const uint8_t *)&buf[pos], "avg10=", 6) == 0) {
+			size_t next_pos;
+
+			*avg10 = pg_parse_q16((const uint8_t *)buf, len,
+					      pos + 6, &next_pos);
+
+			return 0;
+		}
+
+		pos++;
+	}
+
+	return -ENOENT;
+}

@@ -13,6 +13,7 @@
 #include "psi.h"
 #include "sensor.h"
 #include "sysfs.h"
+#include "pg/sweep.h"
 #include "pg/thermal.h"
 #include "pg/time.h"
 #include <unistd.h>
@@ -30,7 +31,7 @@ int pg_gov_init(struct pg_context *ctx)
 	return 0;
 }
 
-static inline void exec_cpu_logic(struct pg_context *RESTRICT ctx,
+static inline void exec_gov_logic(struct pg_context *RESTRICT ctx,
 				  const struct timespec *RESTRICT now)
 {
 	struct pg_psi_data psi_data;
@@ -151,6 +152,21 @@ static inline void exec_cpu_logic(struct pg_context *RESTRICT ctx,
 	     (unsigned long long)walt_u64, (unsigned long long)ucl_u64,
 	     next_poll);
 
+#if defined(NDK_BUILD)
+	q16_t sweep_elaps = pg_dt_sec(&ctx->last_sweep, now);
+	if (sweep_elaps > INT_TO_Q16(PG_SWEEP_IVL_SEC)) {
+		int32_t bl = 0;
+		pg_sensor_read_bl(&ctx->bl_sensor, &bl);
+
+		if (bl == 0 && psi_data.some.avg10 < INT_TO_Q16(3) &&
+		    psi_data.some.cur < INT_TO_Q16(3)) {
+			LOGD("gov: idle detected, running sweep cycle");
+			pg_sweep_run(ctx);
+			clock_gettime(CLOCK_MONOTONIC, &ctx->last_sweep);
+		}
+	}
+#endif // NDK_BUILD
+
 	pg_sysfs_update(&ctx->sched_lat, lat_u64, false, &CHK_LAT);
 	pg_sysfs_update(&ctx->sched_gran, gran_u64, false, &CHK_GRAN);
 	pg_sysfs_update(&ctx->sched_wake, wake_u64, false, &CHK_WAKE);
@@ -159,12 +175,12 @@ static inline void exec_cpu_logic(struct pg_context *RESTRICT ctx,
 	pg_sysfs_update(&ctx->sched_ucl, ucl_u64, false, &CHK_UCL);
 }
 
-void pg_gov_process_cpu(struct pg_context *ctx)
+void pg_gov_process(struct pg_context *ctx)
 {
 	struct timespec now;
 	struct timespec end_calc;
 	clock_gettime(CLOCK_MONOTONIC, &now);
-	exec_cpu_logic(ctx, &now);
+	exec_gov_logic(ctx, &now);
 	clock_gettime(CLOCK_MONOTONIC, &end_calc);
 
 	q16_t calc_s = pg_dt_sec(&now, &end_calc);

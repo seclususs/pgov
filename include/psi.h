@@ -49,4 +49,6 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT monitor,
 		struct pg_psi_data *RESTRICT data,
 		const struct timespec *RESTRICT now);
 
+int pg_psi_read_raw(const char *RESTRICT path, q16_t *RESTRICT avg10);
+
 #endif // PGOV_PSI_H

@@ -157,3 +157,43 @@ int pg_scan_thermal_zone(char *path, size_t len)
 	path[0] = '\0';
 	return -1;
 }
+
+int pg_scan_backlight(char *path, size_t len)
+{
+	DIR *dir = opendir(PG_PATH_BACKLIGHT_BASE);
+	if (!dir) {
+		if (len > 0)
+			path[0] = '\0';
+
+		return -1;
+	}
+
+	struct dirent *entry;
+	bool found = false;
+
+	while ((entry = readdir(dir)) != NULL) {
+		if (entry->d_name[0] == '.')
+			continue;
+
+		pg_str_build_path(path, len, PG_PATH_BACKLIGHT_BASE,
+				  entry->d_name, "brightness");
+
+		int fd = open(path, O_RDONLY | O_CLOEXEC);
+		if (fd >= 0) {
+			close(fd);
+			found = true;
+			break;
+		}
+	}
+
+	closedir(dir);
+
+	if (!found) {
+		if (len > 0)
+			path[0] = '\0';
+
+		return -1;
+	}
+
+	return 0;
+}

@@ -79,6 +79,10 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	pg_poll_init(&ctx->poll_state, PG_CFG_CTRL.press_wt,
 		     PG_CFG_CTRL.deriv_wt, &PG_CFG_POLL);
 
+	char bl_path[256];
+	pg_scan_backlight(bl_path, sizeof(bl_path));
+	pg_sensor_init_bl(&ctx->bl_sensor, bl_path);
+
 	return 0;
 }
 
@@ -117,6 +121,7 @@ int pg_daemon_init(void)
 	context.cpu_temp_sensor.fd = -1;
 	context.bat_temp_sensor.fd = -1;
 	context.bat_cap_sensor.fd = -1;
+	context.bl_sensor.fd = -1;
 	context.on_trigger = NULL;
 	context.on_timeout = NULL;
 
@@ -131,12 +136,17 @@ int pg_daemon_init(void)
 	}
 
 	clock_gettime(CLOCK_MONOTONIC, &context.last_bat);
+
+#if defined(NDK_BUILD)
+	clock_gettime(CLOCK_MONOTONIC, &context.last_sweep);
+#endif // NDK_BUILD
+
 	pg_sensor_read_bat_cap(&context.bat_cap_sensor, &context.bat_lvl);
 	pg_sensor_read_bat_temp(&context.bat_temp_sensor, &context.bat_temp);
 
 	pg_gov_init(&context);
-	context.on_trigger = pg_gov_process_cpu;
-	context.on_timeout = pg_gov_process_cpu;
+	context.on_trigger = pg_gov_process;
+	context.on_timeout = pg_gov_process;
 	LOGI("daemon: entering epoll reactor loop");
 	status = pg_epoll_run(&context);
 
@@ -153,6 +163,7 @@ cleanup:
 	pg_sensor_temp_close(&context.cpu_temp_sensor);
 	pg_sensor_temp_close(&context.bat_temp_sensor);
 	pg_sensor_bat_close(&context.bat_cap_sensor);
+	pg_sensor_bl_close(&context.bl_sensor);
 	pg_sysfs_cache_cleanup(&context.sched_lat);
 	pg_sysfs_cache_cleanup(&context.sched_gran);
 	pg_sysfs_cache_cleanup(&context.sched_wake);

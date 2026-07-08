@@ -14,6 +14,7 @@
 #define FALLBACK_TEMP_CPU INT_TO_Q16(65)
 #define FALLBACK_TEMP_BAT INT_TO_Q16(35)
 #define FALLBACK_BAT_CAP INT_TO_Q16(100)
+#define FALLBACK_BL 0
 
 void pg_sensor_init_cpu_temp(struct pg_temp_sensor *RESTRICT sensor,
 			     const char *RESTRICT path)
@@ -50,6 +51,22 @@ void pg_sensor_init_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 }
 
 void pg_sensor_bat_close(struct pg_bat_sensor *sensor)
+{
+	if (sensor->fd >= 0) {
+		close(sensor->fd);
+		sensor->fd = -1;
+	}
+}
+
+void pg_sensor_init_bl(struct pg_bl_sensor *RESTRICT sensor,
+		       const char *RESTRICT path)
+{
+	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (sensor->fd < 0)
+		LOGW("sensor: failed to open node %s err=%d", path, errno);
+}
+
+void pg_sensor_bl_close(struct pg_bl_sensor *sensor)
 {
 	if (sensor->fd >= 0) {
 		close(sensor->fd);
@@ -111,5 +128,26 @@ int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 	bool valid;
 	int32_t val = pg_parse_i32(sensor->buf, (size_t)sz, &valid);
 	*cap = (int)valid ? INT_TO_Q16(val) : FALLBACK_BAT_CAP;
+	return 0;
+}
+
+int pg_sensor_read_bl(struct pg_bl_sensor *RESTRICT sensor,
+		      int32_t *RESTRICT brightness)
+{
+	if (sensor->fd < 0) {
+		*brightness = FALLBACK_BL;
+		return -EBADF;
+	}
+
+	ssize_t sz = pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
+	if (sz <= 0) {
+		*brightness = FALLBACK_BL;
+		return -EIO;
+	}
+
+	bool valid;
+	int32_t val = pg_parse_i32(sensor->buf, (size_t)sz, &valid);
+	*brightness = (int)valid ? val : FALLBACK_BL;
+
 	return 0;
 }

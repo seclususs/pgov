@@ -7,6 +7,6 @@
 #include "state.h"
 
 int pg_gov_init(struct pg_context *ctx);
-void pg_gov_process_cpu(struct pg_context *ctx);
+void pg_gov_process(struct pg_context *ctx);
 
 #endif // PG_GOV_H

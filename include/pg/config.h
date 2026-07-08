@@ -30,6 +30,10 @@
 #define PG_IOPRIO_CLASS 2
 #define PG_IOPRIO_DATA 0
 
+#if defined(NDK_BUILD)
+#define PG_SWEEP_IVL_SEC 600
+#endif
+
 extern struct pg_cpu_lim LIM_CPU;
 
 static const struct pg_cpu_cfg PG_CFG_CPU = {

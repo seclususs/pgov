@@ -31,12 +31,17 @@ struct ALIGNED(64) pg_context {
 	struct pg_thermal_state thermal_state;
 	struct pg_load_state load_state;
 	struct pg_poll_state poll_state;
+	struct pg_bl_sensor bl_sensor;
 
 	q16_t bat_lvl;
 	q16_t bat_temp;
 
 	struct timespec last_bat;
 	struct timespec last_tick;
+
+#if defined(NDK_BUILD)
+	struct timespec last_sweep;
+#endif // NDK_BUILD
 
 	int epoll_fd;
 	int sig_fd;

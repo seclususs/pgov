@@ -19,6 +19,11 @@ struct pg_bat_sensor {
 	uint8_t buf[16];
 };
 
+struct pg_bl_sensor {
+	int fd;
+	uint8_t buf[16];
+};
+
 void pg_sensor_init_cpu_temp(struct pg_temp_sensor *RESTRICT sensor,
 			     const char *RESTRICT path);
 
@@ -32,6 +37,11 @@ void pg_sensor_init_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 
 void pg_sensor_bat_close(struct pg_bat_sensor *sensor);
 
+void pg_sensor_init_bl(struct pg_bl_sensor *RESTRICT sensor,
+		       const char *RESTRICT path);
+
+void pg_sensor_bl_close(struct pg_bl_sensor *sensor);
+
 int pg_sensor_read_cpu_temp(struct pg_temp_sensor *RESTRICT sensor,
 			    q16_t *RESTRICT temp);
 
@@ -40,5 +50,8 @@ int pg_sensor_read_bat_temp(struct pg_temp_sensor *RESTRICT sensor,
 
 int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 			   q16_t *RESTRICT cap);
+
+int pg_sensor_read_bl(struct pg_bl_sensor *RESTRICT sensor,
+		      int32_t *RESTRICT brightness);
 
 #endif // PGOV_SENSOR_H
