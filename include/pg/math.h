@@ -49,18 +49,14 @@ static ALWAYS_INLINE q32_t q32_mul(q32_t a, q32_t b)
 #else
 static ALWAYS_INLINE q32_t q32_mul(q32_t a, q32_t b)
 {
-	uint64_t al = (uint32_t)a;
-	uint64_t ah = (uint64_t)a >> 32;
-	uint64_t bl = (uint32_t)b;
-	uint64_t bh = (uint64_t)b >> 32;
+	uint64_t al = (uint32_t)a, ah = (uint64_t)a >> 32;
+	uint64_t bl = (uint32_t)b, bh = (uint64_t)b >> 32;
 
-	uint64_t al_bl = al * bl;
-	uint64_t ah_bl = ah * bl;
-	uint64_t al_bh = al * bh;
-	uint64_t ah_bh = ah * bh;
+	uint64_t ll = al * bl, hl = ah * bl;
+	uint64_t lh = al * bh, hh = ah * bh;
 
-	uint64_t mid = ah_bl + al_bh + (al_bl >> 32);
-	uint64_t res = (ah_bh << 32) + mid;
+	uint64_t mid = hl + lh + (ll >> 32);
+	uint64_t res = (hh << 32) + mid;
 
 	if (a < 0)
 		res -= (uint64_t)b << 32;
@@ -116,11 +112,11 @@ static ALWAYS_INLINE q16_t pg_math_q16_sqrt(q16_t x)
 static ALWAYS_INLINE CONST q16_t pg_math_sigmoid(q16_t val, q16_t k, q16_t mid)
 {
 	q16_t x = q16_mul(k, val - mid);
-	q16_t abs_x = (x >= 0) ? x : -x;
-	q16_t denom = Q16_ONE + abs_x;
-	q16_t frac = q16_div(x, denom);
-	q16_t inner = frac + Q16_ONE;
-	return inner >> 1;
+	q16_t ax = (x >= 0) ? x : -x;
+	q16_t den = Q16_ONE + ax;
+	q16_t frc = q16_div(x, den);
+
+	return (frc + Q16_ONE) >> 1;
 }
 
 static ALWAYS_INLINE CONST q16_t pg_math_decay(q16_t val, q16_t coeff)
@@ -129,10 +125,10 @@ static ALWAYS_INLINE CONST q16_t pg_math_decay(q16_t val, q16_t coeff)
 	if (UNLIKELY(x < 0))
 		return Q16_ONE;
 
-	q16_t x_sq = q16_mul(x, x);
-	q16_t half_x_sq = x_sq >> 1;
-	q16_t denom = Q16_ONE + x + half_x_sq;
-	return q16_div(Q16_ONE, denom);
+	q16_t x2 = q16_mul(x, x);
+	q16_t den = Q16_ONE + x + (x2 >> 1);
+
+	return q16_div(Q16_ONE, den);
 }
 
 static ALWAYS_INLINE CONST q16_t pg_math_alg_sig(q16_t x)
@@ -143,14 +139,13 @@ static ALWAYS_INLINE CONST q16_t pg_math_alg_sig(q16_t x)
 	if (x <= -INT_TO_Q16(180))
 		return -Q16_ONE;
 
-	q16_t x_sq = q16_mul(x, x);
-	q16_t radicand = Q16_ONE + x_sq;
+	q16_t x2 = q16_mul(x, x);
+	q16_t den = pg_math_q16_sqrt(Q16_ONE + x2);
 
-	q16_t denom = pg_math_q16_sqrt(radicand);
-	if (UNLIKELY(denom == 0))
+	if (UNLIKELY(den == 0))
 		return (x >= 0) ? Q16_ONE : -Q16_ONE;
 
-	return q16_div(x, denom);
+	return q16_div(x, den);
 }
 
 static ALWAYS_INLINE CONST uint64_t pg_math_san_u64(q16_t val,
@@ -166,23 +161,23 @@ static ALWAYS_INLINE CONST uint64_t pg_math_san_quant_u64(q16_t val,
 							  q16_t fallback,
 							  uint64_t step)
 {
-	q16_t safe_val = (UNLIKELY(val < 0)) ? fallback : val;
-	uint64_t val_ns = ((uint64_t)safe_val * 1000000ULL) >> Q16_SHIFT;
+	q16_t sv = (UNLIKELY(val < 0)) ? fallback : val;
+	uint64_t v_ns = ((uint64_t)sv * 1000000ULL) >> Q16_SHIFT;
 
 	if (UNLIKELY(step == 0 || step == 1))
-		return val_ns;
+		return v_ns;
 
-	uint64_t remainder = val_ns % step;
-	if (remainder >= step / 2)
-		return val_ns + step - remainder;
+	uint64_t rem = v_ns % step;
+	if (rem >= step / 2)
+		return v_ns + step - rem;
 
-	return val_ns - remainder;
+	return v_ns - rem;
 }
 
 static ALWAYS_INLINE CONST q16_t pg_math_lerp(q16_t min, q16_t max, q16_t v)
 {
-	q16_t range = max - min;
-	return min + q16_mul(range, v);
+	q16_t rng = max - min;
+	return min + q16_mul(rng, v);
 }
 
 #endif // PG_MATH_H

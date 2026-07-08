@@ -18,8 +18,8 @@ static ALWAYS_INLINE size_t pg_fmt_u64(uint64_t val, char *buf)
 		return 2;
 	}
 
-	char temp[32];
-	char *p = &temp[31];
+	char tmp[32];
+	char *p = &tmp[31];
 	*p = '\n';
 
 	while (val > 0) {
@@ -27,7 +27,7 @@ static ALWAYS_INLINE size_t pg_fmt_u64(uint64_t val, char *buf)
 		val /= 10;
 	}
 
-	size_t len = (size_t)(&temp[31] - p) + 1;
+	size_t len = (size_t)(&tmp[31] - p) + 1;
 	for (size_t i = 0; i < len; ++i)
 		buf[i] = p[i];
 
@@ -36,22 +36,22 @@ static ALWAYS_INLINE size_t pg_fmt_u64(uint64_t val, char *buf)
 
 static ALWAYS_INLINE size_t pg_fmt_u32(int32_t val, char *buf)
 {
-	char temp[16];
-	size_t i = 0;
-
 	if (val <= 0) {
 		buf[0] = '0';
 		return 1;
 	}
 
+	char tmp[16];
+	char *p = &tmp[16];
+
 	while (val > 0) {
-		temp[i++] = (char)((val % 10) + '0');
+		*(--p) = (char)((val % 10) + '0');
 		val /= 10;
 	}
 
-	size_t len = i;
-	for (size_t j = 0; j < len; ++j)
-		buf[j] = temp[len - 1 - j];
+	size_t len = (size_t)(&tmp[16] - p);
+	for (size_t i = 0; i < len; ++i)
+		buf[i] = p[i];
 
 	return len;
 }
@@ -64,15 +64,15 @@ static ALWAYS_INLINE int32_t pg_parse_i32(const uint8_t *RESTRICT buf,
 	*valid = false;
 
 	for (size_t i = 0; i < len; ++i) {
-		uint8_t byte = buf[i];
+		uint8_t b = buf[i];
 
-		if (byte >= '0' && byte <= '9') {
-			val = (val * 10) + (byte - '0');
+		if (b >= '0' && b <= '9') {
+			val = (val * 10) + (b - '0');
 			*valid = true;
 			continue;
 		}
 
-		if (byte == '-' && !(*valid)) {
+		if (b == '-' && !(*valid)) {
 			sign = -1;
 			continue;
 		}
@@ -85,68 +85,61 @@ static ALWAYS_INLINE int32_t pg_parse_i32(const uint8_t *RESTRICT buf,
 }
 
 static ALWAYS_INLINE uint64_t pg_parse_u64(const uint8_t *RESTRICT buf,
-					   size_t len, size_t start_pos,
+					   size_t len, size_t start,
 					   size_t *RESTRICT next)
 {
-	size_t pos = start_pos;
+	size_t pos = start;
 	uint64_t val = 0;
 
 	while (pos < len) {
-		uint8_t byte = buf[pos];
+		uint8_t b = buf[pos];
 
-		if (byte >= '0' && byte <= '9') {
-			val = (val * 10ULL) + (uint64_t)(byte - '0');
-			pos++;
-			continue;
-		}
+		if (b < '0' || b > '9')
+			break;
 
-		break;
+		val = (val * 10ULL) + (uint64_t)(b - '0');
+		pos++;
 	}
 
 	*next = pos;
 	return val;
 }
 
-static ALWAYS_INLINE q16_t pg_parse_q16(const uint8_t *RESTRICT buffer,
-					size_t len, size_t start_pos,
-					size_t *RESTRICT next)
+static ALWAYS_INLINE q16_t pg_parse_q16(const uint8_t *RESTRICT buf, size_t len,
+					size_t start, size_t *RESTRICT next)
 {
-	size_t pos = start_pos;
+	size_t pos = start;
 	q16_t val = 0;
-	uint32_t frac_val = 0;
-	uint32_t frac_div = 1;
+	uint32_t f_val = 0;
+	uint32_t f_div = 1;
 	bool frac = false;
 
 	while (pos < len) {
-		uint8_t byte = buffer[pos];
+		uint8_t b = buf[pos];
 
-		if (byte >= '0' && byte <= '9') {
+		if (b >= '0' && b <= '9') {
 			if (frac) {
-				frac_val = (frac_val * 10) + (byte - '0');
-				frac_div *= 10;
+				f_val = (f_val * 10) + (b - '0');
+				f_div *= 10;
 			} else {
 				val = q16_mul(val, INT_TO_Q16(10)) +
-				      INT_TO_Q16(byte - '0');
+				      INT_TO_Q16(b - '0');
 			}
 
 			pos++;
-			continue;
-		}
-
-		if (byte == '.') {
+		} else if (b == '.') {
 			frac = true;
 			pos++;
-			continue;
+		} else {
+			break;
 		}
-
-		break;
 	}
 
 	*next = pos;
 
-	if (frac && frac_div > 1) {
-		q16_t f_frac = (q16_t)(((uint64_t)frac_val << 16) / frac_div);
-		return val + f_frac;
+	if (frac && f_div > 1) {
+		q16_t f_q16 = (q16_t)(((uint64_t)f_val << 16) / f_div);
+		return val + f_q16;
 	}
 
 	return val;
