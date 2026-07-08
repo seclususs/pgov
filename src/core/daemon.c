@@ -42,6 +42,27 @@ static void init_os_environment(void)
 	pg_task_set_io_prio(PG_IOPRIO_CLASS, PG_IOPRIO_DATA);
 }
 
+static inline void init_context_defaults(struct pg_context *ctx)
+{
+	ctx->shutdown_req = false;
+	ctx->next_wake = PG_MIN_POLL_MS;
+	ctx->disp_state = PG_DISP_UNKNOWN;
+	ctx->load_state.first_run = true;
+	ctx->load_state.psi_val = 0;
+	ctx->load_state.rate = 0;
+	ctx->load_state.prev_integ = 0;
+	ctx->epoll_fd = -1;
+	ctx->sig_fd = -1;
+	ctx->trg_fd = -1;
+	ctx->psi.fd = -1;
+	ctx->cpu_temp_sensor.fd = -1;
+	ctx->bat_temp_sensor.fd = -1;
+	ctx->bat_cap_sensor.fd = -1;
+	ctx->bl_sensor.fd = -1;
+	ctx->on_trigger = NULL;
+	ctx->on_timeout = NULL;
+}
+
 static void init_sysfs_caches(struct pg_context *ctx)
 {
 	pg_sysfs_cache_init(&ctx->sched_lat, PG_PATH_SCHED_LAT);
@@ -54,10 +75,11 @@ static void init_sysfs_caches(struct pg_context *ctx)
 
 static int init_sensors_and_triggers(struct pg_context *ctx)
 {
-	char cpu_thermal_path[256];
-	pg_scan_thermal_zone(cpu_thermal_path, sizeof(cpu_thermal_path));
-	LOGD("daemon: cpu thermal sensor mapped to %s", cpu_thermal_path);
-	pg_sensor_init_cpu_temp(&ctx->cpu_temp_sensor, cpu_thermal_path);
+	char t_path[256];
+	pg_scan_thermal_zone(t_path, sizeof(t_path));
+	LOGD("daemon: cpu thermal sensor mapped to %s", t_path);
+	pg_sensor_init_cpu_temp(&ctx->cpu_temp_sensor, t_path);
+
 	pg_sensor_init_bat_temp(&ctx->bat_temp_sensor, PG_PATH_BATTERY_TEMP);
 	pg_sensor_init_bat_cap(&ctx->bat_cap_sensor, PG_PATH_BATTERY_CAP);
 
@@ -79,16 +101,16 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	pg_poll_init(&ctx->poll_state, PG_CFG_CTRL.press_wt,
 		     PG_CFG_CTRL.deriv_wt, &PG_CFG_POLL);
 
-	char bl_path[256];
-	pg_scan_backlight(bl_path, sizeof(bl_path));
-	pg_sensor_init_bl(&ctx->bl_sensor, bl_path);
+	char b_path[256];
+	pg_scan_backlight(b_path, sizeof(b_path));
+	pg_sensor_init_bl(&ctx->bl_sensor, b_path);
 
 	return 0;
 }
 
 int pg_daemon_init(void)
 {
-	int status = 0;
+	int ret = 0;
 
 	LOGI("daemon: initiating daemon sequence");
 
@@ -108,30 +130,14 @@ int pg_daemon_init(void)
 		return 1;
 
 	LOGD("daemon: initializing state context");
-	context.shutdown_req = false;
-	context.next_wake = PG_MIN_POLL_MS;
-	context.load_state.first_run = true;
-	context.load_state.psi_val = 0;
-	context.load_state.rate = 0;
-	context.load_state.prev_integ = 0;
-	context.epoll_fd = -1;
-	context.sig_fd = -1;
-	context.trg_fd = -1;
-	context.psi.fd = -1;
-	context.cpu_temp_sensor.fd = -1;
-	context.bat_temp_sensor.fd = -1;
-	context.bat_cap_sensor.fd = -1;
-	context.bl_sensor.fd = -1;
-	context.on_trigger = NULL;
-	context.on_timeout = NULL;
-
+	init_context_defaults(&context);
 	init_sysfs_caches(&context);
 
 	LOGD("daemon: executing limits tuning");
 	pg_tune_limits();
 
 	if (init_sensors_and_triggers(&context) != 0) {
-		status = 1;
+		ret = 1;
 		goto cleanup;
 	}
 
@@ -148,9 +154,9 @@ int pg_daemon_init(void)
 	context.on_trigger = pg_gov_process;
 	context.on_timeout = pg_gov_process;
 	LOGI("daemon: entering epoll reactor loop");
-	status = pg_epoll_run(&context);
+	ret = pg_epoll_run(&context);
 
-	LOGI("daemon: reactor shutdown cleanly status=%d", status);
+	LOGI("daemon: reactor shutdown cleanly status=%d", ret);
 
 cleanup:
 	if (context.trg_fd >= 0)
@@ -171,5 +177,5 @@ cleanup:
 	pg_sysfs_cache_cleanup(&context.sched_walt);
 	pg_sysfs_cache_cleanup(&context.sched_ucl);
 
-	return status;
+	return ret;
 }

@@ -17,11 +17,19 @@
 struct pg_context;
 typedef void (*pg_event_cb)(struct pg_context *ctx);
 
+enum pg_disp_state {
+	PG_DISP_UNKNOWN = 0,
+	PG_DISP_ON,
+	PG_DISP_GRACE,
+	PG_DISP_SUSPEND
+};
+
 struct ALIGNED(64) pg_context {
 	struct pg_psi_monitor psi;
 	struct pg_temp_sensor cpu_temp_sensor;
 	struct pg_temp_sensor bat_temp_sensor;
 	struct pg_bat_sensor bat_cap_sensor;
+	struct pg_bl_sensor bl_sensor;
 	struct pg_sysfs_cache sched_lat;
 	struct pg_sysfs_cache sched_gran;
 	struct pg_sysfs_cache sched_wake;
@@ -31,13 +39,15 @@ struct ALIGNED(64) pg_context {
 	struct pg_thermal_state thermal_state;
 	struct pg_load_state load_state;
 	struct pg_poll_state poll_state;
-	struct pg_bl_sensor bl_sensor;
+
+	enum pg_disp_state disp_state;
 
 	q16_t bat_lvl;
 	q16_t bat_temp;
 
 	struct timespec last_bat;
 	struct timespec last_tick;
+	struct timespec last_dispoff;
 
 #if defined(NDK_BUILD)
 	struct timespec last_sweep;

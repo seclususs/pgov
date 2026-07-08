@@ -37,7 +37,7 @@ void pg_tune_limits(void)
 	cap = pg_math_clamp(cap, 0, Q16_ONE);
 
 	val = pg_math_lerp(FLOAT_TO_Q16(384.0F), FLOAT_TO_Q16(1024.0F), cap);
-	LIM_CPU.max_uclamp =
+	LIM_CPU.max_ucl =
 		pg_math_clamp(val, FLOAT_TO_Q16(384.0F), FLOAT_TO_Q16(1024.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(20.0F), FLOAT_TO_Q16(4.0F), cap);

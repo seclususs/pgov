@@ -20,8 +20,8 @@ struct pg_cpu_lim {
 	q16_t max_mig;
 	q16_t min_walt;
 	q16_t max_walt;
-	q16_t min_uclamp;
-	q16_t max_uclamp;
+	q16_t min_ucl;
+	q16_t max_ucl;
 };
 
 struct pg_cpu_cfg {
@@ -85,29 +85,30 @@ q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
 			      const struct pg_demand_input *RESTRICT input,
 			      const struct pg_cpu_cfg *RESTRICT cfg);
 
-PURE q16_t pg_cpu_calc_trend_gain(q16_t velocity);
+PURE q16_t pg_cpu_calc_trend_gain(q16_t vel);
 
-PURE q16_t pg_cpu_calc_eff_press(q16_t l_dem, q16_t trend_fact,
+PURE q16_t pg_cpu_calc_eff_press(q16_t l_dem, q16_t t_fact,
 				 const struct pg_cpu_cfg *cfg);
 
-PURE q16_t pg_cpu_calc_therm_lat(q16_t therm_scale,
-				 const struct pg_cpu_lim *lim);
+PURE q16_t pg_cpu_calc_therm_lat(q16_t th_scl, const struct pg_cpu_lim *lim);
 
-void pg_cpu_calc_lat_gran(q16_t p_eff, q16_t l_dem, q16_t therm_lat,
-			  const struct pg_cpu_cfg *RESTRICT cfg,
-			  const struct pg_cpu_lim *RESTRICT lim,
-			  q16_t *RESTRICT lat, q16_t *RESTRICT gran);
+PURE q16_t pg_cpu_calc_lat(q16_t p_eff, q16_t l_dem, q16_t th_lat,
+			   const struct pg_cpu_cfg *RESTRICT cfg,
+			   const struct pg_cpu_lim *RESTRICT lim);
+
+PURE q16_t pg_cpu_calc_gran(q16_t lat, const struct pg_cpu_cfg *RESTRICT cfg,
+			    const struct pg_cpu_lim *RESTRICT lim);
 
 PURE q16_t pg_cpu_calc_wakeup(q16_t p_eff,
 			      const struct pg_cpu_cfg *RESTRICT cfg,
 			      const struct pg_cpu_lim *RESTRICT lim);
 
-PURE q16_t pg_cpu_calc_migration(q16_t velocity, q16_t p_eff,
+PURE q16_t pg_cpu_calc_migration(q16_t vel, q16_t p_eff,
 				 const struct pg_cpu_lim *lim);
 
-PURE q16_t pg_cpu_calc_walt(q16_t pressure, const struct pg_cpu_lim *lim);
+PURE q16_t pg_cpu_calc_walt(q16_t press, const struct pg_cpu_lim *lim);
 
-PURE q16_t pg_cpu_calc_uclamp(q16_t pressure, q16_t therm_scale,
+PURE q16_t pg_cpu_calc_uclamp(q16_t press, q16_t th_scl,
 			      const struct pg_cpu_cfg *RESTRICT cfg,
 			      const struct pg_cpu_lim *RESTRICT lim);
 

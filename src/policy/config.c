@@ -14,5 +14,5 @@ struct pg_cpu_lim LIM_CPU = { .min_lat = FLOAT_TO_Q16(8.0F),
 			      .max_mig = FLOAT_TO_Q16(0.6F),
 			      .min_walt = FLOAT_TO_Q16(10.0F),
 			      .max_walt = FLOAT_TO_Q16(40.0F),
-			      .min_uclamp = FLOAT_TO_Q16(0.0F),
-			      .max_uclamp = FLOAT_TO_Q16(384.0F) };
+			      .min_ucl = FLOAT_TO_Q16(0.0F),
+			      .max_ucl = FLOAT_TO_Q16(384.0F) };

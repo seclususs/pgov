@@ -31,30 +31,69 @@ int pg_gov_init(struct pg_context *ctx)
 	return 0;
 }
 
-static inline void exec_gov_logic(struct pg_context *RESTRICT ctx,
-				  const struct timespec *RESTRICT now)
+static inline bool update_disp(struct pg_context *RESTRICT ctx,
+			       const struct timespec *RESTRICT now)
 {
-	struct pg_psi_data psi_data;
-	int psi_status = pg_psi_read(&ctx->psi, &psi_data, now);
+	int32_t bl = 0;
+	pg_sensor_read_bl(&ctx->bl_sensor, &bl);
+	bool on = (bl > 0);
 
-	if (UNLIKELY(psi_status != 0)) {
-		LOGW("gov: psi read failed status=%d, init recov", psi_status);
-		pg_epoll_rm_trg(ctx);
+	if (on && UNLIKELY(ctx->disp_state != PG_DISP_ON)) {
+		ctx->load_state.first_run = true;
+		pg_kalman_reset(&ctx->psi.filter);
+		ctx->psi.first_run = true;
+		ctx->disp_state = PG_DISP_ON;
+	} else if (!on && (ctx->disp_state == PG_DISP_ON ||
+			   ctx->disp_state == PG_DISP_UNKNOWN)) {
+		ctx->disp_state = PG_DISP_GRACE;
+		ctx->last_dispoff = *now;
+	} else if (!on && ctx->disp_state == PG_DISP_GRACE) {
+		if (pg_dt_sec(&ctx->last_dispoff, now) > INT_TO_Q16(10))
+			ctx->disp_state = PG_DISP_SUSPEND;
+	}
 
-		if (ctx->trg_fd >= 0) {
-			pg_psi_close_trg(ctx->trg_fd);
-			ctx->trg_fd = -1;
+	if (ctx->disp_state == PG_DISP_SUSPEND) {
+		ctx->next_wake = 5000;
+		ctx->last_tick = *now;
+
+#if defined(NDK_BUILD)
+		q16_t sweep_elaps = pg_dt_sec(&ctx->last_sweep, now);
+		if (sweep_elaps > INT_TO_Q16(PG_SWEEP_IVL_SEC)) {
+			pg_sweep_run(ctx);
+			clock_gettime(CLOCK_MONOTONIC, &ctx->last_sweep);
 		}
+#endif // NDK_BUILD
 
-		if (pg_psi_recov(&ctx->psi, PG_PATH_PSI_CPU) == 0) {
-			ctx->trg_fd = pg_psi_open_trg(PG_PATH_PSI_CPU,
-						      PG_CFG_CTRL.thresh_us,
-						      PG_CFG_CTRL.win_us);
-			if (ctx->trg_fd >= 0)
-				pg_epoll_add_trg(ctx);
-		}
+		return true;
+	}
 
-		return;
+	return false;
+}
+
+static inline bool read_psi(struct pg_context *RESTRICT ctx,
+			    const struct timespec *RESTRICT now,
+			    struct pg_psi_data *RESTRICT psi)
+{
+	int status = pg_psi_read(&ctx->psi, psi, now);
+	if (LIKELY(status == 0))
+		return true;
+
+	LOGW("gov: psi read failed status=%d, init recov", status);
+	pg_epoll_rm_trg(ctx);
+
+	if (ctx->trg_fd >= 0) {
+		pg_psi_close_trg(ctx->trg_fd);
+		ctx->trg_fd = -1;
+	}
+
+	if (pg_psi_recov(&ctx->psi, PG_PATH_PSI_CPU) == 0) {
+		ctx->trg_fd = pg_psi_open_trg(PG_PATH_PSI_CPU,
+					      PG_CFG_CTRL.thresh_us,
+					      PG_CFG_CTRL.win_us);
+		if (ctx->trg_fd >= 0)
+			pg_epoll_add_trg(ctx);
+
+		return false;
 	}
 
 	if (UNLIKELY(ctx->trg_fd < 0)) {
@@ -65,8 +104,17 @@ static inline void exec_gov_logic(struct pg_context *RESTRICT ctx,
 			pg_epoll_add_trg(ctx);
 	}
 
-	q16_t elapsed_bat_sec = pg_dt_sec(&ctx->last_bat, now);
-	if (elapsed_bat_sec >= INT_TO_Q16(PG_CFG_CTRL.bat_chk_sec)) {
+	return false;
+}
+
+static inline void calc_demand(struct pg_context *RESTRICT ctx,
+			       const struct timespec *RESTRICT now,
+			       const struct pg_psi_data *RESTRICT psi,
+			       q16_t *RESTRICT th_scl, q16_t *RESTRICT l_dem,
+			       q16_t *RESTRICT p_eff)
+{
+	q16_t elaps_bat = pg_dt_sec(&ctx->last_bat, now);
+	if (elaps_bat >= INT_TO_Q16(PG_CFG_CTRL.bat_chk_sec)) {
 		pg_sensor_read_bat_cap(&ctx->bat_cap_sensor, &ctx->bat_lvl);
 		pg_sensor_read_bat_temp(&ctx->bat_temp_sensor, &ctx->bat_temp);
 		ctx->last_bat = *now;
@@ -74,105 +122,103 @@ static inline void exec_gov_logic(struct pg_context *RESTRICT ctx,
 
 	q16_t cpu_temp;
 	pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor, &cpu_temp);
-	q16_t therm_scale = pg_thermal_update(&ctx->thermal_state, cpu_temp,
-					      ctx->bat_temp, psi_data.some.cur,
-					      &PG_CFG_THERMAL, now);
+	*th_scl = pg_thermal_update(&ctx->thermal_state, cpu_temp,
+				    ctx->bat_temp, psi->some.cur,
+				    &PG_CFG_THERMAL, now);
 
-	q16_t trend_fact = pg_cpu_calc_trend_gain(psi_data.some.vel);
+	q16_t t_fact = pg_cpu_calc_trend_gain(psi->some.vel);
 	q16_t dt_real = pg_dt_sec(&ctx->last_tick, now);
 	q16_t dt_safe = pg_math_clamp(dt_real, 1, FLOAT_TO_Q16(0.1F));
 	ctx->last_tick = *now;
 
 	q16_t integ;
-	q16_t integ_dt;
+	q16_t i_dt;
 	pg_cpu_upd_integ_params(&ctx->load_state, ctx->bat_lvl, dt_safe,
-				&PG_CFG_CPU, &integ, &integ_dt);
+				&PG_CFG_CPU, &integ, &i_dt);
 
-	bool struct_break = psi_data.some.nis > PG_CFG_CPU.nis_thresh;
-	struct pg_demand_input demand_in = { .tgt_psi = psi_data.some.cur,
-					     .vel = psi_data.some.vel,
-					     .dt_real = dt_real,
-					     .dt_safe = dt_safe,
-					     .therm_scale = therm_scale,
-					     .trend_fact = trend_fact,
-					     .integ = integ,
-					     .integ_dt = integ_dt,
-					     .struct_break = struct_break };
+	bool s_break = psi->some.nis > PG_CFG_CPU.nis_thresh;
+	struct pg_demand_input d_in = { .tgt_psi = psi->some.cur,
+					.vel = psi->some.vel,
+					.dt_real = dt_real,
+					.dt_safe = dt_safe,
+					.therm_scale = *th_scl,
+					.trend_fact = t_fact,
+					.integ = integ,
+					.integ_dt = i_dt,
+					.struct_break = s_break };
 
-	q16_t load_demand = pg_cpu_calc_load_demand(&ctx->load_state,
-						    &demand_in, &PG_CFG_CPU);
-	q16_t p_eff =
-		pg_cpu_calc_eff_press(load_demand, trend_fact, &PG_CFG_CPU);
+	*l_dem = pg_cpu_calc_load_demand(&ctx->load_state, &d_in, &PG_CFG_CPU);
+	*p_eff = pg_cpu_calc_eff_press(*l_dem, t_fact, &PG_CFG_CPU);
+}
 
-	int32_t next_poll = (int32_t)pg_poll_calc_next(&ctx->poll_state, p_eff,
-						       psi_data.some.avg300,
-						       psi_data.some.vel);
+static inline void update_sysfs(struct pg_context *RESTRICT ctx,
+				const struct pg_psi_data *RESTRICT psi,
+				q16_t th_scl, q16_t l_dem, q16_t p_eff)
+{
+	int32_t n_poll = (int32_t)pg_poll_calc_next(
+		&ctx->poll_state, p_eff, psi->some.avg300, psi->some.vel);
 
-	if (pg_cpu_trans(&ctx->load_state, psi_data.some.cur, &PG_CFG_CPU)) {
-		int32_t trans_poll = Q16_TO_INT(PG_CFG_CPU.trans_poll);
-		if (next_poll > trans_poll)
-			next_poll = trans_poll;
+	if (pg_cpu_trans(&ctx->load_state, psi->some.cur, &PG_CFG_CPU)) {
+		int32_t t_poll = Q16_TO_INT(PG_CFG_CPU.trans_poll);
+		if (n_poll > t_poll)
+			n_poll = t_poll;
 	}
+	ctx->next_wake = n_poll;
 
-	ctx->next_wake = next_poll;
-
-	q16_t therm_lat = pg_cpu_calc_therm_lat(therm_scale, &LIM_CPU);
-	q16_t lat;
-	q16_t gran;
-	pg_cpu_calc_lat_gran(p_eff, load_demand, therm_lat, &PG_CFG_CPU,
-			     &LIM_CPU, &lat, &gran);
-
+	q16_t th = pg_cpu_calc_therm_lat(th_scl, &LIM_CPU);
+	q16_t lat = pg_cpu_calc_lat(p_eff, l_dem, th, &PG_CFG_CPU, &LIM_CPU);
+	q16_t gran = pg_cpu_calc_gran(lat, &PG_CFG_CPU, &LIM_CPU);
 	q16_t wake = pg_cpu_calc_wakeup(p_eff, &PG_CFG_CPU, &LIM_CPU);
-	q16_t mig = pg_cpu_calc_migration(psi_data.some.vel, p_eff, &LIM_CPU);
+	q16_t mig = pg_cpu_calc_migration(psi->some.vel, p_eff, &LIM_CPU);
 	q16_t walt = pg_cpu_calc_walt(p_eff, &LIM_CPU);
-	q16_t ucl =
-		pg_cpu_calc_uclamp(p_eff, therm_scale, &PG_CFG_CPU, &LIM_CPU);
+	q16_t ucl = pg_cpu_calc_uclamp(p_eff, th_scl, &PG_CFG_CPU, &LIM_CPU);
 
-	uint64_t lat_u64 =
+	uint64_t l_u64 =
 		pg_math_san_quant_u64(lat, LIM_CPU.max_lat, PG_QUANT_NS);
 
-	uint64_t gran_u64 =
+	uint64_t g_u64 =
 		pg_math_san_quant_u64(gran, LIM_CPU.max_gran, PG_QUANT_NS);
 
-	uint64_t wake_u64 =
+	uint64_t w_u64 =
 		pg_math_san_quant_u64(wake, LIM_CPU.max_wake, PG_QUANT_NS);
 
-	uint64_t mig_u64 =
+	uint64_t m_u64 =
 		pg_math_san_quant_u64(mig, LIM_CPU.min_mig, PG_QUANT_NS);
 
-	uint64_t walt_u64 =
+	uint64_t wl_u64 =
 		pg_math_san_u64(walt, (uint64_t)Q16_TO_INT(LIM_CPU.min_walt));
 
-	uint64_t ucl_u64 =
-		pg_math_san_u64(ucl, (uint64_t)Q16_TO_INT(LIM_CPU.min_uclamp));
+	uint64_t u_u64 =
+		pg_math_san_u64(ucl, (uint64_t)Q16_TO_INT(LIM_CPU.min_ucl));
 
 	LOGD("gov: lat=%llu gran=%llu wake=%llu mig=%llu walt=%llu uclamp=%llu poll=%d",
-	     (unsigned long long)lat_u64, (unsigned long long)gran_u64,
-	     (unsigned long long)wake_u64, (unsigned long long)mig_u64,
-	     (unsigned long long)walt_u64, (unsigned long long)ucl_u64,
-	     next_poll);
+	     (unsigned long long)l_u64, (unsigned long long)g_u64,
+	     (unsigned long long)w_u64, (unsigned long long)m_u64,
+	     (unsigned long long)wl_u64, (unsigned long long)u_u64, n_poll);
 
-#if defined(NDK_BUILD)
-	q16_t sweep_elaps = pg_dt_sec(&ctx->last_sweep, now);
-	if (sweep_elaps > INT_TO_Q16(PG_SWEEP_IVL_SEC)) {
-		int32_t bl = 0;
-		pg_sensor_read_bl(&ctx->bl_sensor, &bl);
+	pg_sysfs_update(&ctx->sched_lat, l_u64, false, &CHK_LAT);
+	pg_sysfs_update(&ctx->sched_gran, g_u64, false, &CHK_GRAN);
+	pg_sysfs_update(&ctx->sched_wake, w_u64, false, &CHK_WAKE);
+	pg_sysfs_update(&ctx->sched_mig, m_u64, false, &CHK_MIG);
+	pg_sysfs_update(&ctx->sched_walt, wl_u64, false, &CHK_WALT);
+	pg_sysfs_update(&ctx->sched_ucl, u_u64, false, &CHK_UCL);
+}
 
-		if (bl == 0 && psi_data.some.avg10 < INT_TO_Q16(3) &&
-		    psi_data.some.cur < INT_TO_Q16(3)) {
-			LOGD("gov: idle detected, running sweep cycle");
-			pg_sweep_run(ctx);
-			clock_gettime(CLOCK_MONOTONIC, &ctx->last_sweep);
-		}
-	}
-#endif // NDK_BUILD
+static inline void exec_gov_logic(struct pg_context *RESTRICT ctx,
+				  const struct timespec *RESTRICT now)
+{
+	if (update_disp(ctx, now))
+		return;
 
-	pg_sysfs_update(&ctx->sched_lat, lat_u64, false, &CHK_LAT);
-	pg_sysfs_update(&ctx->sched_gran, gran_u64, false, &CHK_GRAN);
-	pg_sysfs_update(&ctx->sched_wake, wake_u64, false, &CHK_WAKE);
-	pg_sysfs_update(&ctx->sched_mig, mig_u64, false, &CHK_MIG);
-	pg_sysfs_update(&ctx->sched_walt, walt_u64, false, &CHK_WALT);
-	pg_sysfs_update(&ctx->sched_ucl, ucl_u64, false, &CHK_UCL);
+	struct pg_psi_data psi;
+	if (!read_psi(ctx, now, &psi))
+		return;
+
+	q16_t th_scl;
+	q16_t l_dem;
+	q16_t p_eff;
+	calc_demand(ctx, now, &psi, &th_scl, &l_dem, &p_eff);
+	update_sysfs(ctx, &psi, th_scl, l_dem, p_eff);
 }
 
 void pg_gov_process(struct pg_context *ctx)
