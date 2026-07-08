@@ -1,0 +1,47 @@
+cc_library_static {
+    name: "libpgov",
+    srcs: [
+        "src/**/*.c",
+    ],
+    exclude_srcs: ["src/main.c"],
+    local_include_dirs: ["include"],
+    export_include_dirs: ["include"],
+    c_std: "c11",
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-O2",
+        "-ffunction-sections",
+        "-fdata-sections",
+        "-fvisibility=hidden",
+        "-fno-math-errno",
+        "-fno-signed-zeros",
+        "-fno-trapping-math",
+    ],
+    lto: {
+        thin: true,
+    },
+    vendor: true,
+}
+
+cc_binary {
+    name: "pgovd",
+    srcs: ["src/main.c"],
+    c_std: "c11",
+    static_libs: [
+        "libpgov",
+    ],
+    shared_libs: [
+        "liblog",
+    ],
+    init_rc: ["pgovd.rc"],
+    ldflags: [
+        "-Wl,--gc-sections",
+        "-Wl,--icf=all",
+    ],
+    lto: {
+        thin: true,
+    },
+    vendor: true,
+}
