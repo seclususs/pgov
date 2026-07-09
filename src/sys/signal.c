@@ -25,26 +25,31 @@ static void pg_crash_handler(int sig, siginfo_t *info, void *context)
 int pg_signal_init(void)
 {
 	sigset_t mask;
-	sigemptyset(&mask);
+	int err;
 
+	sigemptyset(&mask);
 	sigaddset(&mask, SIGINT);
 	sigaddset(&mask, SIGTERM);
 	sigaddset(&mask, SIGHUP);
 
 	if (sigprocmask(SIG_BLOCK, &mask, NULL) == -1) {
-		int err = errno;
+		err = errno;
 		LOGE("signal: failed to block default handlers err=%d", err);
 		return -err;
 	}
 
 	int sfd = signalfd(-1, &mask, SFD_CLOEXEC | SFD_NONBLOCK);
 	if (sfd == -1) {
-		int err = errno;
+		err = errno;
 		LOGE("signal: failed to create signalfd err=%d", err);
-		return -err;
+		goto out_unblock;
 	}
 
 	return sfd;
+
+out_unblock:
+	sigprocmask(SIG_UNBLOCK, &mask, NULL);
+	return -err;
 }
 
 void pg_signal_catch_crash(void)

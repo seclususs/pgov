@@ -6,6 +6,7 @@
 #include "str.h"
 #include "paths.h"
 #include <dirent.h>
+#include <errno.h> // IWYU pragma: keep
 #include <fcntl.h>
 #include <stdbool.h>
 #include <string.h>
@@ -51,23 +52,79 @@ static const char *const BLACKLIST[] = {
 	"pmic",	   "buck", "ldo",  "xo_therm", "quiet",	 "backlight"
 };
 
+struct tz_info {
+	char name[64];
+	char folder[64];
+};
+
+static inline bool thermal_valid(const char *name)
+{
+	char l_name[64];
+	strncpy(l_name, name, sizeof(l_name) - 1);
+	l_name[sizeof(l_name) - 1] = '\0';
+	pg_str_to_lower(l_name);
+
+	bool cpu = (pg_str_contains(l_name, "cpu") ||
+		    pg_str_contains(l_name, "soc") ||
+		    pg_str_contains(l_name, "cluster") ||
+		    pg_str_contains(l_name, "ap")) != 0;
+
+	if (!cpu)
+		return false;
+
+	for (size_t i = 0; i < ARRAY_SIZE(BLACKLIST); ++i) {
+		if (pg_str_contains(l_name, BLACKLIST[i]))
+			return false;
+	}
+
+	return true;
+}
+
+static inline int find_priority(const struct tz_info *zones, size_t nr_zones,
+				char *path, size_t len)
+{
+	for (size_t i = 0; i < ARRAY_SIZE(PRIORITY); ++i) {
+		for (size_t z = 0; z < nr_zones; ++z) {
+			if (strcmp(zones[z].name, PRIORITY[i]) == 0) {
+				pg_str_build_path(path, len,
+						  PG_PATH_THERMAL_BASE,
+						  zones[z].folder, "temp");
+				return 0;
+			}
+		}
+	}
+
+	return -ENOENT;
+}
+
+static inline int find_heuristic(const struct tz_info *zones, size_t nr_zones,
+				 char *path, size_t len)
+{
+	for (size_t z = 0; z < nr_zones; ++z) {
+		if (thermal_valid(zones[z].name)) {
+			pg_str_build_path(path, len, PG_PATH_THERMAL_BASE,
+					  zones[z].folder, "temp");
+			return 0;
+		}
+	}
+
+	return -ENOENT;
+}
+
 int pg_scan_thermal_zone(char *path, size_t len)
 {
 	DIR *dir = opendir(PG_PATH_THERMAL_BASE);
 	if (!dir) {
-		path[0] = '\0';
-		return -1;
+		if (len > 0)
+			path[0] = '\0';
+
+		return -ENOENT;
 	}
 
 	struct dirent *entry;
 	char type_path[256];
 	char buf[64];
-
-	struct {
-		char name[64];
-		char folder[64];
-	} zones[256];
-
+	struct tz_info zones[256];
 	size_t nr_zones = 0;
 
 	while ((entry = readdir(dir)) != NULL && nr_zones < 256) {
@@ -108,54 +165,16 @@ int pg_scan_thermal_zone(char *path, size_t len)
 
 	closedir(dir);
 
-	for (size_t i = 0; i < ARRAY_SIZE(PRIORITY); ++i) {
-		for (size_t z = 0; z < nr_zones; ++z) {
-			if (strcmp(zones[z].name, PRIORITY[i]) == 0) {
-				pg_str_build_path(path, len,
-						  PG_PATH_THERMAL_BASE,
-						  zones[z].folder, "temp");
-				return 0;
-			}
-		}
-	}
+	if (find_priority(zones, nr_zones, path, len) == 0)
+		return 0;
 
-	for (size_t z = 0; z < nr_zones; ++z) {
-		char lower_name[64];
-		strcpy(lower_name, zones[z].name);
-		pg_str_to_lower(lower_name);
+	if (find_heuristic(zones, nr_zones, path, len) == 0)
+		return 0;
 
-		bool is_cpu = pg_str_contains(lower_name, "cpu");
+	if (len > 0)
+		path[0] = '\0';
 
-		if (!is_cpu)
-			is_cpu = pg_str_contains(lower_name, "soc");
-
-		if (!is_cpu)
-			is_cpu = pg_str_contains(lower_name, "cluster");
-
-		if (!is_cpu)
-			is_cpu = pg_str_contains(lower_name, "ap");
-
-		if (!is_cpu)
-			continue;
-
-		bool is_safe = true;
-
-		for (size_t i = 0; i < ARRAY_SIZE(BLACKLIST); ++i) {
-			if (pg_str_contains(lower_name, BLACKLIST[i])) {
-				is_safe = false;
-				break;
-			}
-		}
-
-		if (is_cpu && is_safe) {
-			pg_str_build_path(path, len, PG_PATH_THERMAL_BASE,
-					  zones[z].folder, "temp");
-			return 0;
-		}
-	}
-
-	path[0] = '\0';
-	return -1;
+	return -ENODEV;
 }
 
 int pg_scan_backlight(char *path, size_t len)
@@ -165,7 +184,7 @@ int pg_scan_backlight(char *path, size_t len)
 		if (len > 0)
 			path[0] = '\0';
 
-		return -1;
+		return -ENOENT;
 	}
 
 	struct dirent *entry;
@@ -192,7 +211,7 @@ int pg_scan_backlight(char *path, size_t len)
 		if (len > 0)
 			path[0] = '\0';
 
-		return -1;
+		return -ENODEV;
 	}
 
 	return 0;

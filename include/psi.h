@@ -36,16 +36,15 @@ int pg_psi_open_trg(const char *path, int32_t threshold_us, int32_t window_us);
 
 void pg_psi_close_trg(int fd);
 
-int pg_psi_recov(struct pg_psi_monitor *RESTRICT monitor,
+int pg_psi_recov(struct pg_psi_monitor *RESTRICT mon,
 		 const char *RESTRICT path);
 
-void pg_psi_init(struct pg_psi_monitor *RESTRICT monitor,
-		 const char *RESTRICT path,
+void pg_psi_init(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path,
 		 const struct pg_kalman_cfg *RESTRICT cfg);
 
-void pg_psi_cleanup(struct pg_psi_monitor *monitor);
+void pg_psi_cleanup(struct pg_psi_monitor *mon);
 
-int pg_psi_read(struct pg_psi_monitor *RESTRICT monitor,
+int pg_psi_read(struct pg_psi_monitor *RESTRICT mon,
 		struct pg_psi_data *RESTRICT data,
 		const struct timespec *RESTRICT now);
 
