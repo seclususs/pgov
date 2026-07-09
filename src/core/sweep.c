@@ -78,14 +78,15 @@ static enum pg_fs_act sweep_cb(int dfd, const char *RESTRICT name, uint8_t type,
 	if (type == DT_DIR)
 		return FS_KEEP;
 
-	if (fstatat(dfd, name, &st, AT_SYMLINK_NOFOLLOW) == 0) {
-		if (S_ISREG(st.st_mode) &&
-		    sctx->now_sec > (uint64_t)st.st_mtime) {
-			uint64_t age = sctx->now_sec - (uint64_t)st.st_mtime;
-			if (age > AGE_LIMIT)
-				return FS_DELETE;
-		}
-	}
+	if (fstatat(dfd, name, &st, AT_SYMLINK_NOFOLLOW) != 0)
+		return FS_KEEP;
+
+	if (!S_ISREG(st.st_mode) || sctx->now_sec <= (uint64_t)st.st_mtime)
+		return FS_KEEP;
+
+	uint64_t age = sctx->now_sec - (uint64_t)st.st_mtime;
+	if (age > AGE_LIMIT)
+		return FS_DELETE;
 
 	return FS_KEEP;
 }
@@ -103,10 +104,8 @@ static void sweep_package(int root_fd, const char *RESTRICT pkg_name,
 		close(cache_fd);
 	}
 
-	if (sctx->intr) {
-		close(pkg_fd);
-		return;
-	}
+	if (sctx->intr)
+		goto out_close;
 
 	int code_fd = openat(pkg_fd, "code_cache", DIR_FLAGS);
 	if (code_fd >= 0) {
@@ -114,6 +113,7 @@ static void sweep_package(int root_fd, const char *RESTRICT pkg_name,
 		close(code_fd);
 	}
 
+out_close:
 	close(pkg_fd);
 }
 

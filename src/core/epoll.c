@@ -14,9 +14,8 @@
 #include <time.h>
 #include <unistd.h>
 
-static inline void
-handle_epoll_error(struct pg_context *RESTRICT ctx,
-		   const struct timespec *RESTRICT wait_start)
+static inline void epoll_error(struct pg_context *RESTRICT ctx,
+			       const struct timespec *RESTRICT wait_start)
 {
 	if (errno == EINTR) {
 		struct timespec wait_end;
@@ -34,20 +33,17 @@ handle_epoll_error(struct pg_context *RESTRICT ctx,
 	}
 }
 
-static inline void handle_epoll_events(struct pg_context *RESTRICT ctx,
-				       struct epoll_event *RESTRICT events,
-				       int nfds)
+static inline void epoll_events(struct pg_context *RESTRICT ctx,
+				struct epoll_event *RESTRICT events, int nfds)
 {
 	for (int i = 0; i < nfds; ++i) {
 		int ev_fd = events[i].data.fd;
 
 		if (ev_fd == ctx->sig_fd) {
-			struct signalfd_siginfo siginfo;
+			struct signalfd_siginfo s_info;
+			ssize_t s = read(ctx->sig_fd, &s_info, sizeof(s_info));
 
-			ssize_t s =
-				read(ctx->sig_fd, &siginfo, sizeof(siginfo));
-
-			if (s == sizeof(siginfo))
+			if (s == sizeof(s_info))
 				ctx->shutdown_req = true;
 
 		} else if (ev_fd == ctx->trg_fd) {
@@ -59,16 +55,17 @@ static inline void handle_epoll_events(struct pg_context *RESTRICT ctx,
 
 int pg_epoll_add_trg(struct pg_context *ctx)
 {
-	if (ctx->trg_fd >= 0 && ctx->epoll_fd >= 0) {
-		struct epoll_event ev_trg = { 0 };
-		ev_trg.events = EPOLLPRI | EPOLLERR | EPOLLET;
-		ev_trg.data.fd = ctx->trg_fd;
+	if (ctx->trg_fd < 0 || ctx->epoll_fd < 0)
+		return -EBADF;
 
-		return epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->trg_fd,
-				 &ev_trg);
-	}
+	struct epoll_event ev_trg = { 0 };
+	ev_trg.events = EPOLLPRI | EPOLLERR | EPOLLET;
+	ev_trg.data.fd = ctx->trg_fd;
 
-	return -1;
+	if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->trg_fd, &ev_trg) < 0)
+		return -errno;
+
+	return 0;
 }
 
 void pg_epoll_rm_trg(struct pg_context *ctx)
@@ -81,7 +78,7 @@ int pg_epoll_run(struct pg_context *ctx)
 {
 	ctx->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
 	if (ctx->epoll_fd < 0)
-		return -1;
+		return -errno;
 
 	struct epoll_event ev_sig = { 0 };
 	ev_sig.events = EPOLLIN | EPOLLERR;
@@ -103,7 +100,7 @@ int pg_epoll_run(struct pg_context *ctx)
 				      ctx->next_wake);
 
 		if (UNLIKELY(nfds < 0)) {
-			handle_epoll_error(ctx, &wait_start);
+			epoll_error(ctx, &wait_start);
 			continue;
 		}
 
@@ -114,7 +111,7 @@ int pg_epoll_run(struct pg_context *ctx)
 			continue;
 		}
 
-		handle_epoll_events(ctx, events, nfds);
+		epoll_events(ctx, events, nfds);
 	}
 
 	close(ctx->epoll_fd);

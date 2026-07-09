@@ -31,12 +31,12 @@ static inline uint64_t poll_next_random(struct pg_poll_state *state,
 	state->rng_state = (state->rng_state * 6364136223846793005ULL) + 1ULL;
 
 	uint64_t limit = range * 2;
-	uint64_t limit_plus_one = limit + 1;
+	uint64_t lim_p1 = limit + 1;
 
-	unsigned __int128 product = (unsigned __int128)state->rng_state *
-				    (unsigned __int128)limit_plus_one;
+	unsigned __int128 p =
+		(unsigned __int128)state->rng_state * (unsigned __int128)lim_p1;
 
-	return (uint64_t)(product >> 64);
+	return (uint64_t)(p >> 64);
 #else
 	uint64_t x = state->rng_state;
 	x ^= x << 13;
@@ -52,8 +52,7 @@ static inline uint64_t poll_discrete(struct pg_poll_state *state, uint64_t ivl,
 				     uint64_t min, uint64_t max)
 {
 	uint64_t step = state->cfg.quant;
-	uint64_t quant = ((ivl + (step / 2)) / step) * step;
-	uint64_t clamp = quant;
+	uint64_t clamp = ((ivl + (step / 2)) / step) * step;
 
 	if (clamp < min)
 		clamp = min;
@@ -61,16 +60,16 @@ static inline uint64_t poll_discrete(struct pg_poll_state *state, uint64_t ivl,
 	if (clamp > max)
 		clamp = max;
 
-	uint64_t noise_ampl = (clamp * state->cfg.noise_pct) / 100;
-	if (UNLIKELY(noise_ampl == 0))
+	uint64_t n_amp = (clamp * state->cfg.noise_pct) / 100;
+	if (UNLIKELY(n_amp == 0))
 		return clamp;
 
-	uint64_t noise = poll_next_random(state, noise_ampl);
+	uint64_t noise = poll_next_random(state, n_amp);
 	uint64_t final;
-	if (noise > noise_ampl)
-		final = clamp + (noise - noise_ampl);
-	else {
-		uint64_t sub = noise_ampl - noise;
+	if (noise > n_amp) {
+		final = clamp + (noise - n_amp);
+	} else {
+		uint64_t sub = n_amp - noise;
 		final = (clamp > sub) ? (clamp - sub) : 0;
 	}
 
@@ -110,27 +109,19 @@ uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
 		max = PG_MAX_POLL_MS;
 	}
 
-	q16_t dv = press_vel;
-	q16_t pred = cur_press + q16_mul(dv, Q16_HALF);
+	q16_t pred = cur_press + q16_mul(press_vel, Q16_HALF);
 	q16_t p_term = q16_mul(pred, state->press_wt);
-	q16_t d_term = q16_mul(ABS_Q16(dv), state->deriv_wt);
+	q16_t d_term = q16_mul(ABS_Q16(press_vel), state->deriv_wt);
 	q16_t score = pg_math_clamp(p_term + d_term, 0, INT_TO_Q16(100));
 
 	q16_t range = INT_TO_Q16(max - min);
 	q16_t raw_ivl = INT_TO_Q16(max) -
 			q16_mul(q16_div(score, INT_TO_Q16(100)), range);
 
-	q16_t target = state->tgt_ivl;
-	q16_t next;
-	if (raw_ivl < target) {
-		q16_t alpha = state->cfg.fall_fact;
-		next = q16_mul(alpha, raw_ivl) +
-		       q16_mul(Q16_ONE - alpha, target);
-	} else {
-		q16_t alpha = state->cfg.rise_fact;
-		next = q16_mul(alpha, raw_ivl) +
-		       q16_mul(Q16_ONE - alpha, target);
-	}
+	q16_t tgt = state->tgt_ivl;
+	q16_t alpha = (raw_ivl < tgt) ? state->cfg.fall_fact :
+					state->cfg.rise_fact;
+	q16_t next = q16_mul(alpha, raw_ivl) + q16_mul(Q16_ONE - alpha, tgt);
 
 	state->tgt_ivl = next;
 	state->last_tick = now;
@@ -139,9 +130,8 @@ uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
 	uint64_t diff = (tgt_ms > state->cur_ivl) ? (tgt_ms - state->cur_ivl) :
 						    (state->cur_ivl - tgt_ms);
 
-	if (diff < state->cfg.hyst)
-		return poll_discrete(state, state->cur_ivl, min, max);
+	if (diff >= state->cfg.hyst)
+		state->cur_ivl = tgt_ms;
 
-	state->cur_ivl = tgt_ms;
 	return poll_discrete(state, state->cur_ivl, min, max);
 }
