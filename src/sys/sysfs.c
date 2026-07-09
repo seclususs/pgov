@@ -29,11 +29,11 @@ void pg_sysfs_cache_cleanup(struct pg_sysfs_cache *cache)
 	cache->active = false;
 }
 
-int32_t pg_sysfs_read_i32(const char *path)
+int pg_sysfs_read_i32(const char *path, int32_t *out_val)
 {
 	int fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0)
-		return -1;
+		return -errno;
 
 	char buf[32];
 	ssize_t bytes = read(fd, buf, sizeof(buf));
@@ -41,12 +41,17 @@ int32_t pg_sysfs_read_i32(const char *path)
 	close(fd);
 
 	if (bytes <= 0)
-		return -1;
+		return (bytes < 0) ? -errno : -ENODATA;
 
 	bool valid;
 	int32_t val = pg_parse_i32((const uint8_t *)buf, (size_t)bytes, &valid);
 
-	return (int)valid ? val : -1;
+	if (!valid)
+		return -EINVAL;
+
+	*out_val = val;
+
+	return 0;
 }
 
 int pg_sysfs_write_strm(int fd, uint64_t value)

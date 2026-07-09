@@ -7,6 +7,7 @@
 #include "compiler.h"
 #include "parser.h"
 #include "sysfs.h"
+#include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
 #include <stdbool.h>
@@ -48,8 +49,8 @@ static bool build_cpuset(long num_cores, const char *RESTRICT fmt,
 		int32_t val;
 
 		format_path(buf, fmt, i);
-		val = pg_sysfs_read_i32(buf);
-		if (val <= 0)
+
+		if (pg_sysfs_read_i32(buf, &val) != 0 || val <= 0)
 			continue;
 
 		found = true;
@@ -75,13 +76,21 @@ int pg_topo_set_little_core(void)
 	int i;
 
 	if (num_cores <= 0)
-		return -1;
+		return -EINVAL;
 
-	if (build_cpuset(num_cores, CPU_CAPACITY, &little_cpuset))
-		return sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset);
+	if (build_cpuset(num_cores, CPU_CAPACITY, &little_cpuset)) {
+		if (sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset) < 0)
+			return -errno;
 
-	if (build_cpuset(num_cores, CPU_MAX_FREQ, &little_cpuset))
-		return sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset);
+		return 0;
+	}
+
+	if (build_cpuset(num_cores, CPU_MAX_FREQ, &little_cpuset)) {
+		if (sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset) < 0)
+			return -errno;
+
+		return 0;
+	}
 
 	LOGW("topology: detection failed, binding to all cores");
 
@@ -89,7 +98,10 @@ int pg_topo_set_little_core(void)
 	for (i = 0; i < num_cores; ++i)
 		CPU_SET(i, &little_cpuset);
 
-	return sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset);
+	if (sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset) < 0)
+		return -errno;
+
+	return 0;
 }
 
 int32_t pg_topo_get_core_count(void)
@@ -112,8 +124,7 @@ int32_t pg_topo_get_max_freq_khz(void)
 		int32_t val;
 
 		format_path(buf, CPU_MAX_FREQ, i);
-		val = pg_sysfs_read_i32(buf);
-		if (val > freq)
+		if (pg_sysfs_read_i32(buf, &val) == 0 && val > freq)
 			freq = val;
 	}
 
