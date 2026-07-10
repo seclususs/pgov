@@ -5,15 +5,10 @@
 #include "pg/config.h"
 #include "pg/time.h"
 
-void pg_poll_init(struct pg_poll_state *RESTRICT state, q16_t press_wt,
-		  q16_t deriv_wt, const struct pg_poll_cfg *RESTRICT cfg)
+void pg_poll_init(struct pg_poll_state *RESTRICT state)
 {
 	state->cur_ivl = PG_MIN_POLL_MS;
 	clock_gettime(CLOCK_MONOTONIC, &state->last_tick);
-	state->tgt_ivl = INT_TO_Q16(PG_MIN_POLL_MS);
-	state->press_wt = press_wt;
-	state->deriv_wt = deriv_wt;
-	state->cfg = *cfg;
 
 	struct timespec now;
 	clock_gettime(CLOCK_REALTIME, &now);
@@ -21,8 +16,7 @@ void pg_poll_init(struct pg_poll_state *RESTRICT state, q16_t press_wt,
 		((uint64_t)now.tv_sec * 1000000000ULL) + (uint64_t)now.tv_nsec;
 }
 
-static inline uint64_t poll_next_random(struct pg_poll_state *state,
-					uint64_t range)
+static inline uint64_t next_random(struct pg_poll_state *state, uint64_t range)
 {
 	if (UNLIKELY(range == 0))
 		return 0;
@@ -48,10 +42,10 @@ static inline uint64_t poll_next_random(struct pg_poll_state *state,
 #endif
 }
 
-static inline uint64_t poll_discrete(struct pg_poll_state *state, uint64_t ivl,
-				     uint64_t min, uint64_t max)
+static inline uint64_t jitter(struct pg_poll_state *state, uint64_t ivl,
+			      uint64_t min, uint64_t max)
 {
-	uint64_t step = state->cfg.quant;
+	uint64_t step = 50;
 	uint64_t clamp = ((ivl + (step / 2)) / step) * step;
 
 	if (clamp < min)
@@ -60,11 +54,11 @@ static inline uint64_t poll_discrete(struct pg_poll_state *state, uint64_t ivl,
 	if (clamp > max)
 		clamp = max;
 
-	uint64_t n_amp = (clamp * state->cfg.noise_pct) / 100;
+	uint64_t n_amp = (clamp * 5) / 100;
 	if (UNLIKELY(n_amp == 0))
 		return clamp;
 
-	uint64_t noise = poll_next_random(state, n_amp);
+	uint64_t noise = next_random(state, n_amp);
 	uint64_t final;
 	if (noise > n_amp) {
 		final = clamp + (noise - n_amp);
@@ -90,48 +84,34 @@ uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
 
 	q16_t elapsed = pg_dt_sec(&state->last_tick, &now);
 	uint64_t ms = (uint64_t)((((q32_t)elapsed) * 1000) >> Q16_SHIFT);
-	if (UNLIKELY(ms > (state->cur_ivl + state->cfg.sleep_tol))) {
+	if (UNLIKELY(ms > (state->cur_ivl + 200))) {
 		state->last_tick = now;
 		state->cur_ivl = PG_MIN_POLL_MS;
 		return PG_MIN_POLL_MS;
 	}
 
-	uint64_t min;
-	uint64_t max;
-	if (avg300 < INT_TO_Q16(2) && cur_press < INT_TO_Q16(10)) {
-		min = 6000;
-		max = PG_MAX_POLL_MS;
-	} else if (avg300 > INT_TO_Q16(20)) {
-		min = PG_MIN_POLL_MS;
-		max = 5000;
-	} else {
-		min = PG_MIN_POLL_MS;
-		max = PG_MAX_POLL_MS;
-	}
-
 	q16_t pred = cur_press + q16_mul(press_vel, Q16_HALF);
-	q16_t p_term = q16_mul(pred, state->press_wt);
-	q16_t d_term = q16_mul(ABS_Q16(press_vel), state->deriv_wt);
-	q16_t score = pg_math_clamp(p_term + d_term, 0, INT_TO_Q16(100));
+	uint64_t nxt_ivl = state->cur_ivl;
 
-	q16_t range = INT_TO_Q16(max - min);
-	q16_t raw_ivl = INT_TO_Q16(max) -
-			q16_mul(q16_div(score, INT_TO_Q16(100)), range);
+	if (pred > INT_TO_Q16(5) || press_vel > INT_TO_Q16(2))
+		nxt_ivl = PG_MIN_POLL_MS;
+	else if (pred > FLOAT_TO_Q16(1.5F))
+		nxt_ivl /= 2;
+	else if (avg300 < INT_TO_Q16(2))
+		nxt_ivl += 200;
 
-	q16_t tgt = state->tgt_ivl;
-	q16_t alpha = (raw_ivl < tgt) ? state->cfg.fall_fact :
-					state->cfg.rise_fact;
-	q16_t next = q16_mul(alpha, raw_ivl) + q16_mul(Q16_ONE - alpha, tgt);
+	if (nxt_ivl < PG_MIN_POLL_MS)
+		nxt_ivl = PG_MIN_POLL_MS;
+	else if (nxt_ivl > PG_MAX_POLL_MS)
+		nxt_ivl = PG_MAX_POLL_MS;
 
-	state->tgt_ivl = next;
 	state->last_tick = now;
 
-	uint64_t tgt_ms = (uint64_t)Q16_TO_INT(state->tgt_ivl);
-	uint64_t diff = (tgt_ms > state->cur_ivl) ? (tgt_ms - state->cur_ivl) :
-						    (state->cur_ivl - tgt_ms);
+	uint64_t diff = (nxt_ivl > state->cur_ivl) ?
+				(nxt_ivl - state->cur_ivl) :
+				(state->cur_ivl - nxt_ivl);
+	if (diff >= 200)
+		state->cur_ivl = nxt_ivl;
 
-	if (diff >= state->cfg.hyst)
-		state->cur_ivl = tgt_ms;
-
-	return poll_discrete(state, state->cur_ivl, min, max);
+	return jitter(state, state->cur_ivl, PG_MIN_POLL_MS, PG_MAX_POLL_MS);
 }

@@ -98,8 +98,7 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 		return -1;
 
 	pg_thermal_init(&ctx->thermal_state);
-	pg_poll_init(&ctx->poll_state, PG_CFG_CTRL.press_wt,
-		     PG_CFG_CTRL.deriv_wt, &PG_CFG_POLL);
+	pg_poll_init(&ctx->poll_state);
 
 	char b_path[256];
 	pg_scan_backlight(b_path, sizeof(b_path));
