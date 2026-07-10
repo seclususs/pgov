@@ -39,8 +39,8 @@ void pg_psi_close_trg(int fd);
 int pg_psi_recov(struct pg_psi_monitor *RESTRICT mon,
 		 const char *RESTRICT path);
 
-void pg_psi_init(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path,
-		 const struct pg_kalman_cfg *RESTRICT cfg);
+void pg_psi_init(struct pg_psi_monitor *RESTRICT mon,
+		 const char *RESTRICT path);
 
 void pg_psi_cleanup(struct pg_psi_monitor *mon);
 

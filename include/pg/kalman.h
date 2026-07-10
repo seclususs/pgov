@@ -8,13 +8,6 @@
 #include "pg/math.h"
 #include <stdbool.h>
 
-struct pg_kalman_cfg {
-	q16_t q_pos;
-	q16_t q_vel;
-	q16_t r_meas;
-	q16_t f_fac;
-};
-
 struct pg_kalman_state {
 	q16_t x_pos;
 	q16_t x_vel;
@@ -22,13 +15,14 @@ struct pg_kalman_state {
 	q32_t p01;
 	q32_t p10;
 	q32_t p11;
-	struct pg_kalman_cfg cfg;
+	q16_t q_vel;
+	q16_t r_meas;
+	q32_t cov_y;
 	q16_t nis;
 	bool first_run;
 };
 
-void pg_kalman_init(struct pg_kalman_state *RESTRICT state,
-		    const struct pg_kalman_cfg *RESTRICT cfg);
+void pg_kalman_init(struct pg_kalman_state *RESTRICT state);
 
 void pg_kalman_reset(struct pg_kalman_state *state);
 

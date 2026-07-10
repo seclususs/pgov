@@ -69,8 +69,7 @@ int pg_psi_recov(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path)
 	return 0;
 }
 
-void pg_psi_init(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path,
-		 const struct pg_kalman_cfg *RESTRICT cfg)
+void pg_psi_init(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path)
 {
 	mon->fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (mon->fd < 0)
@@ -79,7 +78,7 @@ void pg_psi_init(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path,
 	clock_gettime(CLOCK_MONOTONIC, &mon->last_read_ts);
 	mon->last_tot = 0;
 	mon->first_run = true;
-	pg_kalman_init(&mon->filter, cfg);
+	pg_kalman_init(&mon->filter);
 }
 
 void pg_psi_cleanup(struct pg_psi_monitor *mon)

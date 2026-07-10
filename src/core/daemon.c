@@ -91,7 +91,7 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 		return -1;
 	}
 
-	pg_psi_init(&ctx->psi, PG_PATH_PSI_CPU, &PG_CFG_KALMAN);
+	pg_psi_init(&ctx->psi, PG_PATH_PSI_CPU);
 
 	ctx->sig_fd = pg_signal_init();
 	if (ctx->sig_fd < 0)

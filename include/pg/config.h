@@ -5,7 +5,6 @@
 #define PG_CONFIG_H
 
 #include "pg/cpu.h"
-#include "pg/kalman.h"
 #include "pg/poll.h"
 #include "pg/thermal.h"
 #include "pg/math.h"
@@ -63,13 +62,6 @@ static const struct pg_ctrl_cfg PG_CFG_CTRL = { .press_wt = FLOAT_TO_Q16(1.5F),
 						.bat_chk_sec = 5,
 						.thresh_us = 100000,
 						.win_us = 1000000 };
-
-static const struct pg_kalman_cfg PG_CFG_KALMAN = {
-	.q_pos = FLOAT_TO_Q16(0.08F),
-	.q_vel = FLOAT_TO_Q16(8.0F),
-	.r_meas = FLOAT_TO_Q16(4.0F),
-	.f_fac = FLOAT_TO_Q16(1.02F)
-};
 
 static const struct pg_poll_cfg PG_CFG_POLL = {
 	.sleep_tol = 200,
