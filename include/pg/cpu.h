@@ -7,7 +7,6 @@
 #include "compiler.h"
 #include "pg/math.h"
 #include <stdbool.h>
-#include <stdint.h>
 
 struct pg_cpu_lim {
 	q16_t min_lat;
@@ -44,14 +43,6 @@ struct pg_cpu_cfg {
 	q16_t trans_poll;
 	q16_t nis_thresh;
 	q16_t bat_wt;
-};
-
-struct pg_ctrl_cfg {
-	q16_t press_wt;
-	q16_t deriv_wt;
-	uint64_t bat_chk_sec;
-	int32_t thresh_us;
-	int32_t win_us;
 };
 
 struct pg_demand_input {

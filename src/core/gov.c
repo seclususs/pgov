@@ -87,9 +87,9 @@ static inline bool read_psi(struct pg_context *RESTRICT ctx,
 	}
 
 	if (pg_psi_recov(&ctx->psi, PG_PATH_PSI_CPU) == 0) {
-		ctx->trg_fd = pg_psi_open_trg(PG_PATH_PSI_CPU,
-					      PG_CFG_CTRL.thresh_us,
-					      PG_CFG_CTRL.win_us);
+		ctx->trg_fd = pg_psi_open_trg(
+			PG_PATH_PSI_CPU, PG_PSI_THRESHOLD_US, PG_PSI_WINDOW_US);
+
 		if (ctx->trg_fd >= 0)
 			pg_epoll_add_trg(ctx);
 
@@ -97,9 +97,9 @@ static inline bool read_psi(struct pg_context *RESTRICT ctx,
 	}
 
 	if (UNLIKELY(ctx->trg_fd < 0)) {
-		ctx->trg_fd = pg_psi_open_trg(PG_PATH_PSI_CPU,
-					      PG_CFG_CTRL.thresh_us,
-					      PG_CFG_CTRL.win_us);
+		ctx->trg_fd = pg_psi_open_trg(
+			PG_PATH_PSI_CPU, PG_PSI_THRESHOLD_US, PG_PSI_WINDOW_US);
+
 		if (ctx->trg_fd >= 0)
 			pg_epoll_add_trg(ctx);
 	}
@@ -114,7 +114,7 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 			       q16_t *RESTRICT p_eff)
 {
 	q16_t elaps_bat = pg_dt_sec(&ctx->last_bat, now);
-	if (elaps_bat >= INT_TO_Q16(PG_CFG_CTRL.bat_chk_sec)) {
+	if (elaps_bat >= INT_TO_Q16(PG_BAT_CHK_SEC)) {
 		pg_sensor_read_bat_cap(&ctx->bat_cap_sensor, &ctx->bat_lvl);
 		pg_sensor_read_bat_temp(&ctx->bat_temp_sensor, &ctx->bat_temp);
 		ctx->last_bat = *now;

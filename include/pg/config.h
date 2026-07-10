@@ -27,6 +27,9 @@
 #define PG_TIMER_SLACK_NS (50UL * 1000UL * 1000UL)
 #define PG_IOPRIO_CLASS 2
 #define PG_IOPRIO_DATA 0
+#define PG_BAT_CHK_SEC 5
+#define PG_PSI_THRESHOLD_US 100000
+#define PG_PSI_WINDOW_US 1000000
 
 #if defined(NDK_BUILD)
 #define PG_SWEEP_IVL_SEC 600
@@ -55,12 +58,6 @@ static const struct pg_cpu_cfg PG_CFG_CPU = {
 	.nis_thresh = FLOAT_TO_Q16(7.8F),
 	.bat_wt = FLOAT_TO_Q16(97.0F)
 };
-
-static const struct pg_ctrl_cfg PG_CFG_CTRL = { .press_wt = FLOAT_TO_Q16(1.5F),
-						.deriv_wt = FLOAT_TO_Q16(0.05F),
-						.bat_chk_sec = 5,
-						.thresh_us = 100000,
-						.win_us = 1000000 };
 
 static const struct pg_thermal_cfg PG_CFG_THERMAL = {
 	.limit_cpu = FLOAT_TO_Q16(52.5F),

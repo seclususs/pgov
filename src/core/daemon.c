@@ -83,9 +83,8 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	pg_sensor_init_bat_temp(&ctx->bat_temp_sensor, PG_PATH_BATTERY_TEMP);
 	pg_sensor_init_bat_cap(&ctx->bat_cap_sensor, PG_PATH_BATTERY_CAP);
 
-	ctx->trg_fd = pg_psi_open_trg(PG_PATH_PSI_CPU, PG_CFG_CTRL.thresh_us,
-				      PG_CFG_CTRL.win_us);
-
+	ctx->trg_fd = pg_psi_open_trg(PG_PATH_PSI_CPU, PG_PSI_THRESHOLD_US,
+				      PG_PSI_WINDOW_US);
 	if (ctx->trg_fd < 0) {
 		LOGE("daemon: failed inject err=%d", ctx->trg_fd);
 		return -1;
