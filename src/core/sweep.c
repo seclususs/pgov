@@ -44,7 +44,7 @@ static bool sweep_chk_intr(struct sweep_ctx *sctx)
 	if (UNLIKELY(sctx->intr))
 		return true;
 
-	if ((++sctx->nr_files & 15) != 0)
+	if ((++sctx->nr_files & 1023) != 0)
 		return false;
 
 	int32_t bl = 0;
@@ -117,27 +117,44 @@ out_close:
 	close(pkg_fd);
 }
 
+static void sweep_process_dirent(int root_fd, struct linux_dirent64 *d,
+				 struct sweep_ctx *sctx)
+{
+	uint8_t dtype = d->d_type;
+
+	if (sweep_chk_intr(sctx))
+		return;
+
+	if (d->d_name[0] == '.')
+		return;
+
+	if (UNLIKELY(dtype == DT_UNKNOWN)) {
+		struct stat st;
+		int ret;
+		ret = fstatat(root_fd, d->d_name, &st, AT_SYMLINK_NOFOLLOW);
+		if (ret == 0 && S_ISDIR(st.st_mode))
+			dtype = DT_DIR;
+	}
+
+	if (dtype == DT_DIR)
+		sweep_package(root_fd, d->d_name, sctx);
+}
+
 static void sweep_app_data(int root_fd, struct sweep_ctx *sctx)
 {
 	char buf[32768];
+	long nrd;
 
-	while (1) {
-		long nread = syscall(SYS_getdents64, root_fd, buf, sizeof(buf));
+	while ((nrd = syscall(SYS_getdents64, root_fd, buf, sizeof(buf))) > 0) {
 		long bpos = 0;
 
-		if (nread <= 0)
-			break;
-
-		while (bpos < nread) {
+		while (bpos < nrd) {
 			struct linux_dirent64 *d = (void *)(buf + bpos);
-
 			bpos += d->d_reclen;
 
-			if (sweep_chk_intr(sctx))
+			sweep_process_dirent(root_fd, d, sctx);
+			if (UNLIKELY(sctx->intr))
 				return;
-
-			if (d->d_type == DT_DIR && d->d_name[0] != '.')
-				sweep_package(root_fd, d->d_name, sctx);
 		}
 	}
 }

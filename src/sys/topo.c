@@ -45,6 +45,9 @@ static bool build_cpuset(long num_cores, const char *RESTRICT fmt,
 
 	CPU_ZERO(cpuset);
 
+	if (num_cores > CPU_SETSIZE)
+		num_cores = CPU_SETSIZE;
+
 	for (i = 0; i < num_cores; ++i) {
 		int32_t val;
 
@@ -93,6 +96,9 @@ int pg_topo_set_little_core(void)
 	}
 
 	LOGW("topology: detection failed, binding to all cores");
+
+	if (num_cores > CPU_SETSIZE)
+		num_cores = CPU_SETSIZE;
 
 	CPU_ZERO(&little_cpuset);
 	for (i = 0; i < num_cores; ++i)

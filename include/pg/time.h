@@ -20,7 +20,7 @@ static ALWAYS_INLINE q16_t pg_dt_sec(const struct timespec *RESTRICT prev,
 	if (UNLIKELY(sec < -32000))
 		sec = -32000;
 
-	q16_t nsec_q16 = (q16_t)((nsec << Q16_SHIFT) / 1000000000LL);
+	q16_t nsec_q16 = (q16_t)((nsec * Q16_ONE) / 1000000000LL);
 	return (q16_t)(sec * Q16_ONE) + nsec_q16;
 }
 

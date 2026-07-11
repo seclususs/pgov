@@ -38,7 +38,7 @@ static ALWAYS_INLINE q16_t q16_div(q16_t a, q16_t b)
 	if (UNLIKELY(b == 0))
 		return (a >= 0) ? INT32_MAX : INT32_MIN;
 
-	return (q16_t)((((q32_t)a) << Q16_SHIFT) / b);
+	return (q16_t)(((q32_t)a * Q16_ONE) / b);
 }
 
 #if defined(__SIZEOF_INT128__)

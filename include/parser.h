@@ -117,22 +117,28 @@ static ALWAYS_INLINE q16_t pg_parse_q16(const uint8_t *RESTRICT buf, size_t len,
 	while (pos < len) {
 		uint8_t b = buf[pos];
 
-		if (b >= '0' && b <= '9') {
-			if (frac) {
-				f_val = (f_val * 10) + (b - '0');
-				f_div *= 10;
-			} else {
-				val = q16_mul(val, INT_TO_Q16(10)) +
-				      INT_TO_Q16(b - '0');
-			}
-
-			pos++;
-		} else if (b == '.') {
+		if (b == '.') {
 			frac = true;
 			pos++;
-		} else {
-			break;
+			continue;
 		}
+
+		if (b < '0' || b > '9')
+			break;
+
+		if (!frac) {
+			val = q16_mul(val, INT_TO_Q16(10)) +
+			      INT_TO_Q16(b - '0');
+			pos++;
+			continue;
+		}
+
+		if (LIKELY(f_div < 1000000)) {
+			f_val = (f_val * 10) + (b - '0');
+			f_div *= 10;
+		}
+
+		pos++;
 	}
 
 	*next = pos;
