@@ -41,4 +41,12 @@
 #define MAYBE_UNUSED __attribute__((unused))
 #endif
 
+#define PGOV_AUTHOR(name)                                                     \
+	__attribute__((used, section(".note.pgov.author"))) static const char \
+		__pgov_author[] = "AUTHOR=" name
+
+#define PGOV_LICENSE(license)                                                  \
+	__attribute__((used, section(".note.pgov.license"))) static const char \
+		__pgov_license[] = "LICENSE=" license
+
 #endif // PGOV_COMPILER_H
