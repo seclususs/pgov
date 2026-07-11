@@ -71,13 +71,6 @@ static const struct pg_thermal_cfg PG_CFG_THERMAL = {
 	.ki_fast = FLOAT_TO_Q16(0.059F),
 	.kd_fast = FLOAT_TO_Q16(3.55F),
 	.aw_k = FLOAT_TO_Q16(1.95F),
-	.filt_n = FLOAT_TO_Q16(18.5F),
-	.ff_gain = FLOAT_TO_Q16(2.55F),
-	.ff_lead_t = FLOAT_TO_Q16(4.8F),
-	.ff_lag_t = FLOAT_TO_Q16(2.3F),
-	.smith_gain = FLOAT_TO_Q16(1.52F),
-	.smith_tau = FLOAT_TO_Q16(11.5F),
-	.smith_delay = FLOAT_TO_Q16(1.7F)
 };
 
 #endif // PG_CONFIG_H

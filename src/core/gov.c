@@ -123,8 +123,7 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 	q16_t cpu_temp;
 	pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor, &cpu_temp);
 	*th_scl = pg_thermal_update(&ctx->thermal_state, cpu_temp,
-				    ctx->bat_temp, psi->some.cur,
-				    &PG_CFG_THERMAL, now);
+				    ctx->bat_temp, &PG_CFG_THERMAL, now);
 
 	q16_t t_fact = pg_cpu_calc_trend_gain(psi->some.vel);
 	q16_t dt_real = pg_dt_sec(&ctx->last_tick, now);
