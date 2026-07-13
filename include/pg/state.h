@@ -56,6 +56,7 @@ struct ALIGNED(64) pg_context {
 	int epoll_fd;
 	int sig_fd;
 	int trg_fd;
+	int lock_fd;
 	int next_wake;
 
 	volatile bool shutdown_req;

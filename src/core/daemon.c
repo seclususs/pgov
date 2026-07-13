@@ -54,6 +54,7 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->epoll_fd = -1;
 	ctx->sig_fd = -1;
 	ctx->trg_fd = -1;
+	ctx->lock_fd = -1;
 	ctx->psi.fd = -1;
 	ctx->cpu_temp_sensor.fd = -1;
 	ctx->bat_temp_sensor.fd = -1;
@@ -115,11 +116,13 @@ int pg_daemon_init(void)
 	if (pg_detect_privilege() != 0)
 		return 1;
 
-	if (pg_lockfile_acquire(PG_PATH_LOCK) != 0)
+	context.lock_fd = pg_lockfile_init(PG_PATH_LOCK);
+	if (context.lock_fd < 0)
 		return 1;
 
 	LOGD("daemon: waiting for android subsystem");
-	pg_prop_wait_boot();
+	if (!pg_prop_wait_boot())
+		return 1;
 
 	LOGD("daemon: configuring os parameters");
 	init_os_environment();
@@ -163,6 +166,7 @@ cleanup:
 	if (context.sig_fd >= 0)
 		pg_signal_close(context.sig_fd);
 
+	pg_lockfile_close(context.lock_fd);
 	pg_psi_cleanup(&context.psi);
 	pg_sensor_temp_close(&context.cpu_temp_sensor);
 	pg_sensor_temp_close(&context.bat_temp_sensor);

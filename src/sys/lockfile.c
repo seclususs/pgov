@@ -8,7 +8,7 @@
 #include <sys/file.h>
 #include <unistd.h>
 
-int pg_lockfile_acquire(const char *path)
+int pg_lockfile_init(const char *path)
 {
 	int err;
 	int fd = open(path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
@@ -24,5 +24,11 @@ int pg_lockfile_acquire(const char *path)
 		return -EAGAIN;
 	}
 
-	return 0;
+	return fd;
+}
+
+void pg_lockfile_close(int fd)
+{
+	if (fd >= 0)
+		close(fd);
 }
