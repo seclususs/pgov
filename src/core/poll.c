@@ -24,11 +24,8 @@ static inline uint64_t next_random(struct pg_poll_state *state, uint64_t range)
 #if defined(__SIZEOF_INT128__)
 	state->rng_state = (state->rng_state * 6364136223846793005ULL) + 1ULL;
 
-	uint64_t limit = range * 2;
-	uint64_t lim_p1 = limit + 1;
-
 	unsigned __int128 p =
-		(unsigned __int128)state->rng_state * (unsigned __int128)lim_p1;
+		(unsigned __int128)state->rng_state * (unsigned __int128)range;
 
 	return (uint64_t)(p >> 64);
 #else
@@ -58,7 +55,7 @@ static inline uint64_t jitter(struct pg_poll_state *state, uint64_t ivl,
 	if (UNLIKELY(n_amp == 0))
 		return clamp;
 
-	uint64_t noise = next_random(state, n_amp);
+	uint64_t noise = next_random(state, (n_amp * 2) + 1);
 	uint64_t final;
 	if (noise > n_amp) {
 		final = clamp + (noise - n_amp);
