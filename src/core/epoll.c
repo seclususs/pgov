@@ -83,12 +83,24 @@ int pg_epoll_run(struct pg_context *ctx)
 	struct epoll_event ev_sig = { 0 };
 	ev_sig.events = EPOLLIN | EPOLLERR;
 	ev_sig.data.fd = ctx->sig_fd;
-	epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->sig_fd, &ev_sig);
+	if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->sig_fd, &ev_sig) < 0) {
+		int err = errno;
+		LOGE("epoll: failed to register sig_fd err=%d", err);
+		close(ctx->epoll_fd);
+		ctx->epoll_fd = -1;
+		return -err;
+	}
 
 	struct epoll_event ev_trg = { 0 };
 	ev_trg.events = EPOLLPRI | EPOLLERR | EPOLLET;
 	ev_trg.data.fd = ctx->trg_fd;
-	epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->trg_fd, &ev_trg);
+	if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->trg_fd, &ev_trg) < 0) {
+		int err = errno;
+		LOGE("epoll: failed to register trg_fd err=%d", err);
+		close(ctx->epoll_fd);
+		ctx->epoll_fd = -1;
+		return -err;
+	}
 
 	struct epoll_event events[PG_MAX_EVENTS];
 

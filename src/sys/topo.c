@@ -35,8 +35,14 @@ static void format_path(char *RESTRICT buf, size_t buf_len,
 			continue;
 		}
 
+		if (pos + 1 >= buf_len)
+			break;
+
 		buf[pos++] = fmt[i++];
 	}
+
+	if (pos >= buf_len)
+		pos = buf_len - 1;
 
 	buf[pos] = '\0';
 }

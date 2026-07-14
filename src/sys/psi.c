@@ -228,9 +228,10 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT mon,
 		pos++;
 	}
 
-	if (found)
-		parse(mon->buf, len, pos, mon->first_run, &trend, &cur_tot);
+	if (!found)
+		return -ENODATA;
 
+	parse(mon->buf, len, pos, mon->first_run, &trend, &cur_tot);
 	calc_kalman(mon, &trend, cur_tot, dt_sec);
 
 	mon->last_read_ts = *now;

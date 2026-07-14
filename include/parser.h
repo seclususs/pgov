@@ -34,7 +34,7 @@ static ALWAYS_INLINE size_t pg_fmt_u64(uint64_t val, char *buf)
 	return len;
 }
 
-static ALWAYS_INLINE size_t pg_fmt_u32(int32_t val, char *buf)
+static ALWAYS_INLINE size_t pg_fmt_u32(uint32_t val, char *buf)
 {
 	if (val == 0) {
 		buf[0] = '0';
