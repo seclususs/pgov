@@ -22,10 +22,10 @@ typedef int64_t q32_t;
 #define Q16_TO_Q32(q) ((q32_t)(q) * Q16_ONE)
 #define Q32_TO_Q16(q) ((q16_t)((q) >> 16))
 
-#define ABS_Q16(x)                      \
-	({                              \
-		__typeof__(x) _x = (x); \
-		(_x < 0) ? -_x : _x;    \
+#define ABS_Q16(x)                                                     \
+	({                                                             \
+		__typeof__(x) _x = (x);                                \
+		(_x == INT32_MIN) ? INT32_MAX : ((_x < 0) ? -_x : _x); \
 	})
 
 static ALWAYS_INLINE q16_t q16_mul(q16_t a, q16_t b)
@@ -49,11 +49,15 @@ static ALWAYS_INLINE q32_t q32_mul(q32_t a, q32_t b)
 #else
 static ALWAYS_INLINE q32_t q32_mul(q32_t a, q32_t b)
 {
-	uint64_t al = (uint32_t)a, ah = (uint64_t)a >> 32;
-	uint64_t bl = (uint32_t)b, bh = (uint64_t)b >> 32;
+	uint64_t al = (uint32_t)a;
+	uint64_t ah = (uint64_t)a >> 32;
+	uint64_t bl = (uint32_t)b;
+	uint64_t bh = (uint64_t)b >> 32;
 
-	uint64_t ll = al * bl, hl = ah * bl;
-	uint64_t lh = al * bh, hh = ah * bh;
+	uint64_t ll = al * bl;
+	uint64_t hl = ah * bl;
+	uint64_t lh = al * bh;
+	uint64_t hh = ah * bh;
 
 	uint64_t mid = hl + lh + (ll >> 32);
 	uint64_t res = (hh << 32) + mid;

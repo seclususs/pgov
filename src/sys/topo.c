@@ -16,14 +16,20 @@
 #define CPU_CAPACITY "/sys/devices/system/cpu/cpu%d/cpu_capacity"
 #define CPU_MAX_FREQ "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq"
 
-static void format_path(char *RESTRICT buf, const char *RESTRICT fmt,
-			int32_t cpu)
+static void format_path(char *RESTRICT buf, size_t buf_len,
+			const char *RESTRICT fmt, int32_t cpu)
 {
 	size_t pos = 0;
 	size_t i = 0;
 
+	if (UNLIKELY(buf_len == 0))
+		return;
+
 	while (fmt[i] != '\0') {
 		if (fmt[i] == '%' && fmt[i + 1] == 'd') {
+			if (pos + 11 >= buf_len)
+				break;
+
 			pos += pg_fmt_u32(cpu, buf + pos);
 			i += 2;
 			continue;
@@ -51,7 +57,7 @@ static bool build_cpuset(long num_cores, const char *RESTRICT fmt,
 	for (i = 0; i < num_cores; ++i) {
 		int32_t val;
 
-		format_path(buf, fmt, i);
+		format_path(buf, sizeof(buf), fmt, i);
 
 		if (pg_sysfs_read_i32(buf, &val) != 0 || val <= 0)
 			continue;
@@ -129,7 +135,7 @@ int32_t pg_topo_get_max_freq_khz(void)
 	for (i = 0; i < num_cores; ++i) {
 		int32_t val;
 
-		format_path(buf, CPU_MAX_FREQ, i);
+		format_path(buf, sizeof(buf), CPU_MAX_FREQ, i);
 		if (pg_sysfs_read_i32(buf, &val) == 0 && val > freq)
 			freq = val;
 	}

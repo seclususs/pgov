@@ -36,7 +36,7 @@ static ALWAYS_INLINE size_t pg_fmt_u64(uint64_t val, char *buf)
 
 static ALWAYS_INLINE size_t pg_fmt_u32(int32_t val, char *buf)
 {
-	if (val <= 0) {
+	if (val == 0) {
 		buf[0] = '0';
 		return 1;
 	}
@@ -59,7 +59,7 @@ static ALWAYS_INLINE size_t pg_fmt_u32(int32_t val, char *buf)
 static ALWAYS_INLINE int32_t pg_parse_i32(const uint8_t *RESTRICT buf,
 					  size_t len, bool *RESTRICT valid)
 {
-	int32_t val = 0;
+	uint64_t val = 0;
 	int32_t sign = 1;
 	*valid = false;
 
@@ -67,7 +67,9 @@ static ALWAYS_INLINE int32_t pg_parse_i32(const uint8_t *RESTRICT buf,
 		uint8_t b = buf[i];
 
 		if (b >= '0' && b <= '9') {
-			val = (val * 10) + (b - '0');
+			if (val <= (uint64_t)2147483648ULL)
+				val = (val * 10ULL) + (uint64_t)(b - '0');
+
 			*valid = true;
 			continue;
 		}
@@ -81,7 +83,15 @@ static ALWAYS_INLINE int32_t pg_parse_i32(const uint8_t *RESTRICT buf,
 			break;
 	}
 
-	return val * sign;
+	int64_t res = (int64_t)val * sign;
+
+	if (res > INT32_MAX)
+		return INT32_MAX;
+
+	if (res < INT32_MIN)
+		return INT32_MIN;
+
+	return (int32_t)res;
 }
 
 static ALWAYS_INLINE uint64_t pg_parse_u64(const uint8_t *RESTRICT buf,

@@ -81,10 +81,11 @@ static enum pg_fs_act sweep_cb(int dfd, const char *RESTRICT name, uint8_t type,
 	if (fstatat(dfd, name, &st, AT_SYMLINK_NOFOLLOW) != 0)
 		return FS_KEEP;
 
-	if (!S_ISREG(st.st_mode) || sctx->now_sec <= (uint64_t)st.st_mtime)
+	uint64_t s_mtime = (st.st_mtime < 0) ? 0 : (uint64_t)st.st_mtime;
+	if (!S_ISREG(st.st_mode) || sctx->now_sec <= s_mtime)
 		return FS_KEEP;
 
-	uint64_t age = sctx->now_sec - (uint64_t)st.st_mtime;
+	uint64_t age = sctx->now_sec - s_mtime;
 	if (age > AGE_LIMIT)
 		return FS_DELETE;
 
@@ -151,6 +152,9 @@ static void sweep_app_data(int root_fd, struct sweep_ctx *sctx)
 		while (bpos < nrd) {
 			struct linux_dirent64 *d = (void *)(buf + bpos);
 			bpos += d->d_reclen;
+
+			if (UNLIKELY(d->d_reclen == 0))
+				break;
 
 			sweep_process_dirent(root_fd, d, sctx);
 			if (UNLIKELY(sctx->intr))

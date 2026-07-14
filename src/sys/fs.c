@@ -80,6 +80,9 @@ static int walk(int dfd, pg_fs_cb cb, void *ctx, int max_depth, int cur_depth)
 			struct linux_dirent64 *d = (void *)(buf + bpos);
 			bpos += d->d_reclen;
 
+			if (UNLIKELY(d->d_reclen == 0))
+				break;
+
 			int ret = dirent(dfd, d, cb, ctx, max_depth, cur_depth);
 			if (ret)
 				return ret;
