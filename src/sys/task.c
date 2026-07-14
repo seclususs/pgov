@@ -40,6 +40,10 @@
 #define SCHED_FLAG_KEEP_POLICY 0x08
 #endif
 
+#ifndef SCHED_FLAG_KEEP_PARAMS
+#define SCHED_FLAG_KEEP_PARAMS 0x10
+#endif
+
 #ifndef SCHED_FLAG_UTIL_CLAMP_MAX
 #define SCHED_FLAG_UTIL_CLAMP_MAX 0x40
 #endif
@@ -114,7 +118,8 @@ int pg_task_set_uclamp(uint32_t util_max)
 {
 	struct pg_sched_attr attr = { 0 };
 	attr.size = sizeof(attr);
-	attr.sched_flags = SCHED_FLAG_KEEP_POLICY | SCHED_FLAG_UTIL_CLAMP_MAX;
+	attr.sched_flags = SCHED_FLAG_KEEP_POLICY | SCHED_FLAG_KEEP_PARAMS |
+			   SCHED_FLAG_UTIL_CLAMP_MAX;
 	attr.sched_util_max = util_max;
 
 	if (syscall(__NR_sched_setattr, 0, &attr, 0) == -1) {
