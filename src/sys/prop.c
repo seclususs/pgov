@@ -3,7 +3,8 @@
 
 #include "prop.h"
 #include "pg/config.h"
-#include <sys/system_properties.h>
+#include <errno.h> // IWYU pragma: keep
+#include <string.h>
 #include <unistd.h>
 
 bool pg_prop_wait_boot(void)
@@ -25,3 +26,82 @@ bool pg_prop_wait_boot(void)
 
 	return false;
 }
+
+#if defined(NDK_BUILD)
+
+void pg_prop_state_init(struct pg_prop_state *RESTRICT state,
+			const char *RESTRICT name)
+{
+	if (UNLIKELY(!state || !name))
+		return;
+
+	strncpy(state->name, name, PROP_NAME_MAX - 1);
+	state->name[PROP_NAME_MAX - 1] = '\0';
+	state->val[0] = '\0';
+	state->modified = false;
+}
+
+int pg_prop_set(struct pg_prop_state *RESTRICT state, const char *RESTRICT val)
+{
+	char os_val[PROP_VALUE_MAX];
+	int ret = 0;
+	int len;
+
+	if (UNLIKELY(!state || !val))
+		return -EINVAL;
+
+	len = __system_property_get(state->name, os_val);
+	if (len <= 0)
+		os_val[0] = '\0';
+
+	if (strncmp(os_val, val, PROP_VALUE_MAX) == 0)
+		return 0;
+
+	if (!state->modified) {
+		strncpy(state->val, os_val, PROP_VALUE_MAX - 1);
+		state->val[PROP_VALUE_MAX - 1] = '\0';
+		state->modified = true;
+	}
+
+	if (__system_property_set(state->name, val) != 0) {
+		state->modified = false;
+		ret = -EIO;
+		goto out;
+	}
+
+out:
+	return ret;
+}
+
+int pg_prop_reset(struct pg_prop_state *RESTRICT state)
+{
+	int ret = 0;
+
+	if (UNLIKELY(!state || !state->modified))
+		return 0;
+
+	if (__system_property_set(state->name, state->val) != 0) {
+		ret = -EIO;
+		goto out;
+	}
+
+	state->modified = false;
+
+out:
+	return ret;
+}
+
+void pg_prop_cleanup(struct pg_prop_state *RESTRICT state)
+{
+	if (UNLIKELY(!state))
+		return;
+
+	if (state->modified)
+		pg_prop_reset(state);
+
+	state->name[0] = '\0';
+	state->val[0] = '\0';
+	state->modified = false;
+}
+
+#endif // NDK_BUILD
