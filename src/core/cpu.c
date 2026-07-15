@@ -11,37 +11,35 @@ PURE bool pg_cpu_trans(const struct pg_load_state *RESTRICT state,
 	return (rate || diff) != 0;
 }
 
-void pg_cpu_upd_integ_params(struct pg_load_state *RESTRICT state,
-			     q16_t bat_level, q16_t dt_safe,
-			     const struct pg_cpu_cfg *RESTRICT cfg,
-			     q16_t *RESTRICT integ, q16_t *RESTRICT integ_dt)
+void pg_cpu_upd_intg(struct pg_load_state *RESTRICT state, q16_t bat_lvl,
+		     q16_t dt_real, q16_t *RESTRICT i, q16_t *RESTRICT i_dt)
 {
-	q16_t d_bat = INT_TO_Q16(100) - bat_level;
+	q16_t d_bat = INT_TO_Q16(100) - bat_lvl;
 	if (d_bat < 0)
 		d_bat = 0;
 
 	q16_t depl = q16_div(d_bat, INT_TO_Q16(100));
 	q16_t depl2 = q16_mul(depl, depl);
 	q16_t depl3 = q16_mul(depl2, depl);
-	q16_t c_intg = q16_mul(cfg->bat_wt, depl3);
+	q16_t c_intg = q16_mul(FLOAT_TO_Q16(97.0F), depl3);
 
 	if (UNLIKELY(state->first_run)) {
 		state->prev_integ = c_intg;
 		state->first_run = false;
-		*integ = c_intg;
-		*integ_dt = 0;
+		*i = c_intg;
+		*i_dt = 0;
 		return;
 	}
 
 	q16_t c_dt = 0;
-	if (LIKELY(dt_safe > 0)) {
+	if (LIKELY(dt_real > 0)) {
 		q16_t d_intg = c_intg - state->prev_integ;
-		c_dt = q16_div(d_intg, dt_safe);
+		c_dt = q16_div(d_intg, dt_real);
 	}
 
 	state->prev_integ = c_intg;
-	*integ = c_intg;
-	*integ_dt = c_dt;
+	*i = c_intg;
+	*i_dt = c_dt;
 }
 
 static inline q32_t calc_l_term(q16_t integ, q16_t psi_val, q16_t k_fin)
@@ -69,7 +67,7 @@ static inline q16_t calc_c_final(q16_t k_fin, q16_t vel, q16_t i_dt,
 	q16_t c_req = (r_sq > 0) ? (q16_t)(d_num / (r_sq >> Q16_SHIFT)) : 0;
 	q16_t c_max = q16_mul(c_base, INT_TO_Q16(4));
 	q16_t c_clp = pg_math_clamp(c_req, 0, c_max);
-	q16_t c_stb = q16_mul(c_clp, cfg->stab_marg);
+	q16_t c_stb = q16_mul(c_clp, FLOAT_TO_Q16(3.1F));
 
 	q16_t th_sq = pg_math_q16_sqrt(th);
 	q16_t c_th = (th_sq > 0) ? q16_div(c_base, th_sq) : c_base;
@@ -77,10 +75,27 @@ static inline q16_t calc_c_final(q16_t k_fin, q16_t vel, q16_t i_dt,
 	return (c_th > c_stb) ? c_th : c_stb;
 }
 
+void pg_cpu_upd_eff(struct pg_cpu_eff *RESTRICT eff, q16_t bat_lvl,
+		    q16_t th_scl, q16_t avg300)
+{
+	q16_t bat_fact = q16_div(bat_lvl, INT_TO_Q16(100));
+	q16_t health = q16_mul(bat_fact, th_scl);
+
+	eff->resp_gain = q16_mul(FLOAT_TO_Q16(31.0F), health);
+	eff->surge_gain = q16_mul(FLOAT_TO_Q16(0.095F), health);
+	eff->trend_amp = q16_mul(FLOAT_TO_Q16(0.115F), health);
+	eff->lookahead = q16_mul(FLOAT_TO_Q16(0.17F), th_scl);
+	eff->decay = q16_mul(FLOAT_TO_Q16(0.019F), th_scl);
+	eff->sig_mid = FLOAT_TO_Q16(6.8F) + q16_mul(FLOAT_TO_Q16(0.5F), avg300);
+	eff->ucl_mid = eff->sig_mid + FLOAT_TO_Q16(2.7F);
+}
+
 q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
 			      const struct pg_demand_input *RESTRICT input,
 			      const struct pg_cpu_cfg *RESTRICT cfg)
 {
+	struct pg_cpu_eff *eff = &state->eff;
+
 	if (UNLIKELY(input->struct_break)) {
 		state->psi_val = input->tgt_psi;
 		state->rate = 0;
@@ -88,11 +103,11 @@ q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
 
 	q16_t l_rate = input->vel;
 	if (ABS_Q16(l_rate) > cfg->surge_thresh)
-		state->rate += q16_mul(l_rate, cfg->surge_gain);
+		state->rate += q16_mul(l_rate, eff->surge_gain);
 
-	q16_t pred = input->tgt_psi + q16_mul(l_rate, cfg->lookahead);
+	q16_t pred = input->tgt_psi + q16_mul(l_rate, eff->lookahead);
 	q16_t trend = q16_mul(cfg->gain_alpha, input->trend_fact);
-	q16_t k_dyn = q16_mul(cfg->resp_gain, Q16_ONE + trend);
+	q16_t k_dyn = q16_mul(eff->resp_gain, Q16_ONE + trend);
 	q16_t th =
 		pg_math_clamp(input->therm_scale, FLOAT_TO_Q16(0.1F), Q16_ONE);
 
@@ -136,9 +151,9 @@ PURE q16_t pg_cpu_calc_trend_gain(q16_t vel)
 }
 
 PURE q16_t pg_cpu_calc_eff_press(q16_t l_dem, q16_t t_fact,
-				 const struct pg_cpu_cfg *cfg)
+				 const struct pg_cpu_eff *eff)
 {
-	q16_t t_mul = Q16_ONE + q16_mul(t_fact, cfg->trend_amp);
+	q16_t t_mul = Q16_ONE + q16_mul(t_fact, eff->trend_amp);
 	return q16_mul(l_dem, t_mul);
 }
 
@@ -151,9 +166,10 @@ PURE q16_t pg_cpu_calc_therm_lat(q16_t th_scl, const struct pg_cpu_lim *lim)
 
 PURE q16_t pg_cpu_calc_lat(q16_t p_eff, q16_t l_dem, q16_t th_lat,
 			   const struct pg_cpu_cfg *RESTRICT cfg,
+			   const struct pg_cpu_eff *RESTRICT eff,
 			   const struct pg_cpu_lim *RESTRICT lim)
 {
-	q16_t sig = pg_math_sigmoid(p_eff, cfg->sigmoid_k, cfg->sigmoid_mid);
+	q16_t sig = pg_math_sigmoid(p_eff, cfg->sigmoid_k, eff->sig_mid);
 	q16_t fac = Q16_ONE - sig;
 	q16_t rng = lim->max_lat - lim->min_lat;
 	q16_t n_lat = lim->min_lat + q16_mul(rng, fac);
@@ -177,10 +193,10 @@ PURE q16_t pg_cpu_calc_gran(q16_t lat, const struct pg_cpu_cfg *RESTRICT cfg,
 }
 
 PURE q16_t pg_cpu_calc_wakeup(q16_t p_eff,
-			      const struct pg_cpu_cfg *RESTRICT cfg,
+			      const struct pg_cpu_eff *RESTRICT eff,
 			      const struct pg_cpu_lim *RESTRICT lim)
 {
-	q16_t dec = pg_math_decay(p_eff, cfg->decay);
+	q16_t dec = pg_math_decay(p_eff, eff->decay);
 	q16_t rng = lim->max_wake - lim->min_wake;
 	q16_t r_wake = lim->min_wake + q16_mul(rng, dec);
 	return pg_math_clamp(r_wake, lim->min_wake, lim->max_wake);
@@ -213,9 +229,10 @@ PURE q16_t pg_cpu_calc_walt(q16_t press, const struct pg_cpu_lim *lim)
 
 PURE q16_t pg_cpu_calc_uclamp(q16_t press, q16_t th_scl,
 			      const struct pg_cpu_cfg *RESTRICT cfg,
+			      const struct pg_cpu_eff *RESTRICT eff,
 			      const struct pg_cpu_lim *RESTRICT lim)
 {
-	q16_t sig = pg_math_sigmoid(press, cfg->uclamp_k, cfg->uclamp_mid);
+	q16_t sig = pg_math_sigmoid(press, cfg->uclamp_k, eff->ucl_mid);
 	q16_t rng = lim->max_ucl - lim->min_ucl;
 	q16_t ucl = lim->min_ucl + q16_mul(rng, sig);
 	return pg_math_clamp(q16_mul(ucl, th_scl), lim->min_ucl, lim->max_ucl);

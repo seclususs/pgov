@@ -14,21 +14,16 @@
 struct pg_thermal_cfg {
 	q16_t limit_cpu;
 	q16_t limit_bat;
-	q16_t temp_cool;
-	q16_t temp_hot;
 	q16_t kp_base;
 	q16_t ki_base;
 	q16_t kd_base;
-	q16_t kp_fast;
-	q16_t ki_fast;
-	q16_t kd_fast;
-	q16_t aw_k;
 };
 
 struct pg_thermal_state {
 	struct timespec last_tick;
 	q16_t integ;
 	q16_t prev_sat;
+	int32_t sat_count;
 	struct pg_kalman_state filter;
 };
 

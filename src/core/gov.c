@@ -123,54 +123,58 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 	q16_t cpu_temp;
 	pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor, &cpu_temp);
 	*th_scl = pg_thermal_update(&ctx->thermal_state, cpu_temp,
-				    ctx->bat_temp, &PG_CFG_THERMAL, now);
+				    ctx->bat_temp, &CFG_THERMAL, now);
 
-	q16_t t_fact = pg_cpu_calc_trend_gain(psi->some.vel);
+	struct pg_cpu_eff *eff = &ctx->load_state.eff;
+	pg_cpu_upd_eff(eff, ctx->bat_lvl, *th_scl, psi->some.avg300);
+
 	q16_t dt_real = pg_dt_sec(&ctx->last_tick, now);
 	q16_t dt_safe = pg_math_clamp(dt_real, 1, FLOAT_TO_Q16(0.1F));
 	ctx->last_tick = *now;
 
-	q16_t integ;
+	q16_t i;
 	q16_t i_dt;
-	pg_cpu_upd_integ_params(&ctx->load_state, ctx->bat_lvl, dt_safe,
-				&PG_CFG_CPU, &integ, &i_dt);
+	pg_cpu_upd_intg(&ctx->load_state, ctx->bat_lvl, dt_real, &i, &i_dt);
 
-	bool s_break = psi->some.nis > PG_CFG_CPU.nis_thresh;
+	q16_t t_fact = pg_cpu_calc_trend_gain(psi->some.vel);
+	bool s_break = psi->some.nis > CFG_CPU.nis_thresh;
 	struct pg_demand_input d_in = { .tgt_psi = psi->some.cur,
 					.vel = psi->some.vel,
 					.dt_real = dt_real,
 					.dt_safe = dt_safe,
 					.therm_scale = *th_scl,
 					.trend_fact = t_fact,
-					.integ = integ,
+					.integ = i,
 					.integ_dt = i_dt,
 					.struct_break = s_break };
 
-	*l_dem = pg_cpu_calc_load_demand(&ctx->load_state, &d_in, &PG_CFG_CPU);
-	*p_eff = pg_cpu_calc_eff_press(*l_dem, t_fact, &PG_CFG_CPU);
+	*l_dem = pg_cpu_calc_load_demand(&ctx->load_state, &d_in, &CFG_CPU);
+	*p_eff = pg_cpu_calc_eff_press(*l_dem, t_fact, eff);
 }
 
 static inline void update_sysfs(struct pg_context *RESTRICT ctx,
 				const struct pg_psi_data *RESTRICT psi,
 				q16_t th_scl, q16_t l_dem, q16_t p_eff)
 {
+	struct pg_cpu_eff *eff = &ctx->load_state.eff;
+
 	int32_t n_poll = (int32_t)pg_poll_calc_next(
 		&ctx->poll_state, p_eff, psi->some.avg300, psi->some.vel);
 
-	if (pg_cpu_trans(&ctx->load_state, psi->some.cur, &PG_CFG_CPU)) {
-		int32_t t_poll = Q16_TO_INT(PG_CFG_CPU.trans_poll);
+	if (pg_cpu_trans(&ctx->load_state, psi->some.cur, &CFG_CPU)) {
+		int32_t t_poll = Q16_TO_INT(CFG_CPU.trans_poll);
 		if (n_poll > t_poll)
 			n_poll = t_poll;
 	}
 	ctx->next_wake = n_poll;
 
 	q16_t th = pg_cpu_calc_therm_lat(th_scl, &LIM_CPU);
-	q16_t lat = pg_cpu_calc_lat(p_eff, l_dem, th, &PG_CFG_CPU, &LIM_CPU);
-	q16_t gran = pg_cpu_calc_gran(lat, &PG_CFG_CPU, &LIM_CPU);
-	q16_t wake = pg_cpu_calc_wakeup(p_eff, &PG_CFG_CPU, &LIM_CPU);
+	q16_t lat = pg_cpu_calc_lat(p_eff, l_dem, th, &CFG_CPU, eff, &LIM_CPU);
+	q16_t gran = pg_cpu_calc_gran(lat, &CFG_CPU, &LIM_CPU);
+	q16_t wake = pg_cpu_calc_wakeup(p_eff, eff, &LIM_CPU);
 	q16_t mig = pg_cpu_calc_migration(psi->some.vel, p_eff, &LIM_CPU);
 	q16_t walt = pg_cpu_calc_walt(p_eff, &LIM_CPU);
-	q16_t ucl = pg_cpu_calc_uclamp(p_eff, th_scl, &PG_CFG_CPU, &LIM_CPU);
+	q16_t ucl = pg_cpu_calc_uclamp(p_eff, th_scl, &CFG_CPU, eff, &LIM_CPU);
 
 	uint64_t l_u64 =
 		pg_math_san_quant_u64(lat, LIM_CPU.max_lat, PG_QUANT_NS);
