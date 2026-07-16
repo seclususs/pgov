@@ -72,6 +72,34 @@ int pg_sysfs_write_strm(int fd, uint64_t value)
 	return 0;
 }
 
+int pg_sysfs_write(const char *RESTRICT path, const char *RESTRICT val)
+{
+	if (UNLIKELY(!path || !val))
+		return -EINVAL;
+
+	int fd = open(path, O_WRONLY | O_CLOEXEC);
+	if (fd < 0)
+		return -errno;
+
+	size_t len = 0;
+	while (val[len] != '\0')
+		len++;
+
+	ssize_t res = pwrite(fd, val, len, 0);
+
+	int err = errno;
+
+	close(fd);
+
+	if (res < 0)
+		return -err;
+
+	if ((size_t)res != len)
+		return -EIO;
+
+	return 0;
+}
+
 static inline bool absolute(uint64_t cur, uint64_t tgt, uint64_t thresh)
 {
 	if (UNLIKELY(cur == UINT64_MAX))

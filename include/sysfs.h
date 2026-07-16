@@ -30,6 +30,8 @@ int pg_sysfs_read_i32(const char *path, int32_t *out_val);
 
 int pg_sysfs_write_strm(int fd, uint64_t value);
 
+int pg_sysfs_write(const char *RESTRICT path, const char *RESTRICT val);
+
 void pg_sysfs_update(struct pg_sysfs_cache *RESTRICT cache, uint64_t value,
 		     bool force, const struct pg_sysfs_chk *RESTRICT strat);
 
