@@ -95,7 +95,7 @@ static inline int read_temp(struct pg_temp_sensor *RESTRICT sensor,
 		return -EINVAL;
 	}
 
-	*temp = (q16_t)(((q32_t)val << 16) / sensor->scale);
+	*temp = (q16_t)(((q32_t)val * Q16_ONE) / sensor->scale);
 	return 0;
 }
 

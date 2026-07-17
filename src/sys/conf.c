@@ -45,7 +45,7 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 	char line[CONF_LINE_SZ];
 	size_t l_pos = 0;
 	size_t i = 0;
-	ssize_t sz;
+	ssize_t sz = 0;
 	int ret = 0;
 	int fd;
 
@@ -56,13 +56,16 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 	if (fd < 0)
 		return -errno;
 
-	sz = read(fd, buf, sizeof(buf));
-	if (sz <= 0) {
-		ret = (sz < 0) ? -errno : 0;
-		goto out;
-	}
+	for (;;) {
+		if (i >= (size_t)sz) {
+			sz = read(fd, buf, sizeof(buf));
 
-	while (i < (size_t)sz) {
+			if (sz <= 0)
+				break;
+
+			i = 0;
+		}
+
 		char c = buf[i++];
 
 		if (c == '\n' || l_pos >= sizeof(line) - 1) {
@@ -77,6 +80,11 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 		}
 
 		line[l_pos++] = c;
+	}
+
+	if (sz < 0) {
+		ret = -errno;
+		goto out;
 	}
 
 	if (l_pos > 0) {

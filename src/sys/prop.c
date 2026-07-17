@@ -57,6 +57,8 @@ int pg_prop_set(struct pg_prop_state *RESTRICT state, const char *RESTRICT val)
 	if (strncmp(os_val, val, PROP_VALUE_MAX) == 0)
 		return 0;
 
+	bool was_mod = state->modified;
+
 	if (!state->modified) {
 		strncpy(state->val, os_val, PROP_VALUE_MAX - 1);
 		state->val[PROP_VALUE_MAX - 1] = '\0';
@@ -64,7 +66,7 @@ int pg_prop_set(struct pg_prop_state *RESTRICT state, const char *RESTRICT val)
 	}
 
 	if (__system_property_set(state->name, val) != 0) {
-		state->modified = false;
+		state->modified = was_mod;
 		ret = -EIO;
 		goto out;
 	}
@@ -73,7 +75,7 @@ out:
 	return ret;
 }
 
-int pg_prop_reset(struct pg_prop_state *RESTRICT state)
+int pg_prop_reset(struct pg_prop_state *state)
 {
 	int ret = 0;
 
@@ -91,7 +93,7 @@ out:
 	return ret;
 }
 
-void pg_prop_cleanup(struct pg_prop_state *RESTRICT state)
+void pg_prop_cleanup(struct pg_prop_state *state)
 {
 	if (UNLIKELY(!state))
 		return;
