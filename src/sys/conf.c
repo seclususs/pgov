@@ -12,7 +12,7 @@
 #define CONF_BUF_SZ 4096
 #define CONF_LINE_SZ 256
 
-static int parse_line(char *RESTRICT line, pg_conf_cb cb, void *RESTRICT ctx)
+static int parse_line(char *RESTRICT line, pg_conf_cb cb)
 {
 	char *key = line;
 	char *val;
@@ -36,10 +36,10 @@ static int parse_line(char *RESTRICT line, pg_conf_cb cb, void *RESTRICT ctx)
 	if (UNLIKELY(*key == '\0'))
 		return 0;
 
-	return cb(key, val, ctx);
+	return cb(key, val);
 }
 
-int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb, void *RESTRICT ctx)
+int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 {
 	char buf[CONF_BUF_SZ];
 	char line[CONF_LINE_SZ];
@@ -68,7 +68,7 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb, void *RESTRICT ctx)
 		if (c == '\n' || l_pos >= sizeof(line) - 1) {
 			line[l_pos] = '\0';
 
-			ret = parse_line(line, cb, ctx);
+			ret = parse_line(line, cb);
 			if (ret < 0)
 				goto out;
 
@@ -81,7 +81,7 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb, void *RESTRICT ctx)
 
 	if (l_pos > 0) {
 		line[l_pos] = '\0';
-		ret = parse_line(line, cb, ctx);
+		ret = parse_line(line, cb);
 	}
 
 out:

@@ -8,9 +8,9 @@
 
 #include "compiler.h"
 
-typedef int (*pg_conf_cb)(const char *key, const char *val, void *ctx);
+typedef int (*pg_conf_cb)(const char *RESTRICT key, const char *RESTRICT val);
 
-int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb, void *RESTRICT ctx);
+int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb);
 
 #endif // PGOV_CONF_H
 

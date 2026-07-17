@@ -7,6 +7,7 @@
 #include "detect.h"
 #include "epoll.h"
 #include "lockfile.h"
+#include "opt.h"
 #include "pg/log.h"
 #include "memory.h"
 #include "paths.h"
@@ -142,6 +143,10 @@ int pg_daemon_init(void)
 		goto cleanup;
 	}
 
+#if defined(NDK_BUILD)
+	pg_opt_init();
+#endif // NDK_BUILD
+
 	clock_gettime(CLOCK_MONOTONIC, &context.last_bat);
 
 #if defined(NDK_BUILD)
@@ -160,6 +165,10 @@ int pg_daemon_init(void)
 	LOGI("daemon: reactor shutdown cleanly status=%d", ret);
 
 cleanup:
+#if defined(NDK_BUILD)
+	pg_opt_exit();
+#endif // NDK_BUILD
+
 	if (context.trg_fd >= 0)
 		pg_psi_close_trg(context.trg_fd);
 

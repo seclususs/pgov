@@ -10,6 +10,10 @@
 #define PG_PATH_LOCK "/data/vendor/pgovd/pgovd.lock"
 #endif
 
+#if defined(NDK_BUILD)
+#define CONF_PATH "/data/adb/modules/pgovd/system/bin/etc/pgovd.conf"
+#endif
+
 #define PG_PATH_PSI_CPU "/proc/pressure/cpu"
 #define PG_PATH_THERMAL_BASE "/sys/class/thermal"
 #define PG_PATH_BACKLIGHT_BASE "/sys/class/backlight"
