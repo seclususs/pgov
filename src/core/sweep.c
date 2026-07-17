@@ -1,13 +1,14 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "pg/sweep.h"
-
 #if defined(NDK_BUILD)
 
 #define _GNU_SOURCE
+#include "pg/sweep.h"
 #include "fs.h"
+#include "pg/config.h"
 #include "pg/log.h"
+#include "task.h"
 #include "sensor.h"
 #include "paths.h"
 #include "compiler.h"
@@ -28,6 +29,7 @@ struct sweep_ctx {
 
 #define AGE_LIMIT 86400
 #define MAX_DEPTH 12
+#define UCLAMP_UNRESTRICTED 1024
 
 #define DIR_FLAGS (O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC | O_NOATIME)
 
@@ -179,6 +181,8 @@ void pg_sweep_run(struct pg_context *ctx)
 	if (sweep_chk_intr(&sctx))
 		return;
 
+	pg_task_set_uclamp(UCLAMP_UNRESTRICTED);
+
 	for (size_t i = 0; i < ARRAY_SIZE(APP_ROOTS); ++i) {
 		if (sctx.intr)
 			break;
@@ -196,6 +200,8 @@ void pg_sweep_run(struct pg_context *ctx)
 
 		pg_fs_walk(TEMP_PATHS[i], sweep_cb, &sctx, MAX_DEPTH);
 	}
+
+	pg_task_set_uclamp(PG_UCLAMP_MAX);
 
 	if (sctx.intr)
 		LOGD("sweep: cycle preempted, intr=1");
