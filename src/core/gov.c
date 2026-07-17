@@ -35,8 +35,8 @@ static inline bool update_disp(struct pg_context *RESTRICT ctx,
 			       const struct timespec *RESTRICT now)
 {
 	int32_t bl = 0;
-	pg_sensor_read_bl(&ctx->bl_sensor, &bl);
-	bool on = (bl > 0);
+	int ret = pg_sensor_read_bl(&ctx->bl_sensor, &bl);
+	bool on = ((ret < 0) ? true : (bl > 0)) != 0;
 
 	if (on && UNLIKELY(ctx->disp_state != PG_DISP_ON)) {
 		ctx->load_state.first_run = true;

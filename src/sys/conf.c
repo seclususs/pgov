@@ -76,6 +76,10 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 				goto out;
 
 			l_pos = 0;
+
+			if (c != '\n')
+				line[l_pos++] = c;
+
 			continue;
 		}
 

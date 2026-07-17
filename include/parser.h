@@ -107,7 +107,9 @@ static ALWAYS_INLINE uint64_t pg_parse_u64(const uint8_t *RESTRICT buf,
 		if (b < '0' || b > '9')
 			break;
 
-		val = (val * 10ULL) + (uint64_t)(b - '0');
+		if (val <= 1844674407370955161ULL)
+			val = (val * 10ULL) + (uint64_t)(b - '0');
+
 		pos++;
 	}
 

@@ -92,9 +92,10 @@ int pg_task_set_io_prio(int ioprio_class, int ioprio_data)
 
 int pg_task_set_core_efficiency(void)
 {
-	if (pg_topo_set_little_core() == -1) {
-		int err = errno;
-		LOGE("task: failed to set topology affinity err=%d", err);
+	int ret = pg_topo_set_little_core();
+	if (ret < 0) {
+		int err = (ret == -1) ? errno : -ret;
+		LOGE("task: failed to set topo affinity err=%d", err);
 		return -err;
 	}
 
