@@ -148,3 +148,49 @@ int32_t pg_topo_get_max_freq_khz(void)
 
 	return freq;
 }
+
+int pg_topo_get_cpu_capacity(int32_t *RESTRICT total,
+			     int32_t *RESTRICT min_capacity,
+			     int32_t *RESTRICT max_capacity)
+{
+	long num_cores = sysconf(_SC_NPROCESSORS_CONF);
+	int32_t t = 0;
+	int32_t min_cap = INT32_MAX;
+	int32_t max_cap = 0;
+	char buf[128];
+	int i;
+
+	if (num_cores <= 0)
+		return -EINVAL;
+
+	for (i = 0; i < num_cores; ++i) {
+		int32_t val;
+
+		format_path(buf, sizeof(buf), CPU_CAPACITY, i);
+
+		if (pg_sysfs_read_i32(buf, &val) != 0 || val <= 0)
+			continue;
+
+		t += val;
+
+		if (val < min_cap)
+			min_cap = val;
+
+		if (val > max_cap)
+			max_cap = val;
+	}
+
+	if (t == 0)
+		return -ENODATA;
+
+	if (total)
+		*total = t;
+
+	if (min_capacity)
+		*min_capacity = min_cap;
+
+	if (max_capacity)
+		*max_capacity = max_cap;
+
+	return 0;
+}
