@@ -216,3 +216,108 @@ int pg_scan_backlight(char *path, size_t len)
 
 	return 0;
 }
+
+static int trip_point(const char *name, char *path, size_t len)
+{
+	char type[256];
+	char buf[64];
+	char file[32];
+	char temp[32];
+
+	for (size_t i = 0; i <= 9; ++i) {
+		file[0] = 't';
+		file[1] = 'r';
+		file[2] = 'i';
+		file[3] = 'p';
+		file[4] = '_';
+		file[5] = 'p';
+		file[6] = 'o';
+		file[7] = 'i';
+		file[8] = 'n';
+		file[9] = 't';
+		file[10] = '_';
+		file[11] = (char)('0' + i);
+		file[12] = '_';
+		file[13] = 't';
+		file[14] = 'y';
+		file[15] = 'p';
+		file[16] = 'e';
+		file[17] = '\0';
+
+		pg_str_build_path(type, sizeof(type), PG_PATH_THERMAL_BASE,
+				  name, file);
+
+		int fd = open(type, O_RDONLY | O_CLOEXEC);
+		if (fd < 0)
+			continue;
+
+		ssize_t bytes = read(fd, buf, sizeof(buf) - 1);
+		close(fd);
+
+		if (bytes <= 0)
+			continue;
+
+		buf[bytes] = '\0';
+
+		if (pg_str_contains(buf, "passive") ||
+		    pg_str_contains(buf, "critical")) {
+			temp[0] = 't';
+			temp[1] = 'r';
+			temp[2] = 'i';
+			temp[3] = 'p';
+			temp[4] = '_';
+			temp[5] = 'p';
+			temp[6] = 'o';
+			temp[7] = 'i';
+			temp[8] = 'n';
+			temp[9] = 't';
+			temp[10] = '_';
+			temp[11] = (char)('0' + i);
+			temp[12] = '_';
+			temp[13] = 't';
+			temp[14] = 'e';
+			temp[15] = 'm';
+			temp[16] = 'p';
+			temp[17] = '\0';
+
+			pg_str_build_path(path, len, PG_PATH_THERMAL_BASE, name,
+					  temp);
+			return 0;
+		}
+	}
+
+	return -ENOENT;
+}
+
+int pg_scan_trip_point(char *path, size_t len)
+{
+	DIR *dir = opendir(PG_PATH_THERMAL_BASE);
+	if (!dir) {
+		if (len > 0)
+			path[0] = '\0';
+
+		return -ENOENT;
+	}
+
+	struct dirent *entry;
+
+	while ((entry = readdir(dir)) != NULL) {
+		if (!pg_str_has_prefix(entry->d_name, "thermal_zone"))
+			continue;
+
+		if (!thermal_valid(entry->d_name))
+			continue;
+
+		if (trip_point(entry->d_name, path, len) == 0) {
+			closedir(dir);
+			return 0;
+		}
+	}
+
+	closedir(dir);
+
+	if (len > 0)
+		path[0] = '\0';
+
+	return -ENODEV;
+}
