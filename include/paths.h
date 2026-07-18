@@ -11,7 +11,7 @@
 #endif
 
 #if defined(NDK_BUILD)
-#define CONF_PATH "/data/adb/modules/pgovd/system/bin/etc/pgovd.conf"
+#define CONF_PATH "/data/adb/modules/pgovd/system/etc/pgovd.conf"
 #endif
 
 #define PG_PATH_PSI_CPU "/proc/pressure/cpu"
