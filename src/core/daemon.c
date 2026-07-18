@@ -24,6 +24,7 @@
 #include "sensor.h"
 #include "sysfs.h"
 #include "pg/thermal.h"
+#include <errno.h> // IWYU pragma: keep
 #include <fcntl.h>
 #include <unistd.h>
 
@@ -89,14 +90,14 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 				      PG_PSI_WINDOW_US);
 	if (ctx->trg_fd < 0) {
 		LOGE("daemon: failed inject err=%d", ctx->trg_fd);
-		return -1;
+		return ctx->trg_fd;
 	}
 
 	pg_psi_init(&ctx->psi, PG_PATH_PSI_CPU);
 
 	ctx->sig_fd = pg_signal_init();
 	if (ctx->sig_fd < 0)
-		return -1;
+		return ctx->sig_fd;
 
 	pg_thermal_init(&ctx->thermal_state);
 	pg_poll_init(&ctx->poll_state);
@@ -114,26 +115,31 @@ int pg_daemon_init(void)
 
 	LOGI("daemon: initiating daemon sequence");
 	init_context_defaults(&context);
-	init_sysfs_caches(&context);
 
-	if (pg_detect_privilege() != 0)
-		return 1;
+	ret = pg_detect_privilege();
+	if (ret != 0)
+		goto cleanup;
 
 	context.lock_fd = pg_lockfile_init(PG_PATH_LOCK);
-	if (context.lock_fd < 0)
-		return 1;
+	if (context.lock_fd < 0) {
+		ret = context.lock_fd;
+		goto cleanup;
+	}
 
 	LOGD("daemon: waiting for android subsystem");
 	if (!pg_prop_wait_boot()) {
-		ret = 1;
+		ret = -ETIMEDOUT;
 		goto cleanup;
 	}
+
+	LOGD("daemon: mapping sysfs cache nodes");
+	init_sysfs_caches(&context);
 
 	LOGD("daemon: configuring os parameters");
 	init_os_environment();
 
 	if (!pg_detect_cpu_psi()) {
-		ret = 1;
+		ret = -ENODEV;
 		goto cleanup;
 	}
 
@@ -141,10 +147,9 @@ int pg_daemon_init(void)
 	pg_tune_limits();
 	pg_tune_configs();
 
-	if (init_sensors_and_triggers(&context) != 0) {
-		ret = 1;
+	ret = init_sensors_and_triggers(&context);
+	if (ret != 0)
 		goto cleanup;
-	}
 
 #if defined(NDK_BUILD)
 	pg_opt_init();
