@@ -1,5 +1,7 @@
 /build/
 /out/
+/obj/
+/libs/
 CMakeCache.txt
 CMakeFiles/
 CMakeScripts/
@@ -28,10 +30,6 @@ Thumbs.db
 
 *.zip
 *.log
-core
-!src/core/
-core.*
-vgcore.*
 
 __pycache__/
 *.py[cod]
@@ -42,3 +40,22 @@ env/
 .env/
 .pytest_cache/
 .mypy_cache/
+
+.intermediates/
+.soong/
+
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.webp
+*.ico
+
+!docs/images/**/*.png
+!docs/images/**/*.jpg
+!docs/images/**/*.jpeg
+!docs/images/**/*.gif
+!docs/images/**/*.svg
+!docs/images/**/*.webp
+!docs/images/**/*.ico

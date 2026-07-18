@@ -12,6 +12,7 @@ CMakePresets.json text eol=lf
 
 .clang-format text eol=lf
 .clang-tidy text eol=lf
+.editorconfig text eol=lf
 
 *.sh text eol=lf executable
 
@@ -24,6 +25,15 @@ CMakePresets.json text eol=lf
 *.rc text eol=lf
 *.te text eol=lf
 *.prop text eol=lf
+*.conf text eol=lf
 
 modules/META-INF/**/update-binary text eol=lf executable
 modules/META-INF/**/updater-script text eol=lf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.webp binary
+*.ico binary
+*.svg text eol=lf
