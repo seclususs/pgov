@@ -41,7 +41,7 @@ static int dirent(int dfd, struct linux_dirent64 *d, pg_fs_cb cb, void *ctx,
 	enum pg_fs_act act = cb(dfd, d->d_name, dtype, cur_depth, ctx);
 
 	if (act == FS_STOP)
-		return 1;
+		return -ECANCELED;
 
 	if (act == FS_DELETE) {
 		int flgs = (dtype == DT_DIR) ? AT_REMOVEDIR : 0;

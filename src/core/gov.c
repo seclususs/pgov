@@ -176,35 +176,35 @@ static inline void update_sysfs(struct pg_context *RESTRICT ctx,
 	q16_t walt = pg_cpu_calc_walt(p_eff, &LIM_CPU);
 	q16_t ucl = pg_cpu_calc_uclamp(p_eff, th_scl, &CFG_CPU, eff, &LIM_CPU);
 
-	uint64_t l_u64 =
+	uint64_t lat_ns =
 		pg_math_san_quant_u64(lat, LIM_CPU.max_lat, PG_QUANT_NS);
 
-	uint64_t g_u64 =
+	uint64_t gran_ns =
 		pg_math_san_quant_u64(gran, LIM_CPU.max_gran, PG_QUANT_NS);
 
-	uint64_t w_u64 =
+	uint64_t wake_ns =
 		pg_math_san_quant_u64(wake, LIM_CPU.max_wake, PG_QUANT_NS);
 
-	uint64_t m_u64 =
+	uint64_t mig_ns =
 		pg_math_san_quant_u64(mig, LIM_CPU.min_mig, PG_QUANT_NS);
 
-	uint64_t wl_u64 =
+	uint64_t walt_val =
 		pg_math_san_u64(walt, (uint64_t)Q16_TO_INT(LIM_CPU.min_walt));
 
-	uint64_t u_u64 =
+	uint64_t ucl_val =
 		pg_math_san_u64(ucl, (uint64_t)Q16_TO_INT(LIM_CPU.min_ucl));
 
 	LOGD("gov: lat=%llu gran=%llu wake=%llu mig=%llu walt=%llu uclamp=%llu poll=%d",
-	     (unsigned long long)l_u64, (unsigned long long)g_u64,
-	     (unsigned long long)w_u64, (unsigned long long)m_u64,
-	     (unsigned long long)wl_u64, (unsigned long long)u_u64, n_poll);
+	     (unsigned long long)lat_ns, (unsigned long long)gran_ns,
+	     (unsigned long long)wake_ns, (unsigned long long)mig_ns,
+	     (unsigned long long)walt_val, (unsigned long long)ucl_val, n_poll);
 
-	pg_sysfs_update(&ctx->sched_lat, l_u64, false, &CHK_LAT);
-	pg_sysfs_update(&ctx->sched_gran, g_u64, false, &CHK_GRAN);
-	pg_sysfs_update(&ctx->sched_wake, w_u64, false, &CHK_WAKE);
-	pg_sysfs_update(&ctx->sched_mig, m_u64, false, &CHK_MIG);
-	pg_sysfs_update(&ctx->sched_walt, wl_u64, false, &CHK_WALT);
-	pg_sysfs_update(&ctx->sched_ucl, u_u64, false, &CHK_UCL);
+	pg_sysfs_update(&ctx->sched_lat, lat_ns, false, &CHK_LAT);
+	pg_sysfs_update(&ctx->sched_gran, gran_ns, false, &CHK_GRAN);
+	pg_sysfs_update(&ctx->sched_wake, wake_ns, false, &CHK_WAKE);
+	pg_sysfs_update(&ctx->sched_mig, mig_ns, false, &CHK_MIG);
+	pg_sysfs_update(&ctx->sched_walt, walt_val, false, &CHK_WALT);
+	pg_sysfs_update(&ctx->sched_ucl, ucl_val, false, &CHK_UCL);
 }
 
 static inline void exec_gov_logic(struct pg_context *RESTRICT ctx,

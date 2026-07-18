@@ -19,7 +19,10 @@
 	do {      \
 	} while (0)
 #else
-#define LOGD(...) __android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__)
+#define LOGD(...)                                                             \
+	do {                                                                  \
+		__android_log_print(ANDROID_LOG_DEBUG, LOG_TAG, __VA_ARGS__); \
+	} while (0)
 #endif
 
 #endif // PG_LOG_H

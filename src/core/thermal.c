@@ -65,7 +65,7 @@ q16_t pg_thermal_update(struct pg_thermal_state *RESTRICT state, q16_t cpu_temp,
 		aw_k += aw_bst;
 	}
 
-	if (ABS_Q16(u_raw - u_sat) > 65) {
+	if (abs_q16(u_raw - u_sat) > 65) {
 		q16_t exc = u_raw - u_sat;
 		q16_t drain = q16_mul(q16_mul(exc, aw_k), dt_s);
 

@@ -188,10 +188,11 @@ void pg_sweep_run(struct pg_context *ctx)
 			break;
 
 		int root_fd = open(APP_ROOTS[i], DIR_FLAGS);
-		if (root_fd >= 0) {
-			sweep_app_data(root_fd, &sctx);
-			close(root_fd);
-		}
+		if (root_fd < 0)
+			continue;
+
+		sweep_app_data(root_fd, &sctx);
+		close(root_fd);
 	}
 
 	for (size_t i = 0; i < ARRAY_SIZE(TEMP_PATHS); ++i) {

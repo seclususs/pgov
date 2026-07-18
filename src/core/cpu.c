@@ -6,8 +6,8 @@
 PURE bool pg_cpu_trans(const struct pg_load_state *RESTRICT state,
 		       q16_t target_psi, const struct pg_cpu_cfg *RESTRICT cfg)
 {
-	bool rate = ABS_Q16(state->rate) > cfg->trans_rate;
-	bool diff = ABS_Q16(state->psi_val - target_psi) > cfg->trans_diff;
+	bool rate = abs_q16(state->rate) > cfg->trans_rate;
+	bool diff = abs_q16(state->psi_val - target_psi) > cfg->trans_diff;
 	return (rate || diff) != 0;
 }
 
@@ -67,7 +67,7 @@ static inline q16_t calc_c_final(q16_t k_fin, q16_t vel, q16_t i_dt,
 	q32_t load = Q16_TO_Q32(vel);
 	q32_t r_sq = q32_mul(load, load) + Q16_TO_Q32(FLOAT_TO_Q16(0.001F));
 
-	q32_t d_n1 = Q16_TO_Q32(q16_mul(Q16_HALF, ABS_Q16(i_dt)));
+	q32_t d_n1 = Q16_TO_Q32(q16_mul(Q16_HALF, abs_q16(i_dt)));
 	q32_t p_val = Q16_TO_Q32(psi_val);
 	q32_t d_n2 = q32_mul(p_val, p_val);
 	q32_t d_num = q32_mul(d_n1, d_n2);
@@ -110,7 +110,7 @@ q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
 	}
 
 	q16_t l_rate = input->vel;
-	if (ABS_Q16(l_rate) > cfg->surge_thresh)
+	if (abs_q16(l_rate) > cfg->surge_thresh)
 		state->rate += q16_mul(l_rate, eff->surge_gain);
 
 	q16_t pred = input->tgt_psi + q16_mul(l_rate, eff->lookahead);
@@ -219,7 +219,7 @@ PURE q16_t pg_cpu_calc_migration(q16_t vel, q16_t p_eff,
 	q16_t rng = lim->max_mig - lim->min_mig;
 	q16_t r_mig = lim->min_mig + q16_mul(rng, crv);
 
-	q16_t a_vel = ABS_Q16(vel);
+	q16_t a_vel = abs_q16(vel);
 	q16_t v_rat = pg_math_clamp(q16_div(a_vel, INT_TO_Q16(25)), 0, Q16_ONE);
 	q16_t mig = q16_mul(r_mig, Q16_ONE - q16_mul(v_rat, Q16_HALF));
 

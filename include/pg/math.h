@@ -22,11 +22,13 @@ typedef int64_t q32_t;
 #define Q16_TO_Q32(q) ((q32_t)(q) * Q16_ONE)
 #define Q32_TO_Q16(q) ((q16_t)((q) >> 16))
 
-#define ABS_Q16(x)                                                     \
-	({                                                             \
-		__typeof__(x) _x = (x);                                \
-		(_x == INT32_MIN) ? INT32_MAX : ((_x < 0) ? -_x : _x); \
-	})
+static ALWAYS_INLINE q16_t abs_q16(q16_t x)
+{
+	if (UNLIKELY(x == INT32_MIN))
+		return INT32_MAX;
+
+	return (x < 0) ? -x : x;
+}
 
 static ALWAYS_INLINE q16_t q16_mul(q16_t a, q16_t b)
 {

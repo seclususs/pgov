@@ -129,7 +129,12 @@ int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 
 	bool valid;
 	int32_t val = pg_parse_i32(sensor->buf, (size_t)sz, &valid);
-	*cap = (int)valid ? INT_TO_Q16(val) : FALLBACK_BAT_CAP;
+	if (UNLIKELY(!valid)) {
+		*cap = FALLBACK_BAT_CAP;
+		return -EINVAL;
+	}
+
+	*cap = INT_TO_Q16(val);
 	return 0;
 }
 
@@ -149,8 +154,12 @@ int pg_sensor_read_bl(struct pg_bl_sensor *RESTRICT sensor,
 
 	bool valid;
 	int32_t val = pg_parse_i32(sensor->buf, (size_t)sz, &valid);
-	*brightness = (int)valid ? val : FALLBACK_BL;
+	if (UNLIKELY(!valid)) {
+		*brightness = FALLBACK_BL;
+		return -EINVAL;
+	}
 
+	*brightness = val;
 	return 0;
 }
 

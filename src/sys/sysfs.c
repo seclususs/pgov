@@ -31,27 +31,31 @@ void pg_sysfs_cache_cleanup(struct pg_sysfs_cache *cache)
 
 int pg_sysfs_read_i32(const char *path, int32_t *out_val)
 {
+	int ret = 0;
+
 	int fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0)
 		return -errno;
 
 	char buf[32];
 	ssize_t bytes = read(fd, buf, sizeof(buf));
-
-	close(fd);
-
-	if (bytes <= 0)
-		return (bytes < 0) ? -errno : -ENODATA;
+	if (bytes <= 0) {
+		ret = (bytes < 0) ? -errno : -ENODATA;
+		goto out;
+	}
 
 	bool valid;
 	int32_t val = pg_parse_i32((const uint8_t *)buf, (size_t)bytes, &valid);
-
-	if (!valid)
-		return -EINVAL;
+	if (!valid) {
+		ret = -EINVAL;
+		goto out;
+	}
 
 	*out_val = val;
 
-	return 0;
+out:
+	close(fd);
+	return ret;
 }
 
 int pg_sysfs_write_strm(int fd, uint64_t value)
@@ -85,19 +89,22 @@ int pg_sysfs_write(const char *RESTRICT path, const char *RESTRICT val)
 	while (val[len] != '\0')
 		len++;
 
+	int ret = 0;
 	ssize_t res = pwrite(fd, val, len, 0);
 
-	int err = errno;
+	if (res < 0) {
+		ret = -errno;
+		goto out;
+	}
 
+	if ((size_t)res != len) {
+		ret = -EIO;
+		goto out;
+	}
+
+out:
 	close(fd);
-
-	if (res < 0)
-		return -err;
-
-	if ((size_t)res != len)
-		return -EIO;
-
-	return 0;
+	return ret;
 }
 
 static inline bool absolute(uint64_t cur, uint64_t tgt, uint64_t thresh)
