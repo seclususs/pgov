@@ -2,6 +2,8 @@
 // Copyright (C) 2026 seclususs
 
 #include "sensor.h"
+#include "scan.h"
+#include "sysfs.h"
 #include "pg/log.h"
 #include "parser.h"
 #include <errno.h>
@@ -150,4 +152,23 @@ int pg_sensor_read_bl(struct pg_bl_sensor *RESTRICT sensor,
 	*brightness = (int)valid ? val : FALLBACK_BL;
 
 	return 0;
+}
+
+q16_t pg_sensor_get_trip_temp(q16_t fallback)
+{
+	char path[256];
+	int32_t val;
+	q16_t temp;
+
+	if (pg_scan_trip_point(path, sizeof(path)) != 0)
+		return fallback;
+
+	if (pg_sysfs_read_i32(path, &val) != 0)
+		return fallback;
+
+	temp = (q16_t)(((q32_t)val * Q16_ONE) / 1000);
+	if (temp < INT_TO_Q16(40) || temp > INT_TO_Q16(115))
+		return fallback;
+
+	return temp;
 }

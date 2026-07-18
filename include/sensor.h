@@ -54,4 +54,6 @@ int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 int pg_sensor_read_bl(struct pg_bl_sensor *RESTRICT sensor,
 		      int32_t *RESTRICT brightness);
 
+q16_t pg_sensor_get_trip_temp(q16_t fallback);
+
 #endif // PGOV_SENSOR_H
