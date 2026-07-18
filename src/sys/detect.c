@@ -23,3 +23,12 @@ int pg_detect_privilege(void)
 
 	return 0;
 }
+
+int32_t pg_detect_kernel_hz(void)
+{
+	long hz = sysconf(_SC_CLK_TCK);
+	if (hz <= 0)
+		return 100;
+
+	return (int32_t)hz;
+}
