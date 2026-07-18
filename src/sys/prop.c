@@ -44,13 +44,11 @@ void pg_prop_state_init(struct pg_prop_state *RESTRICT state,
 int pg_prop_set(struct pg_prop_state *RESTRICT state, const char *RESTRICT val)
 {
 	char os_val[PROP_VALUE_MAX];
-	int ret = 0;
-	int len;
 
 	if (UNLIKELY(!state || !val))
 		return -EINVAL;
 
-	len = __system_property_get(state->name, os_val);
+	int len = __system_property_get(state->name, os_val);
 	if (len <= 0)
 		os_val[0] = '\0';
 
@@ -67,30 +65,22 @@ int pg_prop_set(struct pg_prop_state *RESTRICT state, const char *RESTRICT val)
 
 	if (__system_property_set(state->name, val) != 0) {
 		state->modified = was_mod;
-		ret = -EIO;
-		goto out;
+		return -EIO;
 	}
 
-out:
-	return ret;
+	return 0;
 }
 
 int pg_prop_reset(struct pg_prop_state *state)
 {
-	int ret = 0;
-
 	if (UNLIKELY(!state || !state->modified))
 		return 0;
 
-	if (__system_property_set(state->name, state->val) != 0) {
-		ret = -EIO;
-		goto out;
-	}
+	if (__system_property_set(state->name, state->val) != 0)
+		return -EIO;
 
 	state->modified = false;
-
-out:
-	return ret;
+	return 0;
 }
 
 void pg_prop_cleanup(struct pg_prop_state *state)

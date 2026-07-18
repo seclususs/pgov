@@ -20,11 +20,15 @@ int pg_lockfile_init(const char *path)
 
 	if (flock(fd, LOCK_EX | LOCK_NB) < 0) {
 		LOGE("lockfile: another process is already running");
-		close(fd);
-		return -EAGAIN;
+		err = -EAGAIN;
+		goto err_close;
 	}
 
 	return fd;
+
+err_close:
+	close(fd);
+	return err;
 }
 
 void pg_lockfile_close(int fd)

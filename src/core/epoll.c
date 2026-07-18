@@ -76,6 +76,8 @@ void pg_epoll_rm_trg(struct pg_context *ctx)
 
 int pg_epoll_run(struct pg_context *ctx)
 {
+	int ret = 0;
+
 	ctx->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
 	if (ctx->epoll_fd < 0)
 		return -errno;
@@ -84,22 +86,18 @@ int pg_epoll_run(struct pg_context *ctx)
 	ev_sig.events = EPOLLIN | EPOLLERR;
 	ev_sig.data.fd = ctx->sig_fd;
 	if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->sig_fd, &ev_sig) < 0) {
-		int err = errno;
-		LOGE("epoll: failed to register sig_fd err=%d", err);
-		close(ctx->epoll_fd);
-		ctx->epoll_fd = -1;
-		return -err;
+		ret = -errno;
+		LOGE("epoll: failed to register sig_fd err=%d", -ret);
+		goto out_close;
 	}
 
 	struct epoll_event ev_trg = { 0 };
 	ev_trg.events = EPOLLPRI | EPOLLERR | EPOLLET;
 	ev_trg.data.fd = ctx->trg_fd;
 	if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->trg_fd, &ev_trg) < 0) {
-		int err = errno;
-		LOGE("epoll: failed to register trg_fd err=%d", err);
-		close(ctx->epoll_fd);
-		ctx->epoll_fd = -1;
-		return -err;
+		ret = -errno;
+		LOGE("epoll: failed to register trg_fd err=%d", -ret);
+		goto out_close;
 	}
 
 	struct epoll_event events[PG_MAX_EVENTS];
@@ -126,7 +124,8 @@ int pg_epoll_run(struct pg_context *ctx)
 		epoll_events(ctx, events, nfds);
 	}
 
+out_close:
 	close(ctx->epoll_fd);
 	ctx->epoll_fd = -1;
-	return 0;
+	return ret;
 }

@@ -292,14 +292,15 @@ static int trip_point(const char *name, char *path, size_t len)
 int pg_scan_trip_point(char *path, size_t len)
 {
 	DIR *dir = opendir(PG_PATH_THERMAL_BASE);
+	struct dirent *entry;
+	int ret = -ENODEV;
+
 	if (!dir) {
 		if (len > 0)
 			path[0] = '\0';
 
 		return -ENOENT;
 	}
-
-	struct dirent *entry;
 
 	while ((entry = readdir(dir)) != NULL) {
 		if (!pg_str_has_prefix(entry->d_name, "thermal_zone"))
@@ -309,15 +310,15 @@ int pg_scan_trip_point(char *path, size_t len)
 			continue;
 
 		if (trip_point(entry->d_name, path, len) == 0) {
-			closedir(dir);
-			return 0;
+			ret = 0;
+			goto out;
 		}
 	}
-
-	closedir(dir);
 
 	if (len > 0)
 		path[0] = '\0';
 
-	return -ENODEV;
+out:
+	closedir(dir);
+	return ret;
 }

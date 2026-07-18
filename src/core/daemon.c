@@ -113,6 +113,8 @@ int pg_daemon_init(void)
 	int ret = 0;
 
 	LOGI("daemon: initiating daemon sequence");
+	init_context_defaults(&context);
+	init_sysfs_caches(&context);
 
 	if (pg_detect_privilege() != 0)
 		return 1;
@@ -122,18 +124,18 @@ int pg_daemon_init(void)
 		return 1;
 
 	LOGD("daemon: waiting for android subsystem");
-	if (!pg_prop_wait_boot())
-		return 1;
+	if (!pg_prop_wait_boot()) {
+		ret = 1;
+		goto cleanup;
+	}
 
 	LOGD("daemon: configuring os parameters");
 	init_os_environment();
 
-	if (!pg_detect_cpu_psi())
-		return 1;
-
-	LOGD("daemon: initializing state context");
-	init_context_defaults(&context);
-	init_sysfs_caches(&context);
+	if (!pg_detect_cpu_psi()) {
+		ret = 1;
+		goto cleanup;
+	}
 
 	LOGD("daemon: executing environment tuning");
 	pg_tune_limits();

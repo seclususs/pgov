@@ -20,70 +20,59 @@ static size_t prop_count = 0;
 
 static int add_prop(const char *RESTRICT name, const char *RESTRICT val)
 {
-	int ret = 0;
-
 	if (UNLIKELY(prop_count >= MAX_PROPS)) {
 		LOGW("opt: limit %d props, ignoring %s", MAX_PROPS, name);
-		ret = -ENOSPC;
-		goto out;
+		return -ENOSPC;
 	}
 
 	pg_prop_state_init(&props[prop_count], name);
-	ret = pg_prop_set(&props[prop_count], val);
+	int ret = pg_prop_set(&props[prop_count], val);
 	if (ret != 0) {
 		LOGW("opt: failed to set prop %s err=%d", name, ret);
-		goto out;
+		return ret;
 	}
 
 	prop_count++;
-
-out:
-	return ret;
+	return 0;
 }
 
 static int parse_cb(const char *RESTRICT key, const char *RESTRICT val)
 {
 	const char *path;
 	const char *name;
-	int ret = 0;
 
 	if (pg_str_has_prefix(key, "sysfs.")) {
 		path = key + 6;
-		ret = pg_sysfs_write(path, val);
+		int ret = pg_sysfs_write(path, val);
 		if (ret != 0)
 			LOGW("opt: failed write sysfs %s err=%d", path, ret);
 
-		ret = 0;
-		goto out;
+		return 0;
 	}
 
 	if (pg_str_has_prefix(key, "prop.")) {
 		name = key + 5;
-		ret = add_prop(name, val);
+		int ret = add_prop(name, val);
 		if (ret == -ENOSPC)
-			ret = 0;
+			return 0;
 
-		goto out;
+		return ret;
 	}
 
-out:
-	return ret;
+	return 0;
 }
 
 int pg_opt_init(void)
 {
-	int ret = 0;
-
-	ret = pg_conf_parse(CONF_PATH, parse_cb);
+	int ret = pg_conf_parse(CONF_PATH, parse_cb);
 	if (ret < 0 && ret != -ENOENT) {
 		LOGW("opt: failed to parse conf err=%d", ret);
-		goto out;
+		return ret;
 	}
 
 	if (ret == -ENOENT)
-		ret = 0;
+		return 0;
 
-out:
 	return ret;
 }
 
