@@ -35,7 +35,7 @@
 #endif
 
 extern struct pg_cpu_lim LIM_CPU;
-extern const struct pg_cpu_cfg CFG_CPU;
-extern const struct pg_thermal_cfg CFG_THERMAL;
+extern struct pg_cpu_cfg CFG_CPU;
+extern struct pg_thermal_cfg CFG_THERMAL;
 
 #endif // PG_CONFIG_H

@@ -135,8 +135,9 @@ int pg_daemon_init(void)
 	init_context_defaults(&context);
 	init_sysfs_caches(&context);
 
-	LOGD("daemon: executing limits tuning");
+	LOGD("daemon: executing environment tuning");
 	pg_tune_limits();
+	pg_tune_configs();
 
 	if (init_sensors_and_triggers(&context) != 0) {
 		ret = 1;

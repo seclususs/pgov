@@ -5,5 +5,6 @@
 #define PG_TUNE_H
 
 void pg_tune_limits(void);
+void pg_tune_configs(void);
 
 #endif // PG_TUNE_H
