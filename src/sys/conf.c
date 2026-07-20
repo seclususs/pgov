@@ -6,6 +6,7 @@
 #include "conf.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <stdbool.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -48,6 +49,7 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 	ssize_t sz = 0;
 	int ret = 0;
 	int fd;
+	bool skip = false;
 
 	if (UNLIKELY(!path || !cb))
 		return -EINVAL;
@@ -58,28 +60,40 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 
 	for (;;) {
 		if (i >= (size_t)sz) {
-			sz = read(fd, buf, sizeof(buf));
+			do {
+				sz = read(fd, buf, sizeof(buf));
+			} while (sz < 0 && errno == EINTR);
 
 			if (sz <= 0)
 				break;
-
 			i = 0;
 		}
 
 		char c = buf[i++];
 
-		if (c == '\n' || l_pos >= sizeof(line) - 1) {
-			line[l_pos] = '\0';
+		if (c == '\n') {
+			if (UNLIKELY(skip)) {
+				skip = false;
+				l_pos = 0;
+				continue;
+			}
 
-			ret = parse_line(line, cb);
-			if (ret < 0)
-				goto out;
+			if (l_pos > 0) {
+				line[l_pos] = '\0';
+				ret = parse_line(line, cb);
+				if (ret < 0)
+					goto out;
+			}
 
 			l_pos = 0;
+			continue;
+		}
 
-			if (c != '\n')
-				line[l_pos++] = c;
+		if (UNLIKELY(skip))
+			continue;
 
+		if (UNLIKELY(l_pos >= sizeof(line) - 1)) {
+			skip = true;
 			continue;
 		}
 
@@ -91,7 +105,7 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 		goto out;
 	}
 
-	if (l_pos > 0) {
+	if (l_pos > 0 && !skip) {
 		line[l_pos] = '\0';
 		ret = parse_line(line, cb);
 	}
