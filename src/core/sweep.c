@@ -107,16 +107,6 @@ static void sweep_package(int root_fd, const char *RESTRICT pkg_name,
 		close(cache_fd);
 	}
 
-	if (sctx->intr)
-		goto out_close;
-
-	int code_fd = openat(pkg_fd, "code_cache", DIR_FLAGS);
-	if (code_fd >= 0) {
-		pg_fs_walk_fd(code_fd, sweep_cb, sctx, MAX_DEPTH);
-		close(code_fd);
-	}
-
-out_close:
 	close(pkg_fd);
 }
 
