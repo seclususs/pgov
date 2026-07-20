@@ -38,7 +38,11 @@ int pg_sysfs_read_i32(const char *path, int32_t *out_val)
 		return -errno;
 
 	char buf[32];
-	ssize_t bytes = read(fd, buf, sizeof(buf));
+	ssize_t bytes;
+	do {
+		bytes = read(fd, buf, sizeof(buf));
+	} while (bytes < 0 && errno == EINTR);
+
 	if (bytes <= 0) {
 		ret = (bytes < 0) ? -errno : -ENODATA;
 		goto out;
@@ -60,13 +64,18 @@ out:
 
 int pg_sysfs_write_strm(int fd, uint64_t value)
 {
+	ssize_t res;
+
 	if (fd < 0)
 		return -EBADF;
 
 	char buf[32];
 	size_t len = pg_fmt_u64(value, buf);
 
-	ssize_t res = pwrite(fd, buf, len, 0);
+	do {
+		res = pwrite(fd, buf, len, 0);
+	} while (res < 0 && errno == EINTR);
+
 	if (res < 0)
 		return -errno;
 
@@ -78,6 +87,9 @@ int pg_sysfs_write_strm(int fd, uint64_t value)
 
 int pg_sysfs_write(const char *RESTRICT path, const char *RESTRICT val)
 {
+	ssize_t res;
+	int ret = 0;
+
 	if (UNLIKELY(!path || !val))
 		return -EINVAL;
 
@@ -89,8 +101,9 @@ int pg_sysfs_write(const char *RESTRICT path, const char *RESTRICT val)
 	while (val[len] != '\0')
 		len++;
 
-	int ret = 0;
-	ssize_t res = pwrite(fd, val, len, 0);
+	do {
+		res = pwrite(fd, val, len, 0);
+	} while (res < 0 && errno == EINTR);
 
 	if (res < 0) {
 		ret = -errno;

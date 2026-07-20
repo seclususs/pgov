@@ -40,7 +40,12 @@ void pg_memory_shield(void)
 		return;
 	}
 
-	if (write(fd, OOM_SCORE_MIN, sizeof(OOM_SCORE_MIN) - 1) < 0)
+	ssize_t sz;
+	do {
+		sz = write(fd, OOM_SCORE_MIN, sizeof(OOM_SCORE_MIN) - 1);
+	} while (sz < 0 && errno == EINTR);
+
+	if (sz < 0)
 		LOGE("memory: failed to write oom protection score");
 	else
 		LOGD("memory: lmk shield active");

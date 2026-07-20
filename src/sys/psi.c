@@ -33,7 +33,12 @@ int pg_psi_open_trg(const char *path, int32_t threshold_us, int32_t window_us)
 	pos += pg_fmt_u32(window_us, buf + pos);
 	buf[pos++] = '\n';
 
-	if (write(fd, buf, pos) < 0) {
+	ssize_t sz;
+	do {
+		sz = write(fd, buf, pos);
+	} while (sz < 0 && errno == EINTR);
+
+	if (sz < 0) {
 		err = errno;
 		LOGE("psi: failed to write trigger config err=%d", err);
 		goto out_err;
@@ -191,7 +196,11 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT mon,
 		return -EBADF;
 	}
 
-	ssize_t sz = pread(mon->fd, mon->buf, sizeof(mon->buf), 0);
+	ssize_t sz;
+	do {
+		sz = pread(mon->fd, mon->buf, sizeof(mon->buf), 0);
+	} while (sz < 0 && errno == EINTR);
+
 	if (sz <= 0) {
 		LOGE("psi: read failed or empty err=%d", errno);
 		return -EIO;
@@ -248,7 +257,11 @@ int pg_psi_read_raw(const char *RESTRICT path, q16_t *RESTRICT avg10)
 		return -errno;
 
 	char buf[256];
-	ssize_t sz = read(fd, buf, sizeof(buf));
+	ssize_t sz;
+	do {
+		sz = read(fd, buf, sizeof(buf));
+	} while (sz < 0 && errno == EINTR);
+
 	close(fd);
 
 	if (sz <= 0)

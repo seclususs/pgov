@@ -41,7 +41,11 @@ static inline void epoll_events(struct pg_context *RESTRICT ctx,
 
 		if (ev_fd == ctx->sig_fd) {
 			struct signalfd_siginfo s_info;
-			ssize_t s = read(ctx->sig_fd, &s_info, sizeof(s_info));
+
+			ssize_t s;
+			do {
+				s = read(ctx->sig_fd, &s_info, sizeof(s_info));
+			} while (s < 0 && errno == EINTR);
 
 			if (s == sizeof(s_info))
 				ctx->shutdown_req = true;

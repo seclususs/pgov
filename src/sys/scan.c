@@ -6,7 +6,7 @@
 #include "str.h"
 #include "paths.h"
 #include <dirent.h>
-#include <errno.h> // IWYU pragma: keep
+#include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
 #include <string.h>
@@ -138,7 +138,10 @@ int pg_scan_thermal_zone(char *path, size_t len)
 		if (fd < 0)
 			continue;
 
-		ssize_t bytes = read(fd, buf, sizeof(buf) - 1);
+		ssize_t bytes;
+		do {
+			bytes = read(fd, buf, sizeof(buf) - 1);
+		} while (bytes < 0 && errno == EINTR);
 
 		close(fd);
 
@@ -251,7 +254,11 @@ static int trip_point(const char *name, char *path, size_t len)
 		if (fd < 0)
 			continue;
 
-		ssize_t bytes = read(fd, buf, sizeof(buf) - 1);
+		ssize_t bytes;
+		do {
+			bytes = read(fd, buf, sizeof(buf) - 1);
+		} while (bytes < 0 && errno == EINTR);
+
 		close(fd);
 
 		if (bytes <= 0)

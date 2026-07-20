@@ -79,12 +79,17 @@ void pg_sensor_bl_close(struct pg_bl_sensor *sensor)
 static inline int read_temp(struct pg_temp_sensor *RESTRICT sensor,
 			    q16_t *RESTRICT temp, q16_t fallback)
 {
+	ssize_t sz;
+
 	if (sensor->fd < 0) {
 		*temp = fallback;
 		return -EBADF;
 	}
 
-	ssize_t sz = pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
+	do {
+		sz = pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
+	} while (sz < 0 && errno == EINTR);
+
 	if (sz <= 0) {
 		*temp = fallback;
 		return -EIO;
@@ -116,12 +121,17 @@ int pg_sensor_read_bat_temp(struct pg_temp_sensor *RESTRICT sensor,
 int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 			   q16_t *RESTRICT cap)
 {
+	ssize_t sz;
+
 	if (sensor->fd < 0) {
 		*cap = FALLBACK_BAT_CAP;
 		return -EBADF;
 	}
 
-	ssize_t sz = pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
+	do {
+		sz = pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
+	} while (sz < 0 && errno == EINTR);
+
 	if (sz <= 0) {
 		*cap = FALLBACK_BAT_CAP;
 		return -EIO;
@@ -141,12 +151,17 @@ int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 int pg_sensor_read_bl(struct pg_bl_sensor *RESTRICT sensor,
 		      int32_t *RESTRICT brightness)
 {
+	ssize_t sz;
+
 	if (sensor->fd < 0) {
 		*brightness = FALLBACK_BL;
 		return -EBADF;
 	}
 
-	ssize_t sz = pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
+	do {
+		sz = pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
+	} while (sz < 0 && errno == EINTR);
+
 	if (sz <= 0) {
 		*brightness = FALLBACK_BL;
 		return -EIO;
