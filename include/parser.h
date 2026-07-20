@@ -79,8 +79,15 @@ static ALWAYS_INLINE int32_t pg_parse_i32(const uint8_t *RESTRICT buf,
 			continue;
 		}
 
-		if (*valid)
-			break;
+		if (b == '\n' || b == '\r' || b == ' ' || b == '\t') {
+			if (*valid)
+				break;
+
+			continue;
+		}
+
+		*valid = false;
+		return 0;
 	}
 
 	int64_t res = (int64_t)val * sign;
