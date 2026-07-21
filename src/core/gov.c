@@ -156,55 +156,86 @@ static inline void update_sysfs(struct pg_context *RESTRICT ctx,
 				const struct pg_psi_data *RESTRICT psi,
 				q16_t th_scl, q16_t l_dem, q16_t p_eff)
 {
+	const struct pg_cpu_cfg *c = &CFG_CPU;
+	const struct pg_cpu_lim *l = &LIM_CPU;
+	const uint64_t q_ns = PG_QUANT_NS;
 	struct pg_cpu_eff *eff = &ctx->load_state.eff;
 
-	int32_t n_poll = (int32_t)pg_poll_calc_next(
-		&ctx->poll_state, p_eff, psi->some.avg300, psi->some.vel);
+	uint64_t v_lat = 0;
+	uint64_t v_gran = 0;
+	uint64_t v_wake = 0;
+	uint64_t v_mig = 0;
+	uint64_t v_wlt = 0;
+	uint64_t v_ucl = 0;
 
-	if (pg_cpu_trans(&ctx->load_state, psi->some.cur, &CFG_CPU)) {
-		int32_t t_poll = Q16_TO_INT(CFG_CPU.trans_poll);
-		if (n_poll > t_poll)
-			n_poll = t_poll;
-	}
+	q16_t th = 0;
+	q16_t lat = 0;
+	q16_t gran = 0;
+	q16_t wake = 0;
+	q16_t mig = 0;
+	q16_t wlt = 0;
+	q16_t ucl = 0;
+
+	int32_t n_poll;
+	int32_t t_poll;
+
+	n_poll = (int32_t)pg_poll_calc_next(&ctx->poll_state, p_eff,
+					    psi->some.avg300, psi->some.vel);
+
 	ctx->next_wake = n_poll;
 
-	q16_t th = pg_cpu_calc_therm_lat(th_scl, &LIM_CPU);
-	q16_t lat = pg_cpu_calc_lat(p_eff, l_dem, th, &CFG_CPU, eff, &LIM_CPU);
-	q16_t gran = pg_cpu_calc_gran(lat, &CFG_CPU, &LIM_CPU);
-	q16_t wake = pg_cpu_calc_wakeup(p_eff, eff, &LIM_CPU);
-	q16_t mig = pg_cpu_calc_migration(psi->some.vel, p_eff, &LIM_CPU);
-	q16_t walt = pg_cpu_calc_walt(p_eff, &LIM_CPU);
-	q16_t ucl = pg_cpu_calc_uclamp(p_eff, th_scl, &CFG_CPU, eff, &LIM_CPU);
+	if (!pg_cpu_trans(&ctx->load_state, psi->some.cur, c))
+		return;
 
-	uint64_t lat_ns =
-		pg_math_san_quant_u64(lat, LIM_CPU.max_lat, PG_QUANT_NS);
+	t_poll = Q16_TO_INT(c->trans_poll);
+	if (n_poll > t_poll)
+		ctx->next_wake = t_poll;
 
-	uint64_t gran_ns =
-		pg_math_san_quant_u64(gran, LIM_CPU.max_gran, PG_QUANT_NS);
+	if (ctx->sched_lat.active || ctx->sched_gran.active) {
+		th = pg_cpu_calc_therm_lat(th_scl, l);
+		lat = pg_cpu_calc_lat(p_eff, l_dem, th, c, eff, l);
 
-	uint64_t wake_ns =
-		pg_math_san_quant_u64(wake, LIM_CPU.max_wake, PG_QUANT_NS);
+		if (ctx->sched_lat.active)
+			v_lat = pg_math_san_quant_u64(lat, l->max_lat, q_ns);
+	}
 
-	uint64_t mig_ns =
-		pg_math_san_quant_u64(mig, LIM_CPU.min_mig, PG_QUANT_NS);
+	if (ctx->sched_gran.active) {
+		gran = pg_cpu_calc_gran(lat, c, l);
+		v_gran = pg_math_san_quant_u64(gran, l->max_gran, q_ns);
+	}
 
-	uint64_t walt_val =
-		pg_math_san_u64(walt, (uint64_t)Q16_TO_INT(LIM_CPU.min_walt));
+	if (ctx->sched_wake.active) {
+		wake = pg_cpu_calc_wakeup(p_eff, eff, l);
+		v_wake = pg_math_san_quant_u64(wake, l->max_wake, q_ns);
+	}
 
-	uint64_t ucl_val =
-		pg_math_san_u64(ucl, (uint64_t)Q16_TO_INT(LIM_CPU.min_ucl));
+	if (ctx->sched_mig.active) {
+		mig = pg_cpu_calc_migration(psi->some.vel, p_eff, l);
+		v_mig = pg_math_san_quant_u64(mig, l->min_mig, q_ns);
+	}
+
+	if (ctx->sched_walt.active) {
+		wlt = pg_cpu_calc_walt(p_eff, l);
+		v_wlt = pg_math_san_u64(wlt, (uint64_t)Q16_TO_INT(l->min_walt));
+	}
+
+	if (ctx->sched_ucl.active) {
+		ucl = pg_cpu_calc_uclamp(p_eff, th_scl, c, eff, l);
+		v_ucl = pg_math_san_u64(ucl, (uint64_t)Q16_TO_INT(l->min_ucl));
+	}
 
 	LOGD("gov: lat=%llu gran=%llu wake=%llu mig=%llu walt=%llu uclamp=%llu poll=%d",
-	     (unsigned long long)lat_ns, (unsigned long long)gran_ns,
-	     (unsigned long long)wake_ns, (unsigned long long)mig_ns,
-	     (unsigned long long)walt_val, (unsigned long long)ucl_val, n_poll);
+	     (unsigned long long)v_lat, (unsigned long long)v_gran,
+	     (unsigned long long)v_wake, (unsigned long long)v_mig,
+	     (unsigned long long)v_wlt, (unsigned long long)v_ucl,
+	     ctx->next_wake);
 
-	pg_sysfs_update(&ctx->sched_lat, lat_ns, false, &CHK_LAT);
-	pg_sysfs_update(&ctx->sched_gran, gran_ns, false, &CHK_GRAN);
-	pg_sysfs_update(&ctx->sched_wake, wake_ns, false, &CHK_WAKE);
-	pg_sysfs_update(&ctx->sched_mig, mig_ns, false, &CHK_MIG);
-	pg_sysfs_update(&ctx->sched_walt, walt_val, false, &CHK_WALT);
-	pg_sysfs_update(&ctx->sched_ucl, ucl_val, false, &CHK_UCL);
+	pg_sysfs_update(&ctx->sched_lat, v_lat, false, &CHK_LAT);
+	pg_sysfs_update(&ctx->sched_gran, v_gran, false, &CHK_GRAN);
+	pg_sysfs_update(&ctx->sched_wake, v_wake, false, &CHK_WAKE);
+	pg_sysfs_update(&ctx->sched_mig, v_mig, false, &CHK_MIG);
+	pg_sysfs_update(&ctx->sched_walt, v_wlt, false, &CHK_WALT);
+	pg_sysfs_update(&ctx->sched_ucl, v_ucl, false, &CHK_UCL);
 }
 
 static inline void exec_gov_logic(struct pg_context *RESTRICT ctx,
