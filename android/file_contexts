@@ -1,0 +1,2 @@
+/vendor/bin/pgovd                  u:object_r:pgovd_exec:s0
+/data/vendor/pgovd(/.*)?           u:object_r:pgovd_vendor_data_file:s0

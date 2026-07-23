@@ -3,7 +3,13 @@ cc_library_static {
     srcs: [
         "src/**/*.c",
     ],
-    exclude_srcs: ["src/main.c"],
+    exclude_srcs: [
+        "src/main.c",
+        "src/core/sweep.c",
+        "src/sys/conf.c",
+        "src/sys/fs.c",
+        "src/sys/opt.c",
+    ],
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
     c_std: "c11",

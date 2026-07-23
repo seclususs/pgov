@@ -5,7 +5,7 @@ service pgovd /vendor/bin/pgovd
     class main
     user root
     group root system
-    capabilities SYS_NICE DAC_OVERRIDE DAC_READ_SEARCH SYS_RESOURCE IPC_LOCK
+    capabilities SYS_NICE SYS_RESOURCE IPC_LOCK
     disabled
 
 on property:sys.boot_completed=1
