@@ -4,6 +4,12 @@
 
 print_header
 
+ui_print "- Checking system requirements..."
+check_cpu_arch
+check_api_compat
+check_kernel_compat
+check_psi_nodes
+
 ui_print "- Extracting binaries..."
 extract_binary
 

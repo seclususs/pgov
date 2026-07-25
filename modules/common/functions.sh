@@ -1,5 +1,44 @@
 #!/system/bin/sh
 
+check_cpu_arch() {
+    local abi=$(getprop ro.product.cpu.abi)
+    if [ "$abi" != "arm64-v8a" ] && [ "$abi" != "armeabi-v7a" ]; then
+        abort "err: cpu arch unsupported -> $abi"
+    fi
+}
+
+check_api_compat() {
+    local api_level=$(getprop ro.build.version.sdk)
+    
+    if [ -z "$api_level" ]; then
+        abort "err: sdk prop unreadable"
+    fi
+    
+    if [ "$api_level" -lt 30 ]; then
+        abort "err: api level low -> required >= 30 got $api_level"
+    fi
+}
+
+check_kernel_compat() {
+    local kernel_ver=$(uname -r | cut -d'-' -f1)
+    local major=$(echo "$kernel_ver" | cut -d'.' -f1)
+    local minor=$(echo "$kernel_ver" | cut -d'.' -f2)
+    
+    if [ -z "$major" ] || [ -z "$minor" ]; then
+        abort "err: kernel version parse failed"
+    fi
+    
+    if [ "$major" -lt 4 ] || { [ "$major" -eq 4 ] && [ "$minor" -lt 14 ]; }; then
+        abort "err: kernel obsolete -> required >= 4.14 got $kernel_ver"
+    fi
+}
+
+check_psi_nodes() {
+    if [ ! -r "/proc/pressure/cpu" ] || [ ! -w "/proc/pressure/cpu" ]; then
+        abort "err: psi node inaccessible -> /proc/pressure/cpu"
+    fi
+}
+
 print_header() {
     local mod_id=$(sed -n "s/^id=//p" "$MODPATH/module.prop")
     local mod_name=$(sed -n "s/^name=//p" "$MODPATH/module.prop")
