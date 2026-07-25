@@ -34,6 +34,38 @@ static int parse_line(char *RESTRICT line, pg_conf_cb cb)
 	*val = '\0';
 	val++;
 
+	while (*key == ' ' || *key == '\t')
+		key++;
+
+	tmp = key;
+	while (*tmp != '\0')
+		tmp++;
+
+	if (tmp > key) {
+		tmp--;
+
+		while (tmp >= key && (*tmp == ' ' || *tmp == '\t')) {
+			*tmp = '\0';
+			tmp--;
+		}
+	}
+
+	while (*val == ' ' || *val == '\t')
+		val++;
+
+	tmp = val;
+	while (*tmp != '\0')
+		tmp++;
+
+	if (tmp > val) {
+		tmp--;
+
+		while (tmp >= val && (*tmp == ' ' || *tmp == '\t')) {
+			*tmp = '\0';
+			tmp--;
+		}
+	}
+
 	if (UNLIKELY(*key == '\0'))
 		return 0;
 
