@@ -1,0 +1,79 @@
+name: Release PGOVD
+
+on:
+  push:
+    tags: ["v*"]
+
+jobs:
+  build-release:
+    name: Compile Release ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - arch: arm64
+            ndk_arch: arm64-v8a
+          - arch: arm32
+            ndk_arch: armeabi-v7a
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Setup Android NDK
+        id: setup-ndk
+        uses: nttld/setup-ndk@v1
+        with:
+          ndk-version: r27c
+          add-to-path: false
+
+      - name: Setup Ninja Build System
+        uses: seanmiddleditch/gha-setup-ninja@master
+
+      - name: Configure CMake Release
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: cmake --preset ${{ matrix.arch }}-release
+
+      - name: Build Release
+        env:
+          ANDROID_NDK_HOME: ${{ steps.setup-ndk.outputs.ndk-path }}
+        run: cmake --build --preset ${{ matrix.arch }}-release
+
+      - name: Upload Binary Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: pgovd-${{ matrix.arch }}
+          path: build/${{ matrix.ndk_arch }}/release/pgovd
+          retention-days: 1
+
+  package-module:
+    name: Package Systemless Module
+    needs: build-release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v6
+
+      - name: Download arm64 binary
+        uses: actions/download-artifact@v6
+        with:
+          name: pgovd-arm64
+          path: build/arm64-v8a/release/
+
+      - name: Download arm32 binary
+        uses: actions/download-artifact@v6
+        with:
+          name: pgovd-arm32
+          path: build/armeabi-v7a/release/
+
+      - name: Run mkmod.py
+        run: python3 tools/mkmod.py
+
+      - name: Upload Zip Artifact
+        uses: actions/upload-artifact@v6
+        with:
+          name: pgovd-release
+          path: dist/*.zip
