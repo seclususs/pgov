@@ -3,6 +3,7 @@
 
 #include "sysfs.h"
 #include "parser.h"
+#include "pg/log.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -15,6 +16,8 @@ void pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
 		cache->active = true;
 		cache->last = UINT64_MAX;
 	} else {
+		int err = errno;
+		LOGW("sysfs: failed to cache node %s err=%d", path, err);
 		cache->active = false;
 	}
 }
@@ -34,8 +37,11 @@ int pg_sysfs_read_i32(const char *path, int32_t *out_val)
 	int ret = 0;
 
 	int fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (fd < 0)
-		return -errno;
+	if (fd < 0) {
+		int err = errno;
+		LOGE("sysfs: failed to open read %s err=%d", path, err);
+		return -err;
+	}
 
 	char buf[32];
 	ssize_t bytes;
@@ -45,6 +51,7 @@ int pg_sysfs_read_i32(const char *path, int32_t *out_val)
 
 	if (bytes <= 0) {
 		ret = (bytes < 0) ? -errno : -ENODATA;
+		LOGE("sysfs: failed to read data %s err=%d", path, -ret);
 		goto out;
 	}
 
@@ -52,6 +59,7 @@ int pg_sysfs_read_i32(const char *path, int32_t *out_val)
 	int32_t val = pg_parse_i32((const uint8_t *)buf, (size_t)bytes, &valid);
 	if (!valid) {
 		ret = -EINVAL;
+		LOGE("sysfs: failed to parse valid i32 from %s", path);
 		goto out;
 	}
 
@@ -76,11 +84,16 @@ int pg_sysfs_write_strm(int fd, uint64_t value)
 		res = pwrite(fd, buf, len, 0);
 	} while (res < 0 && errno == EINTR);
 
-	if (res < 0)
-		return -errno;
+	if (res < 0) {
+		int err = errno;
+		LOGE("sysfs: failed to write strm fd=%d err=%d", fd, err);
+		return -err;
+	}
 
-	if ((size_t)res != len)
+	if ((size_t)res != len) {
+		LOGE("sysfs: incomplete strm write fd=%d", fd);
 		return -EIO;
+	}
 
 	return 0;
 }
@@ -94,8 +107,11 @@ int pg_sysfs_write(const char *RESTRICT path, const char *RESTRICT val)
 		return -EINVAL;
 
 	int fd = open(path, O_WRONLY | O_CLOEXEC);
-	if (fd < 0)
-		return -errno;
+	if (fd < 0) {
+		int err = errno;
+		LOGE("sysfs: failed to open write %s err=%d", path, err);
+		return -err;
+	}
 
 	size_t len = 0;
 	while (val[len] != '\0')
@@ -107,11 +123,13 @@ int pg_sysfs_write(const char *RESTRICT path, const char *RESTRICT val)
 
 	if (res < 0) {
 		ret = -errno;
+		LOGE("sysfs: failed to write %s err=%d", path, -ret);
 		goto out;
 	}
 
 	if ((size_t)res != len) {
 		ret = -EIO;
+		LOGE("sysfs: incomplete write %s", path);
 		goto out;
 	}
 
