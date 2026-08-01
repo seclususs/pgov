@@ -6,13 +6,33 @@
 #include "compiler.h"
 #include <errno.h>
 #include <signal.h>
+#include <stdint.h>
 #include <sys/signalfd.h>
 #include <unistd.h>
+#include <unwind.h>
+
+static _Unwind_Reason_Code unwind_cb(struct _Unwind_Context *ctx, void *arg)
+{
+	uintptr_t **ptr = (uintptr_t **)arg;
+	**ptr = (uintptr_t)_Unwind_GetIP(ctx);
+	(*ptr)++;
+	return _URC_NO_REASON;
+}
 
 static void pg_crash_handler(int sig, siginfo_t *info, void *context)
 {
 	UNUSED(info);
 	UNUSED(context);
+
+	LOGE("signal: fatal crash intercepted sig=%d", sig);
+
+	uintptr_t buf[32];
+	uintptr_t *ptr = buf;
+	_Unwind_Backtrace(unwind_cb, (void *)&ptr);
+
+	size_t count = (size_t)(ptr - buf);
+	for (size_t i = 0; i < count; ++i)
+		LOGE("signal: bt[%zu]: 0x%llx", i, (unsigned long long)buf[i]);
 
 	const char msg[] = "\n[PGOV] fatal: daemon crashed\n";
 	ssize_t unused = write(STDERR_FILENO, msg, sizeof(msg) - 1);
