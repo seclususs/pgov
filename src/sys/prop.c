@@ -3,6 +3,7 @@
 
 #include "prop.h"
 #include "pg/config.h"
+#include "pg/log.h"
 #include <errno.h> // IWYU pragma: keep
 #include <string.h>
 #include <unistd.h>
@@ -24,6 +25,7 @@ bool pg_prop_wait_boot(void)
 		sleep(PG_BOOT_POLL_SEC);
 	}
 
+	LOGE("prop: timeout waiting for sys.boot_completed");
 	return false;
 }
 
@@ -65,6 +67,7 @@ int pg_prop_set(struct pg_prop_state *RESTRICT state, const char *RESTRICT val)
 
 	if (__system_property_set(state->name, val) != 0) {
 		state->modified = was_mod;
+		LOGE("prop: failed to set %s to %s", state->name, val);
 		return -EIO;
 	}
 
@@ -76,8 +79,10 @@ int pg_prop_reset(struct pg_prop_state *state)
 	if (UNLIKELY(!state || !state->modified))
 		return 0;
 
-	if (__system_property_set(state->name, state->val) != 0)
+	if (__system_property_set(state->name, state->val) != 0) {
+		LOGE("prop: failed to res %s to %s", state->name, state->val);
 		return -EIO;
+	}
 
 	state->modified = false;
 	return 0;
