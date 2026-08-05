@@ -4,6 +4,7 @@
 #define _GNU_SOURCE
 #include "daemon.h"
 #include "pg/config.h"
+#include "block.h"
 #include "detect.h"
 #include "epoll.h"
 #include "lockfile.h"
@@ -146,6 +147,10 @@ int pg_daemon_init(void)
 	LOGD("daemon: executing environment tuning");
 	pg_tune_limits();
 	pg_tune_configs();
+
+#if defined(NDK_BUILD)
+	pg_block_tune();
+#endif // NDK_BUILD
 
 	ret = init_sensors_and_triggers(&context);
 	if (ret != 0)
