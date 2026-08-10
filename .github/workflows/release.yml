@@ -42,7 +42,7 @@ jobs:
         run: cmake --build --preset ${{ matrix.arch }}-release
 
       - name: Upload Binary Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: pgovd-${{ matrix.arch }}
           path: build/${{ matrix.ndk_arch }}/release/pgovd
@@ -73,7 +73,7 @@ jobs:
         run: python3 tools/mkmod.py
 
       - name: Upload Zip Artifact
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: pgovd-release
           path: dist/*.zip
