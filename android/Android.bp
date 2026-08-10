@@ -1,3 +1,18 @@
+package {
+    default_applicable_licenses: ["pgov_license"],
+}
+
+license {
+    name: "pgov_license",
+    visibility: [":__subpackages__"],
+    license_kinds: [
+        "SPDX-license-identifier-GPL-3.0",
+    ],
+    license_text: [
+        "LICENSE",
+    ],
+}
+
 cc_library_static {
     name: "libpgov",
     srcs: [
