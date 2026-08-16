@@ -9,22 +9,17 @@ import subprocess
 from pathlib import Path
 from typing import List, NoReturn, Dict
 
-from rich.console import Console
-
-console = Console()
 ROOT: Path = Path(__file__).resolve().parent.parent
 ABI_MAP: Dict[str, str] = {"arm64": "arm64-v8a", "arm32": "armeabi-v7a"}
 
 
 def abort(message: str) -> NoReturn:
-    console.print(f"[bold red]FATAL:[/bold red] {message}")
+    print(f"FATAL: {message}")
     sys.exit(1)
 
 
 def log_step(step: str, message: str, color: str = "cyan") -> None:
-    console.print(
-        f"[bold blue]::[/bold blue] [{color}]{step.upper():<10}[/{color}] {message}"
-    )
+    print(f":: {step.upper():<10} {message}")
 
 
 def set_ndk() -> None:
