@@ -35,13 +35,6 @@ void pg_cpu_upd_intg(struct pg_load_state *RESTRICT state, q16_t bat_lvl,
 	if (LIKELY(dt_real > 0)) {
 		q16_t diff = c_intg - state->prev_integ;
 		q16_t tau = INT_TO_Q16(5);
-
-		q16_t alpha = q16_div(dt_real, tau);
-		if (alpha > Q16_ONE)
-			alpha = Q16_ONE;
-
-		q16_t step = q16_mul(diff, alpha);
-		state->prev_integ += step;
 		c_dt = q16_div(diff, tau);
 	}
 
