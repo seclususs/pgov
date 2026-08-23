@@ -24,6 +24,18 @@ enum pg_disp_state {
 	PG_DISP_SUSPEND
 };
 
+/**
+ * @brief The centralized, cache-aligned state machine container for the daemon.
+ *
+ * @note MEMORY LAYOUT & ARCHITECTURE:
+ *       - Declared with `ALIGNED(64)` to strictly fit into standard CPU L1 cache lines.
+ *         Any addition or rearrangement of struct members MUST be carefully audited to 
+ *         prevent cache line bouncing or unnecessary padding inflation.
+ *       - Encapsulates all hardware sensors, sysfs file descriptors, and mathematical 
+ *         integrators (PID/Kalman). 
+ *       - The lifecycle of this object spans the entire daemon execution; it must remain 
+ *         valid and strictly mutated by a single event-reactor thread.
+ */
 struct ALIGNED(64) pg_context {
 	struct pg_psi_monitor psi;
 	struct pg_temp_sensor cpu_temp_sensor;
