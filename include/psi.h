@@ -44,6 +44,21 @@ void pg_psi_init(struct pg_psi_monitor *RESTRICT mon,
 
 void pg_psi_cleanup(struct pg_psi_monitor *mon);
 
+/**
+ * @brief Parses raw Linux PSI strings and feeds the data into the Kalman filter.
+ *
+ * @param mon  Pointer to the initialized PSI monitor state. Borrowed for mutation.
+ * @param data Output structure to store the computed PSI trend/velocity.
+ * @param now  Current monotonic timestamp for dt (delta time) calculations.
+ *
+ * @note IMPLICIT CONTRACTS & SYSTEM IMPACT:
+ *       - Performs zero-allocation string parsing directly on the stack buffer
+ *         (`mon->buf`) to minimize hot-path latency.
+ *       - Implements a resilient `pread` loop to bypass seeking overhead.
+ *       - Deeply mutates `mon->filter` (Kalman state) by injecting the newly parsed metrics.
+ *
+ * @return 0 on successful parse and filter update, or a negative POSIX error code.
+ */
 int pg_psi_read(struct pg_psi_monitor *RESTRICT mon,
 		struct pg_psi_data *RESTRICT data,
 		const struct timespec *RESTRICT now);
