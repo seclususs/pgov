@@ -7,7 +7,20 @@
 #include "compiler.h"
 #include <stdint.h>
 
+/**
+ * @brief Isolates the current calling thread exclusively to efficiency (LITTLE) cores.
+ *
+ * @note SYSTEM SIDE-EFFECTS & CONTRACTS:
+ *       - Discovers the hardware topology dynamically by parsing sysfs capacity/frequency
+ *         nodes across all logical cores.
+ *       - Mutates the thread's scheduling context via the `sched_setaffinity` syscall.
+ *       - This function MUST be called post-fork during daemon initialization, but BEFORE
+ *         the realtime scheduling priorities (e.g., FIFO/RR) are applied.
+ *
+ * @return 0 on successful affinity binding, or a negative POSIX error code (-errno).
+ */
 int pg_topo_set_little_core(void);
+
 int32_t pg_topo_get_core_count(void);
 int32_t pg_topo_get_max_freq_khz(void);
 
