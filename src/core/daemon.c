@@ -63,6 +63,12 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->bat_temp_sensor.fd = -1;
 	ctx->bat_cap_sensor.fd = -1;
 	ctx->bl_sensor.fd = -1;
+	ctx->sched_lat.fd = -1;
+	ctx->sched_gran.fd = -1;
+	ctx->sched_wake.fd = -1;
+	ctx->sched_mig.fd = -1;
+	ctx->sched_walt.fd = -1;
+	ctx->sched_ucl.fd = -1;
 	ctx->on_trigger = NULL;
 	ctx->on_timeout = NULL;
 }
