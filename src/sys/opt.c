@@ -52,11 +52,8 @@ static int parse_cb(const char *RESTRICT key, const char *RESTRICT val)
 
 	if (pg_str_has_prefix(key, "prop.")) {
 		name = key + 5;
-		int ret = add_prop(name, val);
-		if (ret == -ENOSPC)
-			return 0;
-
-		return ret;
+		add_prop(name, val);
+		return 0;
 	}
 
 	return 0;
@@ -80,8 +77,8 @@ void pg_opt_exit(void)
 {
 	size_t i;
 
-	for (i = 0; i < prop_count; ++i)
-		pg_prop_cleanup(&props[i]);
+	for (i = prop_count; i > 0; --i)
+		pg_prop_cleanup(&props[i - 1]);
 
 	prop_count = 0;
 }
