@@ -1,6 +1,6 @@
 {
   "version": "v1.0",
   "versionCode": 1,
-  "zipUrl": "https://github.com//seclususs/pgov/releases/download/v1.0/pgovd-v1.0.zip",
-  "changelog": "https://raw.githubusercontent.com/seclususs/pgov/docs/CHANGELOG.md"
+  "zipUrl": "https://github.com/seclususs/pgov/releases/download/v1.0/pgovd-v1.0.zip",
+  "changelog": "https://raw.githubusercontent.com/seclususs/pgov/main/docs/CHANGELOG.md"
 }
