@@ -120,10 +120,17 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 		ctx->last_bat = *now;
 	}
 
-	q16_t cpu_temp;
-	pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor, &cpu_temp);
-	*th_scl = pg_thermal_update(&ctx->thermal_state, cpu_temp,
-				    ctx->bat_temp, &CFG_THERMAL, now);
+	q16_t elaps_therm = pg_dt_sec(&ctx->last_therm, now);
+	if (elaps_therm >= INT_TO_Q16(PG_THERM_CHK_SEC)) {
+		q16_t cpu_temp;
+		pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor, &cpu_temp);
+		ctx->cached_th_scl = pg_thermal_update(&ctx->thermal_state,
+						       cpu_temp, ctx->bat_temp,
+						       &CFG_THERMAL, now);
+		ctx->last_therm = *now;
+	}
+
+	*th_scl = ctx->cached_th_scl;
 
 	struct pg_cpu_eff *eff = &ctx->load_state.eff;
 	pg_cpu_upd_eff(eff, ctx->bat_lvl, *th_scl, psi->some.avg300);
