@@ -50,6 +50,7 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->shutdown_req = false;
 	ctx->next_wake = PG_MIN_POLL_MS;
 	ctx->disp_state = PG_DISP_UNKNOWN;
+	ctx->cached_th_scl = Q16_ONE;
 	ctx->load_state.first_run = true;
 	ctx->load_state.psi_val = 0;
 	ctx->load_state.rate = 0;
@@ -167,6 +168,7 @@ int pg_daemon_init(void)
 #endif // NDK_BUILD
 
 	clock_gettime(CLOCK_MONOTONIC, &context.last_bat);
+	clock_gettime(CLOCK_MONOTONIC, &context.last_therm);
 
 #if defined(NDK_BUILD)
 	clock_gettime(CLOCK_MONOTONIC, &context.last_sweep);

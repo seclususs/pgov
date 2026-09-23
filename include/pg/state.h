@@ -56,8 +56,10 @@ struct ALIGNED(64) pg_context {
 
 	q16_t bat_lvl;
 	q16_t bat_temp;
+	q16_t cached_th_scl;
 
 	struct timespec last_bat;
+	struct timespec last_therm;
 	struct timespec last_tick;
 	struct timespec last_dispoff;
 
