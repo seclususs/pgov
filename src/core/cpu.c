@@ -97,6 +97,15 @@ q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
 {
 	struct pg_cpu_eff *eff = &state->eff;
 
+	if (UNLIKELY(input->tgt_psi < INT_TO_Q16(1) &&
+		     abs_q16(input->vel) < FLOAT_TO_Q16(0.01F) &&
+		     state->psi_val < INT_TO_Q16(1) &&
+		     abs_q16(state->rate) < FLOAT_TO_Q16(0.01F))) {
+		state->psi_val = 0;
+		state->rate = 0;
+		return 0;
+	}
+
 	if (UNLIKELY(input->struct_break)) {
 		state->psi_val = input->tgt_psi;
 		state->rate = 0;
