@@ -26,14 +26,11 @@ struct pg_cpu_lim {
 struct pg_cpu_cfg {
 	q16_t lat_gran_rat;
 	q16_t uclamp_k;
-	q16_t stab_rat;
-	q16_t gain_alpha;
 	q16_t sigmoid_k;
 	q16_t surge_thresh;
 	q16_t trans_rate;
 	q16_t trans_diff;
 	q16_t trans_poll;
-	q16_t nis_thresh;
 };
 
 struct pg_cpu_eff {
@@ -44,6 +41,9 @@ struct pg_cpu_eff {
 	q16_t decay;
 	q16_t sig_mid;
 	q16_t ucl_mid;
+	q16_t stab_rat;
+	q16_t gain_alpha;
+	q16_t nis_thresh;
 };
 
 struct pg_demand_input {
