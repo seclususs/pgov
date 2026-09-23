@@ -1,5 +1,12 @@
 # Changelog
 
+## [v1.1]
+
+### Changed
+
+- Optimize thermal I/O and load math with idle equilibrium
+  bypasses to reduce unnecessary polling and computation.
+
 ## [v1.0]
 
 ### Added
