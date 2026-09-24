@@ -32,19 +32,17 @@ ls -l /proc/sys/kernel/sched_latency_ns /proc/sys/kernel/sched_wakeup_granularit
 
 ## Logs
 
-Relevant `logcat` output filtered to this daemon, e.g.:
+Please attach or paste the contents of the persistent error log. Depending on your
+build variant, it is located at:
+
+- NDK/Magisk: `/data/adb/modules/pgovd/pgovd.log`
+- AOSP/Soong: `/data/vendor/pgovd/pgovd.log`
+
+If the file does not exist, you may also include relevant `logcat` output:
 
 ```sh
 logcat -d | grep -i pgov
 ```
-
-If the daemon crashed, please also include the crash line(s), if any
-show up. `pgovd`'s own handler only writes a generic line to stderr
-before resetting the signal to its default disposition and re-raising -
-on the Magisk build, `service.sh` sends that to `/dev/null` anyway. It
-also replaces whatever handler was registered before it without
-chaining to it, so don't assume the usual Android crash report shows up
-in logcat either.
 
 ## Steps to reproduce
 
