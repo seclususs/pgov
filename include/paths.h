@@ -6,8 +6,10 @@
 
 #if defined(NDK_BUILD)
 #define PG_PATH_LOCK "/data/local/tmp/pgovd.lock"
+#define PG_PATH_LOG "/data/adb/modules/pgovd/pgovd.log"
 #else
 #define PG_PATH_LOCK "/data/vendor/pgovd/pgovd.lock"
+#define PG_PATH_LOG "/data/vendor/pgovd/pgovd.log"
 #endif
 
 #if defined(NDK_BUILD)
