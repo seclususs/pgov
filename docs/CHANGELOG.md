@@ -2,6 +2,10 @@
 
 ## [v1.1]
 
+### Added
+
+- Persistent error logging to `pgovd.log` via `stderr` redirection.
+
 ### Changed
 
 - Optimize thermal I/O and load math with idle equilibrium
