@@ -33,6 +33,13 @@ static struct pg_context context;
 
 static void init_os_environment(void)
 {
+	int log_fd = open(PG_PATH_LOG,
+			  O_CREAT | O_WRONLY | O_APPEND | O_CLOEXEC, 0644);
+	if (log_fd >= 0) {
+		dup2(log_fd, STDERR_FILENO);
+		close(log_fd);
+	}
+
 	pg_signal_catch_crash();
 	pg_memory_shield();
 	pg_memory_lock();
