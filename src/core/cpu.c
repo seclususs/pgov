@@ -53,10 +53,10 @@ static inline q32_t calc_l_term(q16_t integ, q16_t psi_val, q16_t k_fin)
 
 static inline q16_t calc_c_final(q16_t k_fin, q16_t vel, q16_t i_dt,
 				 q16_t psi_val, q16_t th,
-				 const struct pg_cpu_cfg *cfg)
+				 const struct pg_cpu_eff *eff)
 {
 	q16_t c_crit = q16_mul(INT_TO_Q16(2), pg_math_q16_sqrt(k_fin));
-	q16_t c_base = q16_mul(c_crit, cfg->stab_rat);
+	q16_t c_base = q16_mul(c_crit, eff->stab_rat);
 	q32_t load = Q16_TO_Q32(vel);
 	q32_t r_sq = q32_mul(load, load) + Q16_TO_Q32(FLOAT_TO_Q16(0.001F));
 
@@ -89,6 +89,16 @@ void pg_cpu_upd_eff(struct pg_cpu_eff *RESTRICT eff, q16_t bat_lvl,
 	eff->decay = q16_mul(FLOAT_TO_Q16(0.019F), th_scl);
 	eff->sig_mid = FLOAT_TO_Q16(6.8F) + q16_mul(FLOAT_TO_Q16(0.5F), avg300);
 	eff->ucl_mid = eff->sig_mid + FLOAT_TO_Q16(2.7F);
+
+	q16_t noise = q16_mul(avg300, FLOAT_TO_Q16(0.1F));
+	noise = pg_math_clamp(noise, 0, Q16_ONE);
+
+	eff->nis_thresh =
+		pg_math_lerp(FLOAT_TO_Q16(3.0F), FLOAT_TO_Q16(12.0F), noise);
+	eff->stab_rat =
+		pg_math_lerp(FLOAT_TO_Q16(1.5F), FLOAT_TO_Q16(3.5F), noise);
+	eff->gain_alpha =
+		pg_math_lerp(FLOAT_TO_Q16(0.99F), FLOAT_TO_Q16(0.85F), noise);
 }
 
 q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
@@ -116,7 +126,7 @@ q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
 		state->rate += q16_mul(l_rate, eff->surge_gain);
 
 	q16_t pred = input->tgt_psi + q16_mul(l_rate, eff->lookahead);
-	q16_t trend = q16_mul(cfg->gain_alpha, input->trend_fact);
+	q16_t trend = q16_mul(eff->gain_alpha, input->trend_fact);
 	q16_t k_dyn = q16_mul(eff->resp_gain, Q16_ONE + trend);
 	q16_t th =
 		pg_math_clamp(input->therm_scale, FLOAT_TO_Q16(0.1F), Q16_ONE);
@@ -127,7 +137,7 @@ q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
 
 	q32_t l_term = calc_l_term(input->integ, state->psi_val, k_fin);
 	q16_t c_fin = calc_c_final(k_fin, l_rate, input->integ_dt,
-				   state->psi_val, th, cfg);
+				   state->psi_val, th, eff);
 
 	q32_t d_term = q32_mul(Q16_TO_Q32(c_fin), Q16_TO_Q32(state->rate));
 	q32_t n_q32 = p_term - d_term - l_term;
