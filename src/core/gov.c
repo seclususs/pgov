@@ -144,7 +144,7 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 	pg_cpu_upd_intg(&ctx->load_state, ctx->bat_lvl, dt_real, &i, &i_dt);
 
 	q16_t t_fact = pg_cpu_calc_trend_gain(psi->some.vel);
-	bool s_break = psi->some.nis > CFG_CPU.nis_thresh;
+	bool s_break = psi->some.nis > eff->nis_thresh;
 	struct pg_demand_input d_in = { .tgt_psi = psi->some.cur,
 					.vel = psi->some.vel,
 					.dt_real = dt_real,

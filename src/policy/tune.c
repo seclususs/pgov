@@ -89,8 +89,6 @@ void pg_tune_configs(void)
 	q16_t therm;
 	q16_t val;
 	q16_t trip;
-	q16_t psi;
-	q16_t noise;
 	q16_t tick;
 
 	cap = 0;
@@ -146,22 +144,6 @@ void pg_tune_configs(void)
 	val = pg_math_lerp(FLOAT_TO_Q16(0.50F), FLOAT_TO_Q16(0.20F), rel);
 	CFG_CPU.lat_gran_rat =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.20F), FLOAT_TO_Q16(0.50F));
-
-	psi = FLOAT_TO_Q16(2.0F);
-	noise = q16_div(psi, FLOAT_TO_Q16(10.0F));
-	noise = pg_math_clamp(noise, 0, Q16_ONE);
-
-	val = pg_math_lerp(FLOAT_TO_Q16(3.0F), FLOAT_TO_Q16(12.0F), noise);
-	CFG_CPU.nis_thresh =
-		pg_math_clamp(val, FLOAT_TO_Q16(3.0F), FLOAT_TO_Q16(12.0F));
-
-	val = pg_math_lerp(FLOAT_TO_Q16(1.5F), FLOAT_TO_Q16(3.5F), noise);
-	CFG_CPU.stab_rat =
-		pg_math_clamp(val, FLOAT_TO_Q16(1.5F), FLOAT_TO_Q16(3.5F));
-
-	val = pg_math_lerp(FLOAT_TO_Q16(0.99F), FLOAT_TO_Q16(0.85F), noise);
-	CFG_CPU.gain_alpha =
-		pg_math_clamp(val, FLOAT_TO_Q16(0.85F), FLOAT_TO_Q16(0.99F));
 
 	trip = pg_sensor_get_trip_temp(FLOAT_TO_Q16(57.5F));
 	val = trip - INT_TO_Q16(5);
