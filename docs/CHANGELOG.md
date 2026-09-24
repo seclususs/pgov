@@ -6,6 +6,9 @@
 
 - Optimize thermal I/O and load math with idle equilibrium
   bypasses to reduce unnecessary polling and computation.
+- Transition Kalman Filter sensitivity and structural break
+  thresholds from static boot-time constants to dynamic
+  runtime parameters driven by live 5-minute PSI load.
 
 ## [v1.0]
 
