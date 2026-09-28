@@ -62,33 +62,20 @@ automatically.
 For raw CMake preset commands, on-device Termux builds, or building
 into an AOSP vendor tree via Soong, see [`BUILD`](docs/BUILD.md).
 
-## Configuration
-
-An optional config file at
-`/data/adb/modules/pgovd/system/etc/pgovd.conf` (only present when
-built with `NDK_BUILD`) supports two kinds of directives:
-
-```
-sysfs./proc/sys/vm/swappiness=60
-prop.persist.sys.example=value
-```
-
-`sysfs.*` writes are fire-and-forget at startup. `prop.*` overrides
-capture the original value first and restore it when the daemon exits,
-so nothing outlives the process. Blank lines and `#` comments are
-fine, anything past the line buffer (256 bytes) gets silently skipped
-rather than misparsed.
-
 ## Documentation
 
 - [`ARCHITECTURE`](docs/ARCHITECTURE.md) - start here if
   you want to understand what the code is doing and why.
 - [`BUILD`](docs/BUILD.md) - detailed build instructions.
 - [`CHANGELOG`](docs/CHANGELOG.md) - release history.
+- [`CONFIGURATION`](docs/CONFIGURATION.md) - the optional config
+  file's syntax and directives.
+
+## Disclaimer
+
+This runs as root and rewrites scheduler on your device.<br>
+Tested on my own hardware, not yours - use it at your own risk.
 
 ## License
 
 GPL-3.0. See [LICENSE](LICENSE).
-
-This runs as root and rewrites scheduler on your device.
-Tested on my own hardware, not yours - use it at your own risk.

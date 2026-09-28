@@ -79,9 +79,10 @@ src/
 │   └── config.c    tune.c
 └── sys/
     ├── block.c     conf.c        detect.c       fs.c
-    ├── lockfile.c  memory.c      opt.c          prop.c
-    ├── psi.c       rlimit.c      scan.c         sensor.c
-    ├── signal.c    sysfs.c       task.c         topo.c
+    ├── lockfile.c  log.c         memory.c       opt.c
+    ├── prop.c      psi.c         rlimit.c       scan.c
+    ├── sensor.c    signal.c      sysfs.c        task.c
+    └── topo.c
 ```
 
 I keep three layers separated on purpose:
@@ -165,7 +166,7 @@ diff.
 
 A handful of headers are inline-only, with no matching `.c` file:
 `compiler.h`, `str.h`, `parser.h`, `paths.h`, and, in `pg/`, `math.h`,
-`time.h`, `log.h`, and `state.h`.
+`time.h`, and `state.h`.
 
 ## Build targets
 
@@ -209,17 +210,17 @@ I build this two different ways, both C11 with `-Wall -Wextra -Werror`:
 `NDK_BUILD` is the only macro distinguishing the two targets. This is
 everywhere it matters:
 
-| Location                     | Without `NDK_BUILD`                                                                  |
-| ---------------------------- | ------------------------------------------------------------------------------------ |
-| `pg/sweep.h`, `core/sweep.c` | idle cache sweep doesn't exist                                                       |
-| `conf.h`, `sys/conf.c`       | config-file parser doesn't exist                                                     |
-| `opt.h`, `sys/opt.c`         | config-driven sysfs/property overrides don't exist                                   |
-| `block.h`, `sys/block.c`     | excluded from the Soong build via `exclude_srcs`, same as `sweep.c`/`conf.c`/`opt.c` |
-| `prop.h`, `sys/prop.c`       | `pg_prop_wait_boot()` stays; the capture/restore property helpers don't exist        |
-| `paths.h`                    | `PG_PATH_LOCK` becomes `/data/vendor/pgovd/pgovd.lock`; `CONF_PATH` isn't defined    |
-| `pg/state.h`                 | `struct pg_context` loses its `last_sweep` field                                     |
-| `core/daemon.c`              | drops `pg_block_tune()`, `pg_opt_init()`/`pg_opt_exit()`, the `last_sweep` seed      |
-| `core/gov.c`                 | drops the sweep-invocation branch in `update_disp()`                                 |
+| Location                     | Without `NDK_BUILD`                                                                      |
+| ---------------------------- | ---------------------------------------------------------------------------------------- |
+| `pg/sweep.h`, `core/sweep.c` | idle cache sweep doesn't exist                                                           |
+| `conf.h`, `sys/conf.c`       | config-file parser doesn't exist                                                         |
+| `opt.h`, `sys/opt.c`         | config-driven sysfs/property overrides don't exist                                       |
+| `block.h`, `sys/block.c`     | excluded from the Soong build via `exclude_srcs`, same as `sweep.c`/`conf.c`/`opt.c`     |
+| `prop.h`, `sys/prop.c`       | `pg_prop_wait_boot()` stays; the capture/restore property helpers don't exist            |
+| `paths.h`                    | `PG_PATH_LOCK`/`PG_PATH_LOG` move under `/data/vendor/pgovd/`; `CONF_PATH` isn't defined |
+| `pg/state.h`                 | `struct pg_context` loses its `last_sweep` field                                         |
+| `core/daemon.c`              | drops `pg_block_tune()`, `pg_opt_init()`/`pg_opt_exit()`, the `last_sweep` seed          |
+| `core/gov.c`                 | drops the sweep-invocation branch in `update_disp()`                                     |
 
 ## Why fixed-point
 
@@ -267,17 +268,18 @@ them visible in one place than scattered:
   file's property overrides.
 
 `struct pg_context` (`pg/state.h`), `ALIGNED(64)`, is where everything
-else lives: the PSI monitor, four sensor handles (CPU temp, battery temp,
-battery capacity, backlight - each with its own fd and a small read
-buffer), six `pg_sysfs_cache` entries, thermal-loop state, load-demand
-state, poll state, the display-state enum, cached battery level/temp,
-timestamps, four file descriptors, `next_wake` - a bare `int` alongside
-them holding the poll timeout in milliseconds, not itself a descriptor -
-a `volatile bool shutdown_req`, and two function pointers - `on_trigger`
-and `on_timeout` - that I bind to the same function at startup. Because
-this is one static instance passed around by pointer, there's no
-per-tick allocation and no per-connection state to track; the whole
-daemon's memory footprint is fixed at compile time.
+else lives: the PSI monitor, four sensor handles (CPU temp, battery
+temp, battery capacity, backlight - each with its own fd and a small
+read buffer), six `pg_sysfs_cache` entries, thermal-loop state,
+load-demand state, poll state, the display-state enum, cached battery
+level/temp and thermal scale, timestamps, four file descriptors,
+`next_wake` - a bare `int` alongside them holding the poll timeout in
+milliseconds, not itself a descriptor - a `volatile bool shutdown_req`,
+and two function pointers - `on_trigger` and `on_timeout` - that I bind
+to the same function at startup. Because this is one static instance
+passed around by pointer, there's no per-tick allocation and no
+per-connection state to track; the whole daemon's memory footprint is
+fixed at compile time.
 
 ## Boot sequence
 
@@ -339,7 +341,11 @@ all in `src/sys/`:
 - **Crash visibility** (`signal.c`) - a `SA_SIGINFO` handler on `SIGSEGV`,
   `SIGFPE`, `SIGABRT`, `SIGILL` that logs to `stderr`, restores the
   default disposition, and re-raises, so a crash is visible without
-  changing the resulting core-dump/exit-status behavior.
+  changing the resulting core-dump/exit-status behavior. `stderr` itself
+  is redirected to `PG_PATH_LOG` before this handler is even installed, so
+  that line - and every `LOGE()` call for the rest of the process's life
+  (`sys/log.c`) - persists past the current boot instead of only reaching
+  `logcat`.
 - **OOM immunity** (`memory.c`) - `/proc/self/oom_score_adj` gets `-1000`,
   the most negative value the kernel accepts, so neither the OOM killer
   nor Android's LMK will touch this process.
@@ -515,11 +521,16 @@ one-shot `avg10` reader used only by the idle sweep's interrupt check.
 ## Keeping thermals in check
 
 `pg_thermal_update()` is a PID controller with adaptive gains and
-anti-windup, run every tick regardless of what the display-state machine
-is doing elsewhere. Its input is CPU temperature, run through its own
-Kalman filter instance (seeded tighter than the PSI filter - `q_vel =
-0.01`, `r_meas = 2.0` - since temperature moves slower and cleaner than
-PSI does) to get a smoothed value and a velocity estimate.
+anti-windup. `calc_demand()` only calls it once every `PG_THERM_CHK_SEC`
+(1s), caching the result in `cached_th_scl` for the ticks in between
+instead of paying for a fresh CPU-temperature read and a full PID pass
+on every reactor wake - the same caching shape the battery reads below
+use, just on a tighter clock. When it does run, it runs the same
+regardless of what the display-state machine is doing elsewhere. Its
+input is CPU temperature, run through its own Kalman filter instance
+(seeded tighter than the PSI filter - `q_vel = 0.01`, `r_meas = 2.0` -
+since temperature moves slower and cleaner than PSI does) to get a
+smoothed value and a velocity estimate.
 
 The setpoint isn't fixed. It starts at `cfg->limit_cpu` and gets pulled
 down by up to 5°C as battery temperature closes in on `cfg->limit_bat`,
@@ -581,19 +592,27 @@ flowchart TD
     DEBOUNCE --> WRITE["pwrite() to cached sysfs fd"]
 ```
 
-Battery level and temperature are cheaper than the rest of this pipeline:
-both are re-read on their own five-second cadence (`PG_BAT_CHK_SEC`)
-rather than every tick, and it's the cached values that everything below
+Battery level and temperature are cheaper than the rest of this
+pipeline: both are re-read on their own five-second cadence
+(`PG_BAT_CHK_SEC`) rather than every tick - the thermal PID above
+follows the same shape at a tighter one-second cadence
+(`PG_THERM_CHK_SEC`) - and it's the cached values that everything below
 actually consumes.
 
 **Effectiveness parameters** get recomputed first, every tick, from
-current battery level and `th_scl`: a `health` factor
-(`battery_fraction * th_scl`) scales response gain, surge gain, and
-trend-amplification; thermal scale alone scales lookahead and decay; and
-the sigmoid midpoints used later for latency and uclamp shaping shift
-upward with the 300-second PSI baseline, so a system that's been under
-sustained load recently needs more instantaneous pressure before the same
-curves respond.
+current battery level and `th_scl`: a `health` factor (`battery_fraction - th_scl`)
+scales response gain, surge gain, and trend-amplification;
+thermal scale alone scales lookahead and decay; and the sigmoid
+midpoints used later for latency and uclamp shaping shift upward with
+the 300-second PSI baseline, so a system that's been under sustained
+load recently needs more instantaneous pressure before the same curves
+respond. That same baseline, clamped to a [0, 1] `noise` term, drives
+three more interpolations: the structural-break NIS threshold (3.0 at
+zero recent noise, up to 12.0), the load-demand model's damping ratio
+(1.5 up to 3.5), and its trend gain (0.99 down to 0.85) - a system
+that's been quiet snaps into a structural break easily, stays lightly
+damped, and trusts the trend term fully; a noisy one needs a bigger
+surprise to count as a break, damps harder, and leans on trend less.
 
 **The battery-depletion integrator** takes a cubic function of how
 depleted the battery is (`97 * ((100 - level)/100)^3`) and derives a rate
@@ -602,11 +621,17 @@ What reaches the load-demand model is that raw tracked value and a plain
 finite difference of two consecutive raw samples divided by `tau`. This
 integrator doesn't produce an output of its own.
 
-**The load-demand model** is where I spent the most time getting the feel
-right. It treats the running PSI estimate as a critically-damped
-second-order system chasing a lookahead-extrapolated target
-(`pred = tgt_psi + vel * lookahead`), with one pre-emptive kick applied
-before any of that:
+**The load-demand model** is where I spent the most time getting the
+feel right. Before any of that runs, an idle-equilibrium check
+short-circuits it: if the incoming target PSI is under 1.0, its
+velocity's magnitude is under 0.01, and the model's own tracked
+`psi_val`/`rate` are already that negligible too, both reset to exactly
+zero and the function returns immediately - no spring, damping, or
+integral math for a system that's already at rest with nothing arriving.
+Otherwise it treats the running PSI estimate as a critically-damped
+second-order system chasing a lookahead-extrapolated target (`pred =
+tgt_psi + vel * lookahead`), with one pre-emptive kick applied before
+any of that:
 
 - If the raw PSI velocity's magnitude clears `surge_thresh`, the internal
   rate state gets an immediate additive nudge - `vel * surge_gain` -
@@ -816,16 +841,6 @@ bounds:
   capacity ratio when EAS data exists, otherwise a fixed 0.5 above 4 cores
   or 1.0 at or below.
 - **`therm`** - `rel * (max_freq_mhz / 3500)`, clamped [0, 1].
-- **`noise`** - resolves to a fixed 0.2 every time: an intermediate `psi`
-  term is hardcoded to `2.0` and scaled by `1/10`, rather than coming from
-  any per-device measurement. That's a deliberate stand-in, not an
-  uninitialized or undefined one - the three fields it drives land on a
-  single, safe, in-range point instead of the value being left to
-  whatever garbage would otherwise be sitting in an unset field, and the
-  daemon runs correctly and deterministically on it. The interpolation
-  machinery around `psi` is real and already wired up for whenever it's
-  backed by an actual measured noise floor instead of the constant; that
-  measurement itself is just not written yet.
 - **`tick`** - `1000 / kernel_hz`, with a 10ms fallback if
   `pg_detect_kernel_hz()` comes back unusable.
 
@@ -842,9 +857,6 @@ bounds:
 | `LIM_CPU.max_ucl`       | 384      | 384–1024     | `cap`                                       | higher capability → higher |
 | `CFG_CPU.trans_poll`    | 52.0 ms  | 20–100 ms    | `tick`                                      | `clamp(tick * 5, 20, 100)` |
 | `CFG_CPU.lat_gran_rat`  | 0.34     | 0.20–0.50    | `rel`                                       | higher `rel` → lower       |
-| `CFG_CPU.nis_thresh`    | 7.8      | 3.0–12.0     | `noise` (fixed)                             | -                          |
-| `CFG_CPU.stab_rat`      | 2.18     | 1.5–3.5      | `noise` (fixed)                             | -                          |
-| `CFG_CPU.gain_alpha`    | 0.972    | 0.85–0.99    | `noise` (fixed)                             | -                          |
 | `CFG_CPU.uclamp_k`      | 0.185    | 0.12–0.25    | `rat`                                       | higher `rat` → higher      |
 | `CFG_CPU.sigmoid_k`     | 0.072    | 0.04–0.12    | `rat`                                       | higher `rat` → higher      |
 | `CFG_CPU.surge_thresh`  | 17.5     | 12.0–25.0    | `rel`                                       | higher `rel` → higher      |
@@ -867,19 +879,11 @@ process, same as everything else that isn't in the table above.
 
 Under `NDK_BUILD`, `pg_opt_init()` parses `CONF_PATH`
 (`/data/adb/modules/pgovd/system/etc/pgovd.conf`) through the streaming
-line parser in `conf.c` - 4KiB read buffer, 256-byte line buffer,
-`#`-comments stripped, `\r` stripped, both sides of `=` trimmed, anything
-longer than the line buffer silently skipped rather than misparsed. Two
-directive prefixes:
-
-- `sysfs.<path>=<value>` - write `<value>` to `<path>` once, at startup.
-  Failures get logged and otherwise ignored; this is meant for extra
-  one-shot tuning I don't want to hardcode into the binary itself.
-- `prop.<name>=<value>` - capture whatever the property currently holds
-  the first time it's touched, apply the override, and keep it applied for
-  the life of the process (up to `MAX_PROPS`, 64, simultaneously).
-  `pg_opt_exit()` restores every recorded property to its original value
-  on the way out, so these overrides never outlive the daemon.
+line parser in `conf.c` - a 4KiB read buffer feeding a 256-byte line
+buffer, so the whole file is consumed in fixed-size chunks rather than
+needing a buffer sized to it. What comes out gets applied as `sysfs.*`
+one-shot writes or `prop.*` overrides; directive syntax and behavior are
+documented in [`CONFIGURATION`](CONFIGURATION.md).
 
 `pg_prop_wait_boot()` - the `sys.boot_completed` poll - isn't gated by
 `NDK_BUILD` and runs identically on both build targets.
@@ -901,13 +905,3 @@ Things that are true by design and I don't expect to change: single
 thread, no heap, no runtime floating point, one lockfile enforcing a
 single instance, six independent sysfs channels that degrade gracefully
 per-node instead of all-or-nothing.
-
-Things that are true right now but aren't finished: `noise` in the
-calibration pass resolves through a hardcoded stand-in rather than
-a real measured noise-floor signal, so the three fields it drives land on
-one fixed, safe point in their range instead of actually adapting per
-device - deterministic, not broken, just not yet what the surrounding
-interpolation code was built for. `PG_CHK_STRICT` exists for a channel
-that doesn't exist yet. Neither affects correctness on the path that
-actually runs today; they're just parts of the tree that are ahead of
-what currently uses them.
