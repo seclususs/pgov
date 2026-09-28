@@ -2,10 +2,9 @@
 
 import shutil
 from pathlib import Path
-from typing import List
 
 
-def mv_files(root: Path, files: List[str]) -> None:
+def mv_files(root: Path, files: list[str]) -> None:
     for f in files:
         src: Path = root / f
         dst: Path = root / src.name
@@ -13,7 +12,7 @@ def mv_files(root: Path, files: List[str]) -> None:
             shutil.move(str(src), str(dst))
 
 
-def rm_paths(root: Path, paths: List[str]) -> None:
+def rm_paths(root: Path, paths: list[str]) -> None:
     for p in paths:
         tgt: Path = root / p
         if tgt.is_file():
@@ -25,14 +24,14 @@ def rm_paths(root: Path, paths: List[str]) -> None:
 def main() -> None:
     root: Path = Path(__file__).resolve().parent.parent
 
-    mv_list: List[str] = [
+    mv_list: list[str] = [
         "android/Android.bp",
         "android/file_contexts",
         "android/pgovd.rc",
         "android/pgovd.te",
     ]
 
-    rm_list: List[str] = [
+    rm_list: list[str] = [
         "android",
         "CMakeLists.txt",
         "CMakePresets.json",

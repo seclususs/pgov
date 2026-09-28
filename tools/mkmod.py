@@ -1,17 +1,19 @@
 #!/usr/bin/env python3
 
-import logging as log
+import logging
 import os
 import shutil
 import sys
 import zipfile
 from pathlib import Path
 
-log.basicConfig(
-    level=log.INFO,
+logging.basicConfig(
+    level=logging.INFO,
     format="%(message)s",
     stream=sys.stdout,
 )
+
+log = logging.getLogger(__name__)
 
 
 def read_version(prop_path: Path) -> str:

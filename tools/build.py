@@ -1,16 +1,16 @@
 #!/usr/bin/env python3
 
-import os
-import sys
-import shutil
-import platform
 import argparse
+import os
+import platform
+import shutil
 import subprocess
+import sys
 from pathlib import Path
-from typing import List, NoReturn, Dict
+from typing import NoReturn
 
 ROOT: Path = Path(__file__).resolve().parent.parent
-ABI_MAP: Dict[str, str] = {"arm64": "arm64-v8a", "arm32": "armeabi-v7a"}
+ABI_MAP: dict[str, str] = {"arm64": "arm64-v8a", "arm32": "armeabi-v7a"}
 
 
 def abort(message: str) -> NoReturn:
@@ -18,7 +18,7 @@ def abort(message: str) -> NoReturn:
     sys.exit(1)
 
 
-def log_step(step: str, message: str, color: str = "cyan") -> None:
+def log_step(step: str, message: str) -> None:
     print(f":: {step.upper():<10} {message}")
 
 
@@ -41,7 +41,7 @@ def set_ndk() -> None:
         if versions:
             latest = str(versions[0].resolve())
             os.environ["ANDROID_NDK_HOME"] = latest
-            log_step("WARN", f"ndk auto-detected at {latest}", "yellow")
+            log_step("WARN", f"ndk auto-detected at {latest}")
             return
 
     abort("missing ANDROID_NDK_HOME environment variable")
@@ -66,7 +66,7 @@ def parse_stream(line: str) -> str:
     return ""
 
 
-def exec_cmd(command: List[str], step_name: str) -> None:
+def exec_cmd(command: list[str], step_name: str) -> None:
     try:
         proc = subprocess.Popen(
             command,
@@ -89,7 +89,7 @@ def exec_cmd(command: List[str], step_name: str) -> None:
         abort("executable missing during build step")
 
 
-def rm_workspace(abi: str = None, variant: str = None) -> None:
+def rm_workspace(abi: str | None = None, variant: str | None = None) -> None:
     if abi and variant:
         target = ROOT / "build" / ABI_MAP[abi] / variant
     else:
@@ -137,7 +137,7 @@ def main() -> None:
 
     if args.clean and not args.abi and not args.type:
         rm_workspace()
-        log_step("CLEAN", "global build workspace wiped", "green")
+        log_step("CLEAN", "global build workspace wiped")
         sys.exit(0)
 
     if not args.abi or not args.type:
@@ -163,7 +163,7 @@ def main() -> None:
     cmd_comp = ["cmake", "--build", f"--preset={preset}"]
     exec_cmd(cmd_comp, "COMPILE")
 
-    log_step("DONE", "build finished", "green")
+    log_step("DONE", "build finished")
 
 
 if __name__ == "__main__":
