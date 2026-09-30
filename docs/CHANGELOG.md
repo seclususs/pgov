@@ -14,6 +14,12 @@
   thresholds from static boot-time constants to dynamic
   runtime parameters driven by live 5-minute PSI load.
 
+### Fixed
+
+- Prevent `-EINVAL` rejection on strict kernel `sysctl` handlers
+  (e.g., `printk_devkmsg`) by enforcing a trailing newline on
+  string writes in `pg_sysfs_write`.
+
 ## [v1.0]
 
 ### Added
