@@ -10,7 +10,8 @@
 #include <time.h>
 
 struct pg_poll_state {
-	uint64_t cur_ivl;
+	uint32_t cur_ivl;
+	uint32_t last_wait;
 	struct timespec last_tick;
 	uint64_t rng_state;
 };
