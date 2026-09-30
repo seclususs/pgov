@@ -25,6 +25,8 @@
   content instead of directory names.
 - Fix governor lockup on devices without CPU thermal sensors
   by omitting the static 65°C fallback.
+- Fix idle cache sweep bypass where the busy-system guard
+  was skipped on initial invocation.
 
 ## [v1.0]
 
