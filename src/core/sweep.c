@@ -34,12 +34,15 @@ struct sweep_ctx {
 #define DIR_FLAGS (O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC | O_NOATIME)
 
 static const char *const TEMP_PATHS[] = {
-	"/data/media/0/DCIM/.thumbnails", "/data/media/0/Movies/.thumbnails",
-	"/data/media/0/Pictures/.thumbnails"
+	"/data/media/0/DCIM/.thumbnails",
+	"/data/media/0/Movies/.thumbnails",
+	"/data/media/0/Pictures/.thumbnails",
 };
 
-static const char *const APP_ROOTS[] = { "/data/data",
-					 "/data/media/0/Android/data" };
+static const char *const APP_ROOTS[] = {
+	"/data/data",
+	"/data/media/0/Android/data",
+};
 
 static bool sweep_chk_intr(struct sweep_ctx *sctx)
 {

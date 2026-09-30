@@ -47,9 +47,10 @@ static const char *const PRIORITY[] = {
 };
 
 static const char *const BLACKLIST[] = {
-	"battery", "bms",  "bat",  "charger",  "usb",	 "pa_therm", "pa-therm",
-	"modem",   "wifi", "wlan", "gpu",      "camera", "flash",    "led",
-	"pmic",	   "buck", "ldo",  "xo_therm", "quiet",	 "backlight"
+	"battery",  "bms",	"bat",	    "charger", "usb",
+	"pa_therm", "pa-therm", "modem",    "wifi",    "wlan",
+	"gpu",	    "camera",	"flash",    "led",     "pmic",
+	"buck",	    "ldo",	"xo_therm", "quiet",   "backlight",
 };
 
 struct tz_info {

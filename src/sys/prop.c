@@ -29,7 +29,7 @@ bool pg_prop_wait_boot(void)
 	return false;
 }
 
-#if defined(NDK_BUILD)
+#ifdef NDK_BUILD
 
 void pg_prop_state_init(struct pg_prop_state *RESTRICT state,
 			const char *RESTRICT name)

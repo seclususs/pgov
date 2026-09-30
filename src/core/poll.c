@@ -21,7 +21,7 @@ static inline uint64_t next_random(struct pg_poll_state *state, uint64_t range)
 	if (UNLIKELY(range == 0))
 		return 0;
 
-#if defined(__SIZEOF_INT128__)
+#ifdef __SIZEOF_INT128__
 	state->rng_state = (state->rng_state * 6364136223846793005ULL) + 1ULL;
 
 	unsigned __int128 p =

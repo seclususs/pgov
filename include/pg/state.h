@@ -21,7 +21,7 @@ enum pg_disp_state {
 	PG_DISP_UNKNOWN = 0,
 	PG_DISP_ON,
 	PG_DISP_GRACE,
-	PG_DISP_SUSPEND
+	PG_DISP_SUSPEND,
 };
 
 /**
@@ -63,7 +63,7 @@ struct ALIGNED(64) pg_context {
 	struct timespec last_tick;
 	struct timespec last_dispoff;
 
-#if defined(NDK_BUILD)
+#ifdef NDK_BUILD
 	struct timespec last_sweep;
 #endif // NDK_BUILD
 

@@ -43,7 +43,7 @@ static ALWAYS_INLINE q16_t q16_div(q16_t a, q16_t b)
 	return (q16_t)(((q32_t)a * Q16_ONE) / b);
 }
 
-#if defined(__SIZEOF_INT128__)
+#ifdef __SIZEOF_INT128__
 static ALWAYS_INLINE q32_t q32_mul(q32_t a, q32_t b)
 {
 	return (q32_t)(((unsigned __int128)a * (unsigned __int128)b) >> 32);

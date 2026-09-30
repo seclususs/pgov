@@ -162,7 +162,7 @@ int pg_daemon_init(void)
 	pg_tune_limits();
 	pg_tune_configs();
 
-#if defined(NDK_BUILD)
+#ifdef NDK_BUILD
 	pg_block_tune();
 #endif // NDK_BUILD
 
@@ -170,14 +170,14 @@ int pg_daemon_init(void)
 	if (ret != 0)
 		goto cleanup;
 
-#if defined(NDK_BUILD)
+#ifdef NDK_BUILD
 	pg_opt_init();
 #endif // NDK_BUILD
 
 	clock_gettime(CLOCK_MONOTONIC, &context.last_bat);
 	clock_gettime(CLOCK_MONOTONIC, &context.last_therm);
 
-#if defined(NDK_BUILD)
+#ifdef NDK_BUILD
 	clock_gettime(CLOCK_MONOTONIC, &context.last_sweep);
 #endif // NDK_BUILD
 
@@ -193,7 +193,7 @@ int pg_daemon_init(void)
 	LOGI("daemon: reactor shutdown cleanly status=%d", ret);
 
 cleanup:
-#if defined(NDK_BUILD)
+#ifdef NDK_BUILD
 	pg_opt_exit();
 #endif // NDK_BUILD
 

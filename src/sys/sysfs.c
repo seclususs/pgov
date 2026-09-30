@@ -117,8 +117,20 @@ int pg_sysfs_write(const char *RESTRICT path, const char *RESTRICT val)
 	while (val[len] != '\0')
 		len++;
 
+	char buf[64];
+	const char *w_val = val;
+
+	if (len > 0 && val[len - 1] != '\n' && len < sizeof(buf) - 1) {
+		for (size_t i = 0; i < len; i++)
+			buf[i] = val[i];
+
+		buf[len] = '\n';
+		len++;
+		w_val = buf;
+	}
+
 	do {
-		res = pwrite(fd, val, len, 0);
+		res = pwrite(fd, w_val, len, 0);
 	} while (res < 0 && errno == EINTR);
 
 	if (res < 0) {
@@ -173,9 +185,9 @@ void pg_sysfs_update(struct pg_sysfs_cache *RESTRICT cache, uint64_t value,
 
 	bool update = false;
 
-	if (force)
+	if (force) {
 		update = true;
-	else {
+	} else {
 		switch (strat->type) {
 		case PG_CHK_ABS:
 			update = absolute(cache->last, value, strat->thresh);

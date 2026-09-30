@@ -56,7 +56,7 @@ static inline bool update_disp(struct pg_context *RESTRICT ctx,
 		ctx->next_wake = 5000;
 		ctx->last_tick = *now;
 
-#if defined(NDK_BUILD)
+#ifdef NDK_BUILD
 		q16_t sweep_elaps = pg_dt_sec(&ctx->last_sweep, now);
 		if (sweep_elaps > INT_TO_Q16(PG_SWEEP_IVL_SEC)) {
 			pg_sweep_run(ctx);
@@ -145,15 +145,17 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 
 	q16_t t_fact = pg_cpu_calc_trend_gain(psi->some.vel);
 	bool s_break = psi->some.nis > eff->nis_thresh;
-	struct pg_demand_input d_in = { .tgt_psi = psi->some.cur,
-					.vel = psi->some.vel,
-					.dt_real = dt_real,
-					.dt_safe = dt_safe,
-					.therm_scale = *th_scl,
-					.trend_fact = t_fact,
-					.integ = i,
-					.integ_dt = i_dt,
-					.struct_break = s_break };
+	struct pg_demand_input d_in = {
+		.tgt_psi = psi->some.cur,
+		.vel = psi->some.vel,
+		.dt_real = dt_real,
+		.dt_safe = dt_safe,
+		.therm_scale = *th_scl,
+		.trend_fact = t_fact,
+		.integ = i,
+		.integ_dt = i_dt,
+		.struct_break = s_break,
+	};
 
 	*l_dem = pg_cpu_calc_load_demand(&ctx->load_state, &d_in, &CFG_CPU);
 	*p_eff = pg_cpu_calc_eff_press(*l_dem, t_fact, eff);

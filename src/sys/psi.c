@@ -207,9 +207,9 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT mon,
 	}
 
 	q16_t dt_sec;
-	if (mon->first_run)
+	if (mon->first_run) {
 		dt_sec = Q16_ONE;
-	else {
+	} else {
 		dt_sec = pg_dt_sec(&mon->last_read_ts, now);
 		if (dt_sec < FLOAT_TO_Q16(0.001F))
 			dt_sec = FLOAT_TO_Q16(0.001F);
