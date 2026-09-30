@@ -30,6 +30,7 @@ struct sweep_ctx {
 #define AGE_LIMIT 86400
 #define MAX_DEPTH 12
 #define UCLAMP_UNRESTRICTED 1024
+#define INTR_MASK 1023
 
 #define DIR_FLAGS (O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC | O_NOATIME)
 
@@ -49,7 +50,7 @@ static bool sweep_chk_intr(struct sweep_ctx *sctx)
 	if (UNLIKELY(sctx->intr))
 		return true;
 
-	if ((++sctx->nr_files & 1023) != 0)
+	if ((++sctx->nr_files & INTR_MASK) != 0)
 		return false;
 
 	int32_t bl = 0;
@@ -163,7 +164,7 @@ void pg_sweep_run(struct pg_context *ctx)
 	struct sweep_ctx sctx = { 0 };
 	sctx.pg_ctx = ctx;
 	sctx.intr = false;
-	sctx.nr_files = 0;
+	sctx.nr_files = INTR_MASK;
 
 	struct timespec ts;
 	clock_gettime(CLOCK_REALTIME, &ts);
