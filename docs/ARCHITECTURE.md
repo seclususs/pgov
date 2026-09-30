@@ -359,18 +359,18 @@ all in `src/sys/`:
 - **Scheduling class** (`task.c`) - affinity gets pinned to the least
   capable CPU cluster (`pg_topo_set_little_core()`), policy switches to
   `SCHED_FIFO` at `PG_RT_PRIORITY` (50), timer slack relaxes to
-  `PG_TIMER_SLACK_NS` (50ms) so the kernel can batch this process's
-  wakeups with others, and a raw `sched_setattr` call applies
-  `PG_UCLAMP_MAX` (102 of 1024) as a uclamp-max ceiling - capping the
-  utilization the scheduler will ever attribute to this task - gated
-  behind `SCHED_FLAG_UTIL_CLAMP_MAX` together with
+  `PG_TIMER_SLACK_NS` (50ms) - though the kernel actually ignores timer
+  slack for RT tasks, leaving the daemon's own ±5% PRNG jitter as the
+  sole mechanism keeping wakeups de-aligned - and a raw `sched_setattr`
+  call applies `PG_UCLAMP_MAX` (102 of 1024) as a uclamp-max ceiling -
+  capping the utilization the scheduler will ever attribute to this task -
+  gated behind `SCHED_FLAG_UTIL_CLAMP_MAX` together with
   `SCHED_FLAG_KEEP_POLICY | SCHED_FLAG_KEEP_PARAMS`, which is what keeps
   the call from touching the `SCHED_FIFO` policy and priority set moments
-  earlier. I/O priority goes to best-effort
-  class 2, priority 0, via a raw `ioprio_set`. Both `ioprio_set` and
-  `sched_setattr` syscall numbers get architecture-specific fallback
-  `#define`s (`aarch64`/`arm`/other) behind `#ifndef`, since Bionic
-  doesn't always declare them.
+  earlier. I/O priority goes to best-effort class 2, priority 0, via a raw
+  `ioprio_set`. Both `ioprio_set` and `sched_setattr` syscall numbers get
+  architecture-specific fallback `#define`s (`aarch64`/`arm`/other) behind
+  `#ifndef`, since Bionic doesn't always declare them.
 
 Running real-time and utilization-clamped at the same time looks like a
 contradiction until you think about what each one is actually for: RT
@@ -462,8 +462,9 @@ if neither is) and applies it with `sched_setaffinity(0, ...)` - this is
 what actually confines the daemon to the SoC's efficiency cluster.
 
 `sys/detect.c` covers three boot-time checks: PSI access, root privilege,
-and kernel HZ (`sysconf(_SC_CLK_TCK)`, falling back to 100) - the last one
-feeds directly into the calibration pass later.
+and userspace HZ (`sysconf(_SC_CLK_TCK)`). On Android's Bionic libc, this
+always returns a hardcoded `USER_HZ` (100), meaning the downstream
+calibration pass effectively yields a static 10ms baseline on all devices.
 
 ## Reading PSI and filtering it
 
