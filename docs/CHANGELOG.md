@@ -21,6 +21,8 @@
   string writes in `pg_sysfs_write`.
 - Fix false-positive reactor resets in `pg_poll_calc_next`
   by tracking actual wait time instead of base interval.
+- Fix thermal trip-point detection by validating zone `type`
+  content instead of directory names.
 
 ## [v1.0]
 
