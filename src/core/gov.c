@@ -122,8 +122,11 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 
 	q16_t elaps_therm = pg_dt_sec(&ctx->last_therm, now);
 	if (elaps_therm >= INT_TO_Q16(PG_THERM_CHK_SEC)) {
-		q16_t cpu_temp;
-		pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor, &cpu_temp);
+		q16_t cpu_temp = 0;
+		if (LIKELY(ctx->cpu_temp_sensor.fd >= 0))
+			pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor,
+						&cpu_temp);
+
 		ctx->cached_th_scl = pg_thermal_update(&ctx->thermal_state,
 						       cpu_temp, ctx->bat_temp,
 						       &CFG_THERMAL, now);
