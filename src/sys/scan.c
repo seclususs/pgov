@@ -81,6 +81,33 @@ static inline bool thermal_valid(const char *name)
 	return true;
 }
 
+static bool type_valid(const char *name)
+{
+	char type_path[256];
+	char buf[64];
+
+	pg_str_build_path(type_path, sizeof(type_path), PG_PATH_THERMAL_BASE,
+			  name, "type");
+
+	int fd = open(type_path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0)
+		return false;
+
+	ssize_t bytes;
+	do {
+		bytes = read(fd, buf, sizeof(buf) - 1);
+	} while (bytes < 0 && errno == EINTR);
+
+	close(fd);
+
+	if (bytes <= 0)
+		return false;
+
+	buf[bytes] = '\0';
+
+	return thermal_valid(buf);
+}
+
 static inline int find_priority(const struct tz_info *zones, size_t nr_zones,
 				char *path, size_t len)
 {
@@ -314,7 +341,7 @@ int pg_scan_trip_point(char *path, size_t len)
 		if (!pg_str_has_prefix(entry->d_name, "thermal_zone"))
 			continue;
 
-		if (!thermal_valid(entry->d_name))
+		if (!type_valid(entry->d_name))
 			continue;
 
 		if (trip_point(entry->d_name, path, len) == 0) {
