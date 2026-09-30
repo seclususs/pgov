@@ -23,6 +23,8 @@
   by tracking actual wait time instead of base interval.
 - Fix thermal trip-point detection by validating zone `type`
   content instead of directory names.
+- Fix governor lockup on devices without CPU thermal sensors
+  by omitting the static 65°C fallback.
 
 ## [v1.0]
 
