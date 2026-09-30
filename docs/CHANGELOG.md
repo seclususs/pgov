@@ -19,6 +19,8 @@
 - Prevent `-EINVAL` rejection on strict kernel `sysctl` handlers
   (e.g., `printk_devkmsg`) by enforcing a trailing newline on
   string writes in `pg_sysfs_write`.
+- Fix false-positive reactor resets in `pg_poll_calc_next`
+  by tracking actual wait time instead of base interval.
 
 ## [v1.0]
 
