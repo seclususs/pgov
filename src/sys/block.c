@@ -146,7 +146,7 @@ static inline void set_sched(const char *RESTRICT name,
 
 static int apply_block_tweaks(const char *name)
 {
-	char buf[128];
+	char buf[128] = { 0 };
 	char path[128];
 	const char *sched;
 	int ret;
