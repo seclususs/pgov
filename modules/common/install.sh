@@ -1,6 +1,6 @@
 #!/system/bin/sh
 
-. "$MODPATH/common/functions.sh"
+. "${MODPATH}/common/functions.sh"
 
 print_header
 
