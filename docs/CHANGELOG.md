@@ -5,6 +5,8 @@
 ### Added
 
 - Persistent error logging to `pgovd.log` via `stderr` redirection.
+- Multi-panel backlight monitoring supporting up to 4 concurrent
+  display panels on foldable devices.
 
 ### Changed
 

@@ -63,17 +63,28 @@ void pg_sensor_bat_close(struct pg_bat_sensor *sensor)
 void pg_sensor_init_bl(struct pg_bl_sensor *RESTRICT sensor,
 		       const char *RESTRICT path)
 {
-	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (sensor->fd < 0)
+	if (sensor->n >= PG_BL_MAX)
+		return;
+
+	int fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0) {
 		LOGW("sensor: failed to open node %s err=%d", path, errno);
+		return;
+	}
+
+	sensor->fd[sensor->n++] = fd;
 }
 
 void pg_sensor_bl_close(struct pg_bl_sensor *sensor)
 {
-	if (sensor->fd >= 0) {
-		close(sensor->fd);
-		sensor->fd = -1;
+	for (uint8_t i = 0; i < sensor->n; i++) {
+		if (sensor->fd[i] >= 0) {
+			close(sensor->fd[i]);
+			sensor->fd[i] = -1;
+		}
 	}
+
+	sensor->n = 0;
 }
 
 static inline int read_temp(struct pg_temp_sensor *RESTRICT sensor,
@@ -151,31 +162,37 @@ int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 int pg_sensor_read_bl(struct pg_bl_sensor *RESTRICT sensor,
 		      int32_t *RESTRICT brightness)
 {
-	ssize_t sz;
-
-	if (sensor->fd < 0) {
+	if (sensor->n == 0) {
 		*brightness = FALLBACK_BL;
 		return -EBADF;
 	}
 
-	do {
-		sz = pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
-	} while (sz < 0 && errno == EINTR);
+	int32_t best = FALLBACK_BL;
+	bool any = false;
 
-	if (sz <= 0) {
-		*brightness = FALLBACK_BL;
-		return -EIO;
+	for (uint8_t i = 0; i < sensor->n; i++) {
+		ssize_t sz;
+
+		do {
+			sz = pread(sensor->fd[i], sensor->buf,
+				   sizeof(sensor->buf), 0);
+		} while (sz < 0 && errno == EINTR);
+
+		if (sz <= 0)
+			continue;
+
+		bool valid;
+		int32_t val = pg_parse_i32(sensor->buf, (size_t)sz, &valid);
+		if (UNLIKELY(!valid))
+			continue;
+
+		any = true;
+		if (val > best)
+			best = val;
 	}
 
-	bool valid;
-	int32_t val = pg_parse_i32(sensor->buf, (size_t)sz, &valid);
-	if (UNLIKELY(!valid)) {
-		*brightness = FALLBACK_BL;
-		return -EINVAL;
-	}
-
-	*brightness = val;
-	return 0;
+	*brightness = best;
+	return any ? 0 : -EIO;
 }
 
 q16_t pg_sensor_get_trip_temp(q16_t fallback)

@@ -5,6 +5,7 @@
 #define PGOV_SENSOR_H
 
 #include "compiler.h"
+#include "pg/config.h"
 #include "pg/math.h"
 #include <stdint.h>
 
@@ -20,7 +21,8 @@ struct pg_bat_sensor {
 };
 
 struct pg_bl_sensor {
-	int fd;
+	int fd[PG_BL_MAX];
+	uint8_t n;
 	uint8_t buf[16];
 };
 

@@ -208,44 +208,35 @@ int pg_scan_thermal_zone(char *path, size_t len)
 	return -ENODEV;
 }
 
-int pg_scan_backlight(char *path, size_t len)
+int pg_scan_backlight(char (*paths)[PG_BL_PATH_LEN], size_t max)
 {
 	DIR *dir = opendir(PG_PATH_BACKLIGHT_BASE);
-	if (!dir) {
-		if (len > 0)
-			path[0] = '\0';
-
+	if (!dir)
 		return -ENOENT;
-	}
 
 	struct dirent *entry;
-	bool found = false;
+	size_t n = 0;
 
-	while ((entry = readdir(dir)) != NULL) {
+	while (n < max && (entry = readdir(dir)) != NULL) {
 		if (entry->d_name[0] == '.')
 			continue;
 
-		pg_str_build_path(path, len, PG_PATH_BACKLIGHT_BASE,
-				  entry->d_name, "brightness");
+		pg_str_build_path(paths[n], PG_BL_PATH_LEN,
+				  PG_PATH_BACKLIGHT_BASE, entry->d_name,
+				  "brightness");
 
-		int fd = open(path, O_RDONLY | O_CLOEXEC);
+		int fd = open(paths[n], O_RDONLY | O_CLOEXEC);
 		if (fd >= 0) {
 			close(fd);
-			found = true;
-			break;
+			n++;
 		}
 	}
 
 	closedir(dir);
-
-	if (!found) {
-		if (len > 0)
-			path[0] = '\0';
-
+	if (n == 0)
 		return -ENODEV;
-	}
 
-	return 0;
+	return (int)n;
 }
 
 static int trip_point(const char *name, char *path, size_t len)

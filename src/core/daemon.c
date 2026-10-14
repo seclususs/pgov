@@ -70,7 +70,11 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->cpu_temp_sensor.fd = -1;
 	ctx->bat_temp_sensor.fd = -1;
 	ctx->bat_cap_sensor.fd = -1;
-	ctx->bl_sensor.fd = -1;
+
+	ctx->bl_sensor.n = 0;
+	for (size_t i = 0; i < PG_BL_MAX; i++)
+		ctx->bl_sensor.fd[i] = -1;
+
 	ctx->sched_lat.fd = -1;
 	ctx->sched_gran.fd = -1;
 	ctx->sched_wake.fd = -1;
@@ -117,9 +121,10 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	pg_thermal_init(&ctx->thermal_state);
 	pg_poll_init(&ctx->poll_state);
 
-	char b_path[256];
-	pg_scan_backlight(b_path, sizeof(b_path));
-	pg_sensor_init_bl(&ctx->bl_sensor, b_path);
+	char b_path[PG_BL_MAX][PG_BL_PATH_LEN];
+	int n_bl = pg_scan_backlight(b_path, PG_BL_MAX);
+	for (int i = 0; i < n_bl; i++)
+		pg_sensor_init_bl(&ctx->bl_sensor, b_path[i]);
 
 	return 0;
 }
