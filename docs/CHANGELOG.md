@@ -29,6 +29,9 @@
   was skipped on initial invocation.
 - Stabilize load demand integration and prevent mapping gate lockup
   by adopting semi-implicit Euler damping and tracking `psi_ref`.
+- Fix `-EINVAL` syscall rejection during daemon startup and cache
+  sweep by passing `sched_util_min = 0` whenever clamping task
+  utilization under `SCHED_FIFO`.
 
 ## [v1.0]
 
