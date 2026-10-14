@@ -27,6 +27,8 @@
   by omitting the static 65°C fallback.
 - Fix idle cache sweep bypass where the busy-system guard
   was skipped on initial invocation.
+- Stabilize load demand integration and prevent mapping gate lockup
+  by adopting semi-implicit Euler damping and tracking `psi_ref`.
 
 ## [v1.0]
 

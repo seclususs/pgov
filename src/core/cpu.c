@@ -4,10 +4,10 @@
 #include "pg/cpu.h"
 
 PURE bool pg_cpu_trans(const struct pg_load_state *RESTRICT state,
-		       q16_t target_psi, const struct pg_cpu_cfg *RESTRICT cfg)
+		       const struct pg_cpu_cfg *RESTRICT cfg)
 {
 	bool rate = abs_q16(state->rate) > cfg->trans_rate;
-	bool diff = abs_q16(state->psi_val - target_psi) > cfg->trans_diff;
+	bool diff = abs_q16(state->psi_val - state->psi_ref) > cfg->trans_diff;
 	return (rate || diff) != 0;
 }
 
@@ -65,9 +65,18 @@ static inline q16_t calc_c_final(q16_t k_fin, q16_t vel, q16_t i_dt,
 	q32_t d_n2 = q32_mul(p_val, p_val);
 	q32_t d_num = q32_mul(d_n1, d_n2);
 
-	q16_t c_req = (r_sq > 0) ? (q16_t)(d_num / (r_sq >> Q16_SHIFT)) : 0;
+	q32_t c_req = (r_sq > 0) ? d_num / (r_sq >> Q16_SHIFT) : 0;
 	q16_t c_max = q16_mul(c_base, INT_TO_Q16(4));
-	q16_t c_clp = pg_math_clamp(c_req, 0, c_max);
+	q16_t c_clp;
+
+	if (c_req >= c_max)
+		c_clp = c_max;
+
+	else if (c_req <= 0)
+		c_clp = 0;
+	else
+		c_clp = (q16_t)c_req;
+
 	q16_t c_stb = q16_mul(c_clp, FLOAT_TO_Q16(3.1F));
 
 	q16_t th_sq = pg_math_q16_sqrt(th);
@@ -139,17 +148,20 @@ q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
 	q16_t c_fin = calc_c_final(k_fin, l_rate, input->integ_dt,
 				   state->psi_val, th, eff);
 
-	q32_t d_term = q32_mul(Q16_TO_Q32(c_fin), Q16_TO_Q32(state->rate));
-	q32_t n_q32 = p_term - d_term - l_term;
+	q32_t f_q32 = p_term - l_term;
 
-	if (n_q32 > Q16_TO_Q32(INT_TO_Q16(32000)))
-		n_q32 = Q16_TO_Q32(INT_TO_Q16(32000));
-	else if (n_q32 < Q16_TO_Q32(INT_TO_Q16(-32000)))
-		n_q32 = Q16_TO_Q32(INT_TO_Q16(-32000));
+	if (f_q32 > Q16_TO_Q32(INT_TO_Q16(32000)))
+		f_q32 = Q16_TO_Q32(INT_TO_Q16(32000));
 
-	q16_t net = Q32_TO_Q16(n_q32);
-	state->rate += q16_mul(net, input->dt_safe);
-	state->psi_val += q16_mul(state->rate, input->dt_real);
+	else if (f_q32 < Q16_TO_Q32(INT_TO_Q16(-32000)))
+		f_q32 = Q16_TO_Q32(INT_TO_Q16(-32000));
+
+	q16_t dt = input->dt_safe;
+	q16_t den = Q16_ONE + q16_mul(c_fin, dt);
+	state->rate =
+		q16_div(state->rate + q16_mul(Q32_TO_Q16(f_q32), dt), den);
+
+	state->psi_val += q16_mul(state->rate, dt);
 
 	if (UNLIKELY(state->psi_val < 0)) {
 		state->psi_val = 0;

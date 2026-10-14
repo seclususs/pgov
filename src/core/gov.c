@@ -131,6 +131,7 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 						       cpu_temp, ctx->bat_temp,
 						       &CFG_THERMAL, now);
 		ctx->last_therm = *now;
+		ctx->remap_due = true;
 	}
 
 	*th_scl = ctx->cached_th_scl;
@@ -151,7 +152,6 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 	struct pg_demand_input d_in = {
 		.tgt_psi = psi->some.cur,
 		.vel = psi->some.vel,
-		.dt_real = dt_real,
 		.dt_safe = dt_safe,
 		.therm_scale = *th_scl,
 		.trend_fact = t_fact,
@@ -196,12 +196,18 @@ static inline void update_sysfs(struct pg_context *RESTRICT ctx,
 
 	ctx->next_wake = n_poll;
 
-	if (!pg_cpu_trans(&ctx->load_state, psi->some.cur, c))
+	bool moving = pg_cpu_trans(&ctx->load_state, c);
+	if (!moving && !ctx->remap_due)
 		return;
 
-	t_poll = Q16_TO_INT(c->trans_poll);
-	if (n_poll > t_poll)
-		ctx->next_wake = t_poll;
+	if (moving) {
+		t_poll = Q16_TO_INT(c->trans_poll);
+		if (n_poll > t_poll)
+			ctx->next_wake = t_poll;
+	}
+
+	ctx->load_state.psi_ref = ctx->load_state.psi_val;
+	ctx->remap_due = false;
 
 	if (ctx->sched_lat.active || ctx->sched_gran.active) {
 		th = pg_cpu_calc_therm_lat(th_scl, l);

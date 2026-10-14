@@ -49,7 +49,6 @@ struct pg_cpu_eff {
 struct pg_demand_input {
 	q16_t tgt_psi;
 	q16_t vel;
-	q16_t dt_real;
 	q16_t dt_safe;
 	q16_t therm_scale;
 	q16_t trend_fact;
@@ -61,13 +60,14 @@ struct pg_demand_input {
 struct pg_load_state {
 	q16_t psi_val;
 	q16_t rate;
+	q16_t psi_ref;
 	q16_t prev_integ;
 	bool first_run;
 	struct pg_cpu_eff eff;
 };
 
 PURE bool pg_cpu_trans(const struct pg_load_state *RESTRICT state,
-		       q16_t target_psi, const struct pg_cpu_cfg *RESTRICT cfg);
+		       const struct pg_cpu_cfg *RESTRICT cfg);
 
 void pg_cpu_upd_intg(struct pg_load_state *RESTRICT state, q16_t bat_lvl,
 		     q16_t dt_real, q16_t *RESTRICT i, q16_t *RESTRICT i_dt);
