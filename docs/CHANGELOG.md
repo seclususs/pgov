@@ -7,6 +7,8 @@
 - Persistent error logging to `pgovd.log` via `stderr` redirection.
 - Multi-panel backlight monitoring supporting up to 4 concurrent
   display panels on foldable devices.
+- Support debugfs scheduler fallback paths, governor dormant mode,
+  and automatic sysfs baseline restoration on shutdown.
 
 ### Changed
 

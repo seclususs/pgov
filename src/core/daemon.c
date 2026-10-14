@@ -31,6 +31,50 @@
 
 static struct pg_context context;
 
+static const char *const CAND_LAT[] = {
+	PG_PATH_SCHED_LAT,
+	PG_PATH_SCHED_LAT_DBG,
+	NULL,
+};
+
+static const char *const CAND_GRAN[] = {
+	PG_PATH_SCHED_GRAN,
+	PG_PATH_SCHED_GRAN_DBG,
+	NULL,
+};
+
+static const char *const CAND_WAKE[] = {
+	PG_PATH_SCHED_WAKEUP,
+	PG_PATH_SCHED_WAKEUP_DBG,
+	NULL,
+};
+
+static const char *const CAND_MIG[] = {
+	PG_PATH_SCHED_MIG,
+	PG_PATH_SCHED_MIG_DBG,
+	NULL,
+};
+
+static const char *const CAND_WALT[] = {
+	PG_PATH_SCHED_WALT,
+	NULL,
+};
+
+static const char *const CAND_UCL[] = {
+	PG_PATH_SCHED_UCLAMP,
+	NULL,
+};
+
+static void restore_all(struct pg_context *ctx)
+{
+	pg_sysfs_restore(&ctx->sched_lat);
+	pg_sysfs_restore(&ctx->sched_gran);
+	pg_sysfs_restore(&ctx->sched_wake);
+	pg_sysfs_restore(&ctx->sched_mig);
+	pg_sysfs_restore(&ctx->sched_walt);
+	pg_sysfs_restore(&ctx->sched_ucl);
+}
+
 static void init_os_environment(void)
 {
 	int log_fd = open(PG_PATH_LOG,
@@ -85,14 +129,18 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->on_timeout = NULL;
 }
 
-static void init_sysfs_caches(struct pg_context *ctx)
+static int init_sysfs_caches(struct pg_context *ctx)
 {
-	pg_sysfs_cache_init(&ctx->sched_lat, PG_PATH_SCHED_LAT);
-	pg_sysfs_cache_init(&ctx->sched_gran, PG_PATH_SCHED_GRAN);
-	pg_sysfs_cache_init(&ctx->sched_wake, PG_PATH_SCHED_WAKEUP);
-	pg_sysfs_cache_init(&ctx->sched_mig, PG_PATH_SCHED_MIG);
-	pg_sysfs_cache_init(&ctx->sched_walt, PG_PATH_SCHED_WALT);
-	pg_sysfs_cache_init(&ctx->sched_ucl, PG_PATH_SCHED_UCLAMP);
+	int n = 0;
+
+	n += pg_sysfs_cache_init(&ctx->sched_lat, CAND_LAT);
+	n += pg_sysfs_cache_init(&ctx->sched_gran, CAND_GRAN);
+	n += pg_sysfs_cache_init(&ctx->sched_wake, CAND_WAKE);
+	n += pg_sysfs_cache_init(&ctx->sched_mig, CAND_MIG);
+	n += pg_sysfs_cache_init(&ctx->sched_walt, CAND_WALT);
+	n += pg_sysfs_cache_init(&ctx->sched_ucl, CAND_UCL);
+
+	return n;
 }
 
 static int init_sensors_and_triggers(struct pg_context *ctx)
@@ -105,11 +153,14 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	pg_sensor_init_bat_temp(&ctx->bat_temp_sensor, PG_PATH_BATTERY_TEMP);
 	pg_sensor_init_bat_cap(&ctx->bat_cap_sensor, PG_PATH_BATTERY_CAP);
 
-	ctx->trg_fd = pg_psi_open_trg(PG_PATH_PSI_CPU, PG_PSI_THRESHOLD_US,
-				      PG_PSI_WINDOW_US);
-	if (ctx->trg_fd < 0) {
-		LOGE("daemon: failed inject err=%d", ctx->trg_fd);
-		return ctx->trg_fd;
+	if (!ctx->dormant) {
+		ctx->trg_fd = pg_psi_open_trg(
+			PG_PATH_PSI_CPU, PG_PSI_THRESHOLD_US, PG_PSI_WINDOW_US);
+
+		if (ctx->trg_fd < 0) {
+			LOGE("daemon: failed inject err=%d", ctx->trg_fd);
+			return ctx->trg_fd;
+		}
 	}
 
 	pg_psi_init(&ctx->psi, PG_PATH_PSI_CPU);
@@ -153,7 +204,10 @@ int pg_daemon_init(void)
 	}
 
 	LOGD("daemon: mapping sysfs cache nodes");
-	init_sysfs_caches(&context);
+	if (init_sysfs_caches(&context) == 0) {
+		LOGW("daemon: no node is writable on this kernel, gov goes dormant");
+		context.dormant = true;
+	}
 
 	LOGD("daemon: configuring os parameters");
 	init_os_environment();
@@ -198,6 +252,8 @@ int pg_daemon_init(void)
 	LOGI("daemon: reactor shutdown cleanly status=%d", ret);
 
 cleanup:
+	restore_all(&context);
+
 #ifdef NDK_BUILD
 	pg_opt_exit();
 #endif // NDK_BUILD

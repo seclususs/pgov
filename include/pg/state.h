@@ -77,6 +77,7 @@ struct ALIGNED(64) pg_context {
 	uint8_t temp_fails;
 
 	bool remap_due;
+	bool dormant;
 	volatile bool shutdown_req;
 
 	pg_event_cb on_trigger;

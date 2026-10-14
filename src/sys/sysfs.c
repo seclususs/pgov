@@ -21,20 +21,47 @@ static inline uint32_t mono_ms(void)
 			  ((uint64_t)ts.tv_nsec / 1000000U));
 }
 
-void pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
-			 const char *RESTRICT path)
+int pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
+			const char *const *RESTRICT paths)
 {
-	cache->fd = open(path, O_WRONLY | O_CLOEXEC);
-	if (cache->fd >= 0) {
+	cache->active = false;
+	cache->has_base = false;
+	cache->fails = 0;
+	cache->retry_ms = 0;
+	cache->last = UINT64_MAX;
+	cache->base = 0;
+	cache->fd = -1;
+
+	for (size_t i = 0; paths[i] != NULL; i++) {
+		int fd = open(paths[i], O_WRONLY | O_CLOEXEC);
+		if (fd < 0)
+			continue;
+
+		int32_t cur = -1;
+		cache->fd = fd;
 		cache->active = true;
-		cache->last = UINT64_MAX;
-		cache->fails = 0;
-		cache->retry_ms = 0;
-	} else {
-		int err = errno;
-		LOGW("sysfs: failed to cache node %s err=%d", path, err);
-		cache->active = false;
+
+		if (pg_sysfs_read_i32(paths[i], &cur) == 0 && cur >= 0) {
+			cache->base = (uint32_t)cur;
+			cache->has_base = true;
+		}
+
+		LOGI("sysfs: node mapped to %s", paths[i]);
+		return 1;
 	}
+
+	LOGW("sysfs: no usable node (candidate %s)", paths[0]);
+	return 0;
+}
+
+void pg_sysfs_restore(struct pg_sysfs_cache *cache)
+{
+	if (!cache->active || !cache->has_base || cache->last == UINT64_MAX ||
+	    cache->last == cache->base)
+		return;
+
+	if (pg_sysfs_write_strm(cache->fd, cache->base) == 0)
+		cache->last = cache->base;
 }
 
 void pg_sysfs_cache_cleanup(struct pg_sysfs_cache *cache)

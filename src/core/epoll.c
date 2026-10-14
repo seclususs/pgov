@@ -95,13 +95,17 @@ int pg_epoll_run(struct pg_context *ctx)
 		goto out_close;
 	}
 
-	struct epoll_event ev_trg = { 0 };
-	ev_trg.events = EPOLLPRI | EPOLLERR | EPOLLET;
-	ev_trg.data.fd = ctx->trg_fd;
-	if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->trg_fd, &ev_trg) < 0) {
-		ret = -errno;
-		LOGE("epoll: failed to register trg_fd err=%d", -ret);
-		goto out_close;
+	if (ctx->trg_fd >= 0) {
+		struct epoll_event ev_trg = { 0 };
+		ev_trg.events = EPOLLPRI | EPOLLERR | EPOLLET;
+		ev_trg.data.fd = ctx->trg_fd;
+
+		if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->trg_fd,
+			      &ev_trg) < 0) {
+			ret = -errno;
+			LOGE("epoll: failed to register trg_fd err=%d", -ret);
+			goto out_close;
+		}
 	}
 
 	struct epoll_event events[PG_MAX_EVENTS];

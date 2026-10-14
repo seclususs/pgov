@@ -18,8 +18,10 @@ struct pg_sysfs_chk {
 struct pg_sysfs_cache {
 	uint64_t last;
 	int fd;
+	uint32_t base;
 	uint32_t retry_ms;
 	uint8_t fails;
+	bool has_base;
 	bool active;
 };
 
@@ -36,8 +38,10 @@ struct pg_sysfs_cache {
  *       - Fails gracefully: Does NOT return an error code on permission denial; instead,
  *         it flags `cache->active = false`. Downstream updates will become zero-cost no-ops.
  */
-void pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
-			 const char *RESTRICT path);
+int pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
+			const char *const *RESTRICT paths);
+
+void pg_sysfs_restore(struct pg_sysfs_cache *cache);
 
 void pg_sysfs_cache_cleanup(struct pg_sysfs_cache *cache);
 

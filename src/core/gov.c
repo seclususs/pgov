@@ -302,8 +302,25 @@ static inline void exec_gov_logic(struct pg_context *RESTRICT ctx,
 	update_sysfs(ctx, &psi, th_scl, l_dem, p_eff);
 }
 
+static void dormant_tick(struct pg_context *ctx)
+{
+#ifdef NDK_BUILD
+	struct timespec now;
+	clock_gettime(CLOCK_MONOTONIC, &now);
+	if (!update_disp(ctx, &now))
+		ctx->next_wake = PG_MAX_POLL_MS;
+#else
+	ctx->next_wake = -1;
+#endif // NDK_BUILD
+}
+
 void pg_gov_process(struct pg_context *ctx)
 {
+	if (UNLIKELY(ctx->dormant)) {
+		dormant_tick(ctx);
+		return;
+	}
+
 	struct timespec now;
 	struct timespec end_calc;
 	clock_gettime(CLOCK_MONOTONIC, &now);
