@@ -32,6 +32,9 @@
 - Fix `-EINVAL` syscall rejection during daemon startup and cache
   sweep by passing `sched_util_min = 0` whenever clamping task
   utilization under `SCHED_FIFO`.
+- Prevent prolonged thermal throttling on display wake by resetting
+  stale Kalman filter velocity and PID integrator states across
+  extended suspend intervals.
 
 ## [v1.0]
 

@@ -2,7 +2,15 @@
 // Copyright (C) 2026 seclususs
 
 #include "pg/thermal.h"
+#include "pg/config.h"
 #include "pg/time.h"
+
+static void thermal_filter_reset(struct pg_thermal_state *state)
+{
+	pg_kalman_init(&state->filter);
+	state->filter.q_vel = FLOAT_TO_Q16(0.01F);
+	state->filter.r_meas = FLOAT_TO_Q16(2.0F);
+}
 
 void pg_thermal_init(struct pg_thermal_state *state)
 {
@@ -10,9 +18,7 @@ void pg_thermal_init(struct pg_thermal_state *state)
 	state->integ = 0;
 	state->prev_sat = 0;
 	state->sat_count = 0;
-	pg_kalman_init(&state->filter);
-	state->filter.q_vel = FLOAT_TO_Q16(0.01F);
-	state->filter.r_meas = FLOAT_TO_Q16(2.0F);
+	thermal_filter_reset(state);
 }
 
 q16_t pg_thermal_update(struct pg_thermal_state *RESTRICT state, q16_t cpu_temp,
@@ -24,15 +30,25 @@ q16_t pg_thermal_update(struct pg_thermal_state *RESTRICT state, q16_t cpu_temp,
 	q16_t dt_s = pg_math_clamp(dt, FLOAT_TO_Q16(0.01F), Q16_ONE);
 	state->last_tick = *now;
 
-	q16_t tmp = pg_kalman_update(&state->filter, cpu_temp, dt_s);
-	q16_t vel = state->filter.x_vel;
-
 	q16_t b_marg = cfg->limit_bat - bat_temp;
 	if (b_marg < 0)
 		b_marg = 0;
 
 	q16_t c_marg = (b_marg < INT_TO_Q16(5)) ? (INT_TO_Q16(5) - b_marg) : 0;
 	q16_t sp = cfg->limit_cpu - c_marg;
+
+	if (UNLIKELY(dt > INT_TO_Q16(PG_THERM_STALE_SEC))) {
+		thermal_filter_reset(state);
+
+		state->prev_sat = 0;
+		state->sat_count = 0;
+
+		if (cpu_temp < sp)
+			state->integ = 0;
+	}
+
+	q16_t tmp = pg_kalman_update(&state->filter, cpu_temp, dt_s);
+	q16_t vel = state->filter.x_vel;
 	q16_t err = tmp - sp;
 
 	q16_t t_dist = sp - tmp;
