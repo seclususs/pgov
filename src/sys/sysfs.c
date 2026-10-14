@@ -4,9 +4,22 @@
 #include "sysfs.h"
 #include "parser.h"
 #include "pg/log.h"
+#include "pg/config.h"
 #include <errno.h>
 #include <fcntl.h>
+#include <time.h>
 #include <unistd.h>
+
+#define SYSFS_BACKOFF_BASE_MS 1000U
+#define SYSFS_BACKOFF_MAX_MS 60000U
+
+static inline uint32_t mono_ms(void)
+{
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (uint32_t)(((uint64_t)ts.tv_sec * 1000U) +
+			  ((uint64_t)ts.tv_nsec / 1000000U));
+}
 
 void pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
 			 const char *RESTRICT path)
@@ -15,6 +28,8 @@ void pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
 	if (cache->fd >= 0) {
 		cache->active = true;
 		cache->last = UINT64_MAX;
+		cache->fails = 0;
+		cache->retry_ms = 0;
 	} else {
 		int err = errno;
 		LOGW("sysfs: failed to cache node %s err=%d", path, err);
@@ -203,6 +218,25 @@ void pg_sysfs_update(struct pg_sysfs_cache *RESTRICT cache, uint64_t value,
 		}
 	}
 
-	if (update && pg_sysfs_write_strm(cache->fd, value) == 0)
+	if (!update)
+		return;
+
+	if (UNLIKELY(cache->fails != 0) &&
+	    (int32_t)(mono_ms() - cache->retry_ms) < 0)
+		return;
+
+	if (pg_sysfs_write_strm(cache->fd, value) == 0) {
 		cache->last = value;
+		cache->fails = 0;
+		return;
+	}
+
+	if (cache->fails < PG_SYSFS_FAIL_MAX)
+		cache->fails++;
+
+	uint32_t delay = SYSFS_BACKOFF_BASE_MS << (cache->fails - 1);
+	if (delay > SYSFS_BACKOFF_MAX_MS)
+		delay = SYSFS_BACKOFF_MAX_MS;
+
+	cache->retry_ms = mono_ms() + delay;
 }

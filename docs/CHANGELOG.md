@@ -35,6 +35,8 @@
 - Prevent prolonged thermal throttling on display wake by resetting
   stale Kalman filter velocity and PID integrator states across
   extended suspend intervals.
+- Prevent reactor busy-spinning and log saturation on sysfs write
+  or PSI read failures by adding exponential retry backoff.
 
 ## [v1.0]
 

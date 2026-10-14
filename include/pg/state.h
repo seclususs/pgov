@@ -73,6 +73,9 @@ struct ALIGNED(64) pg_context {
 	int lock_fd;
 	int next_wake;
 
+	uint8_t psi_fails;
+	uint8_t temp_fails;
+
 	bool remap_due;
 	volatile bool shutdown_req;
 

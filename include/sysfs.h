@@ -16,8 +16,10 @@ struct pg_sysfs_chk {
 };
 
 struct pg_sysfs_cache {
-	int fd;
 	uint64_t last;
+	int fd;
+	uint32_t retry_ms;
+	uint8_t fails;
 	bool active;
 };
 

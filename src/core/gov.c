@@ -70,15 +70,42 @@ static inline bool update_disp(struct pg_context *RESTRICT ctx,
 	return false;
 }
 
+static void arm_trigger(struct pg_context *ctx)
+{
+	int fd = pg_psi_open_trg(PG_PATH_PSI_CPU, PG_PSI_THRESHOLD_US,
+				 PG_PSI_WINDOW_US);
+	if (fd < 0)
+		return;
+
+	ctx->trg_fd = fd;
+	if (pg_epoll_add_trg(ctx) < 0) {
+		pg_psi_close_trg(fd);
+		ctx->trg_fd = -1;
+	}
+}
+
 static inline bool read_psi(struct pg_context *RESTRICT ctx,
 			    const struct timespec *RESTRICT now,
 			    struct pg_psi_data *RESTRICT psi)
 {
 	int status = pg_psi_read(&ctx->psi, psi, now);
-	if (LIKELY(status == 0))
-		return true;
 
-	LOGW("gov: psi read failed status=%d, init recov", status);
+	if (LIKELY(status == 0)) {
+		if (UNLIKELY(ctx->psi_fails != 0)) {
+			ctx->psi_fails = 0;
+			LOGI("gov: psi read recovered");
+		}
+		return true;
+	}
+
+	if (ctx->psi_fails < PG_PSI_FAIL_MAX) {
+		ctx->psi_fails++;
+		LOGW("gov: psi read failed status=%d, init recov", status);
+	}
+
+	uint32_t delay = 1000U << (ctx->psi_fails - 1);
+	ctx->next_wake = (int)(delay > 30000U ? 30000U : delay);
+
 	pg_epoll_rm_trg(ctx);
 
 	if (ctx->trg_fd >= 0) {
@@ -86,23 +113,10 @@ static inline bool read_psi(struct pg_context *RESTRICT ctx,
 		ctx->trg_fd = -1;
 	}
 
-	if (pg_psi_recov(&ctx->psi, PG_PATH_PSI_CPU) == 0) {
-		ctx->trg_fd = pg_psi_open_trg(
-			PG_PATH_PSI_CPU, PG_PSI_THRESHOLD_US, PG_PSI_WINDOW_US);
+	if (pg_psi_recov(&ctx->psi, PG_PATH_PSI_CPU) == 0)
+		ctx->next_wake = PG_MIN_POLL_MS;
 
-		if (ctx->trg_fd >= 0)
-			pg_epoll_add_trg(ctx);
-
-		return false;
-	}
-
-	if (UNLIKELY(ctx->trg_fd < 0)) {
-		ctx->trg_fd = pg_psi_open_trg(
-			PG_PATH_PSI_CPU, PG_PSI_THRESHOLD_US, PG_PSI_WINDOW_US);
-
-		if (ctx->trg_fd >= 0)
-			pg_epoll_add_trg(ctx);
-	}
+	arm_trigger(ctx);
 
 	return false;
 }
@@ -118,18 +132,33 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 		pg_sensor_read_bat_cap(&ctx->bat_cap_sensor, &ctx->bat_lvl);
 		pg_sensor_read_bat_temp(&ctx->bat_temp_sensor, &ctx->bat_temp);
 		ctx->last_bat = *now;
+
+		if (UNLIKELY(ctx->trg_fd < 0))
+			arm_trigger(ctx);
 	}
 
 	q16_t elaps_therm = pg_dt_sec(&ctx->last_therm, now);
 	if (elaps_therm >= INT_TO_Q16(PG_THERM_CHK_SEC)) {
 		q16_t cpu_temp = 0;
-		if (LIKELY(ctx->cpu_temp_sensor.fd >= 0))
-			pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor,
-						&cpu_temp);
+		bool hold = false;
 
-		ctx->cached_th_scl = pg_thermal_update(&ctx->thermal_state,
-						       cpu_temp, ctx->bat_temp,
-						       &CFG_THERMAL, now);
+		if (LIKELY(ctx->cpu_temp_sensor.fd >= 0)) {
+			if (pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor,
+						    &cpu_temp) == 0) {
+				ctx->temp_fails = 0;
+			} else if (ctx->temp_fails < PG_TEMP_FAIL_MAX) {
+				ctx->temp_fails++;
+				hold = true;
+			} else {
+				cpu_temp = 0;
+			}
+		}
+
+		if (LIKELY(!hold))
+			ctx->cached_th_scl = pg_thermal_update(
+				&ctx->thermal_state, cpu_temp, ctx->bat_temp,
+				&CFG_THERMAL, now);
+
 		ctx->last_therm = *now;
 		ctx->remap_due = true;
 	}
