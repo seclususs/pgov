@@ -93,19 +93,13 @@ int pg_topo_set_little_core(void)
 	if (num_cores <= 0)
 		return -EINVAL;
 
-	if (build_cpuset(num_cores, CPU_CAPACITY, &little_cpuset)) {
-		if (sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset) < 0)
-			return -errno;
-
+	if (build_cpuset(num_cores, CPU_CAPACITY, &little_cpuset) &&
+	    sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset) == 0)
 		return 0;
-	}
 
-	if (build_cpuset(num_cores, CPU_MAX_FREQ, &little_cpuset)) {
-		if (sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset) < 0)
-			return -errno;
-
+	if (build_cpuset(num_cores, CPU_MAX_FREQ, &little_cpuset) &&
+	    sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset) == 0)
 		return 0;
-	}
 
 	LOGW("topology: detection failed, binding to all cores");
 

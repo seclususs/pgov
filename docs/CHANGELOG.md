@@ -51,6 +51,7 @@
 - Preserve Android `debuggerd` crash tombstones on fatal signals
   by forwarding to previous handlers after restoring sysfs baseline.
 - Fix inverted sched_setattr fallback syscall number on arm32.
+- Fix core affinity fallback traversal on offline cores.
 
 ## [v1.0]
 
