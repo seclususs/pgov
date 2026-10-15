@@ -5,12 +5,14 @@
 #include "daemon.h"
 #include "pg/config.h"
 #include "block.h"
+#include "compiler.h"
 #include "detect.h"
 #include "epoll.h"
 #include "lockfile.h"
 #include "opt.h"
 #include "pg/log.h"
 #include "memory.h"
+#include "parser.h"
 #include "paths.h"
 #include "prop.h"
 #include "rlimit.h"
@@ -65,6 +67,43 @@ static const char *const CAND_UCL[] = {
 	NULL,
 };
 
+#define NR_SINKS 6
+
+static struct {
+	int fd;
+	uint64_t base;
+} rs_tbl[NR_SINKS];
+
+static size_t rs_cnt;
+
+static void restore_snapshot(const struct pg_context *ctx)
+{
+	const struct pg_sysfs_cache *const c[NR_SINKS] = {
+		&ctx->sched_lat, &ctx->sched_gran, &ctx->sched_wake,
+		&ctx->sched_mig, &ctx->sched_walt, &ctx->sched_ucl,
+	};
+
+	rs_cnt = 0;
+	for (size_t i = 0; i < NR_SINKS; i++) {
+		if (!c[i]->active || !c[i]->has_base)
+			continue;
+
+		rs_tbl[rs_cnt].fd = c[i]->fd;
+		rs_tbl[rs_cnt].base = c[i]->base;
+		rs_cnt++;
+	}
+}
+
+static void crash_restore(void)
+{
+	for (size_t i = 0; i < rs_cnt; i++) {
+		char buf[32];
+		size_t len = pg_fmt_u64(rs_tbl[i].base, buf);
+		ssize_t unused = pwrite(rs_tbl[i].fd, buf, len, 0);
+		UNUSED(unused);
+	}
+}
+
 static void restore_all(struct pg_context *ctx)
 {
 	pg_sysfs_restore(&ctx->sched_lat);
@@ -73,6 +112,7 @@ static void restore_all(struct pg_context *ctx)
 	pg_sysfs_restore(&ctx->sched_mig);
 	pg_sysfs_restore(&ctx->sched_walt);
 	pg_sysfs_restore(&ctx->sched_ucl);
+	rs_cnt = 0;
 }
 
 static void init_os_environment(void)
@@ -84,7 +124,7 @@ static void init_os_environment(void)
 		close(log_fd);
 	}
 
-	pg_signal_catch_crash();
+	pg_signal_catch_crash(crash_restore);
 	pg_memory_shield();
 	pg_memory_lock();
 	pg_rlimit_set_max_fd();
@@ -208,6 +248,7 @@ int pg_daemon_init(void)
 		LOGW("daemon: no node is writable on this kernel, gov goes dormant");
 		context.dormant = true;
 	}
+	restore_snapshot(&context);
 
 	LOGD("daemon: configuring os parameters");
 	init_os_environment();

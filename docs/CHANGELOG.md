@@ -41,6 +41,8 @@
   extended suspend intervals.
 - Prevent reactor busy-spinning and log saturation on sysfs write
   or PSI read failures by adding exponential retry backoff.
+- Preserve Android `debuggerd` crash tombstones on fatal signals
+  by forwarding to previous handlers after restoring sysfs baseline.
 
 ## [v1.0]
 

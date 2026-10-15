@@ -9,14 +9,45 @@
 #include <sys/signalfd.h>
 #include <unistd.h>
 
+#define NR_CRASH_SIGS 4
+
+static const int CRASH_SIGS[NR_CRASH_SIGS] = {
+	SIGSEGV,
+	SIGFPE,
+	SIGABRT,
+	SIGILL,
+};
+
+static struct sigaction prev_act[NR_CRASH_SIGS];
+static void (*crash_hook)(void);
+
 static void pg_crash_handler(int sig, siginfo_t *info, void *context)
 {
-	UNUSED(info);
-	UNUSED(context);
-
 	const char msg[] = "\n[PGOV] fatal: daemon crashed\n";
 	ssize_t unused = write(STDERR_FILENO, msg, sizeof(msg) - 1);
 	UNUSED(unused);
+
+	void (*hook)(void) = crash_hook;
+	crash_hook = NULL;
+	if (hook)
+		hook();
+
+	for (int i = 0; i < NR_CRASH_SIGS; i++) {
+		if (CRASH_SIGS[i] != sig)
+			continue;
+
+		const struct sigaction *old = &prev_act[i];
+		if (old->sa_flags & SA_SIGINFO) {
+			if (old->sa_sigaction)
+				old->sa_sigaction(sig, info, context);
+
+		} else if (old->sa_handler != SIG_DFL &&
+			   old->sa_handler != SIG_IGN) {
+			old->sa_handler(sig);
+		}
+
+		break;
+	}
 
 	(void)signal(sig, SIG_DFL);
 	(void)raise(sig);
@@ -52,17 +83,17 @@ out_unblock:
 	return -err;
 }
 
-void pg_signal_catch_crash(void)
+void pg_signal_catch_crash(void (*hook)(void))
 {
 	struct sigaction sa = { 0 };
 	sa.sa_flags = SA_SIGINFO | SA_RESTART;
 	sa.sa_sigaction = pg_crash_handler;
 	sigemptyset(&sa.sa_mask);
 
-	sigaction(SIGSEGV, &sa, NULL);
-	sigaction(SIGFPE, &sa, NULL);
-	sigaction(SIGABRT, &sa, NULL);
-	sigaction(SIGILL, &sa, NULL);
+	crash_hook = hook;
+
+	for (int i = 0; i < NR_CRASH_SIGS; i++)
+		sigaction(CRASH_SIGS[i], &sa, &prev_act[i]);
 }
 
 void pg_signal_close(int fd)
