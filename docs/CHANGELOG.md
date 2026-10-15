@@ -50,6 +50,7 @@
   or PSI read failures by adding exponential retry backoff.
 - Preserve Android `debuggerd` crash tombstones on fatal signals
   by forwarding to previous handlers after restoring sysfs baseline.
+- Fix inverted sched_setattr fallback syscall number on arm32.
 
 ## [v1.0]
 

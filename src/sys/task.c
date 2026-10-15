@@ -26,9 +26,11 @@
 #if defined(__aarch64__)
 #define __NR_sched_setattr 274
 #elif defined(__arm__)
-#define __NR_sched_setattr 381
-#else
 #define __NR_sched_setattr 380
+#elif defined(__x86_64__)
+#define __NR_sched_setattr 314
+#else
+#define __NR_sched_setattr 274
 #endif
 #endif
 
