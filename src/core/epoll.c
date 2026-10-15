@@ -18,6 +18,9 @@ static inline void epoll_error(struct pg_context *RESTRICT ctx,
 			       const struct timespec *RESTRICT wait_start)
 {
 	if (errno == EINTR) {
+		if (ctx->next_wake < 0)
+			return;
+
 		struct timespec wait_end;
 		clock_gettime(CLOCK_MONOTONIC, &wait_end);
 
