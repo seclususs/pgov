@@ -62,6 +62,7 @@ struct ALIGNED(64) pg_context {
 	struct timespec last_therm;
 	struct timespec last_tick;
 	struct timespec last_dispoff;
+	struct timespec last_disp;
 
 #ifdef NDK_BUILD
 	struct timespec last_sweep;

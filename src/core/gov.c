@@ -34,6 +34,12 @@ int pg_gov_init(struct pg_context *ctx)
 static inline bool update_disp(struct pg_context *RESTRICT ctx,
 			       const struct timespec *RESTRICT now)
 {
+	if (LIKELY(ctx->disp_state == PG_DISP_ON) &&
+	    pg_dt_sec(&ctx->last_disp, now) < INT_TO_Q16(PG_DISP_CHK_SEC))
+		return false;
+
+	ctx->last_disp = *now;
+
 	int32_t bl = 0;
 	int ret = pg_sensor_read_bl(&ctx->bl_sensor, &bl);
 	bool on = ((ret < 0) ? true : (bl > 0)) != 0;

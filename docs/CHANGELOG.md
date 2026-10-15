@@ -17,6 +17,8 @@
 - Transition Kalman Filter sensitivity and structural break
   thresholds from static boot-time constants to dynamic
   runtime parameters driven by live 5-minute PSI load.
+- Throttle backlight sysfs polling to at most once per second while
+  the display is known to be active, reducing system call frequency.
 
 ### Fixed
 

@@ -28,6 +28,7 @@
 #define PG_IOPRIO_DATA 0
 #define PG_BAT_CHK_SEC 5
 #define PG_THERM_CHK_SEC 1
+#define PG_DISP_CHK_SEC 1
 #define PG_THERM_STALE_SEC 30
 #define PG_TEMP_FAIL_MAX 10
 #define PG_PSI_FAIL_MAX 6
