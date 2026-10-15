@@ -54,7 +54,8 @@ static inline void epoll_events(struct pg_context *RESTRICT ctx,
 				ctx->shutdown_req = true;
 
 		} else if (ev_fd == ctx->trg_fd) {
-			if (LIKELY(ctx->on_trigger != NULL))
+			if (LIKELY(ctx->on_trigger != NULL &&
+				   !ctx->shutdown_req))
 				ctx->on_trigger(ctx);
 		}
 	}

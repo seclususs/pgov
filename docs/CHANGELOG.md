@@ -53,6 +53,7 @@
 - Fix inverted sched_setattr fallback syscall number on arm32.
 - Fix core affinity fallback traversal on offline cores.
 - Fix infinite epoll timeout corruption upon signal EINTR.
+- Suppress governor trigger execution during shutdown.
 
 ## [v1.0]
 
