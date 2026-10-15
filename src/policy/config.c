@@ -26,7 +26,7 @@ struct pg_cpu_cfg CFG_CPU = {
 	.surge_thresh = FLOAT_TO_Q16(17.5F),
 	.trans_rate = FLOAT_TO_Q16(0.115F),
 	.trans_diff = FLOAT_TO_Q16(0.58F),
-	.trans_poll = FLOAT_TO_Q16(52.0F),
+	.trans_poll = INT_TO_Q16(50),
 };
 
 struct pg_thermal_cfg CFG_THERMAL = {

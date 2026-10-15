@@ -4,7 +4,6 @@
 #include "pg/tune.h"
 #include "pg/config.h"
 #include "topo.h"
-#include "detect.h"
 #include "sensor.h"
 
 void pg_tune_limits(void)
@@ -82,14 +81,12 @@ void pg_tune_configs(void)
 	int32_t cap;
 	int32_t min_c;
 	int32_t max_c;
-	int32_t hz;
 	q16_t rat;
 	q16_t rel;
 	q16_t f_val;
 	q16_t therm;
 	q16_t val;
 	q16_t trip;
-	q16_t tick;
 
 	cap = 0;
 	min_c = 0;
@@ -132,14 +129,6 @@ void pg_tune_configs(void)
 
 	therm = q16_mul(rel, f_val);
 	therm = pg_math_clamp(therm, 0, Q16_ONE);
-
-	hz = pg_detect_kernel_hz();
-	tick = (hz > 0) ? q16_div(INT_TO_Q16(1000), INT_TO_Q16(hz)) :
-			  INT_TO_Q16(10);
-
-	val = q16_mul(tick, INT_TO_Q16(5));
-	CFG_CPU.trans_poll =
-		pg_math_clamp(val, FLOAT_TO_Q16(20.0F), FLOAT_TO_Q16(100.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.50F), FLOAT_TO_Q16(0.20F), rel);
 	CFG_CPU.lat_gran_rat =

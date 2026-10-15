@@ -19,6 +19,8 @@
   runtime parameters driven by live 5-minute PSI load.
 - Throttle backlight sysfs polling to at most once per second while
   the display is known to be active, reducing system call frequency.
+- Drop redundant userspace HZ detection in favor of a constant 50ms
+  transition poll baseline, avoiding synthetic tick computations.
 
 ### Fixed
 
