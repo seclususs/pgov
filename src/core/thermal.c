@@ -9,7 +9,6 @@ static void thermal_filter_reset(struct pg_thermal_state *state)
 {
 	pg_kalman_init(&state->filter);
 	state->filter.q_vel = FLOAT_TO_Q16(0.01F);
-	state->filter.r_meas = FLOAT_TO_Q16(2.0F);
 }
 
 void pg_thermal_init(struct pg_thermal_state *state)
