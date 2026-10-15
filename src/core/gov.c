@@ -119,8 +119,7 @@ static inline bool read_psi(struct pg_context *RESTRICT ctx,
 		ctx->trg_fd = -1;
 	}
 
-	if (pg_psi_recov(&ctx->psi, PG_PATH_PSI_CPU) == 0)
-		ctx->next_wake = PG_MIN_POLL_MS;
+	pg_psi_recov(&ctx->psi, PG_PATH_PSI_CPU);
 
 	arm_trigger(ctx);
 
