@@ -199,9 +199,35 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 	*p_eff = pg_cpu_calc_eff_press(*l_dem, t_fact, eff);
 }
 
-static inline void update_sysfs(struct pg_context *RESTRICT ctx,
-				const struct pg_psi_data *RESTRICT psi,
-				q16_t th_scl, q16_t l_dem, q16_t p_eff)
+static inline bool gov_gate(struct pg_context *RESTRICT ctx,
+			    const struct pg_psi_data *RESTRICT psi, q16_t p_eff)
+{
+	const struct pg_cpu_cfg *c = &CFG_CPU;
+	int32_t n_poll;
+	int32_t t_poll;
+
+	n_poll = (int32_t)pg_poll_calc_next(&ctx->poll_state, p_eff,
+					    psi->some.avg300, psi->some.vel);
+	ctx->next_wake = n_poll;
+
+	bool moving = pg_cpu_trans(&ctx->load_state, c);
+	if (!moving && !ctx->remap_due)
+		return false;
+
+	if (moving) {
+		t_poll = Q16_TO_INT(c->trans_poll);
+		if (n_poll > t_poll)
+			ctx->next_wake = t_poll;
+	}
+
+	ctx->load_state.psi_ref = ctx->load_state.psi_val;
+	ctx->remap_due = false;
+	return true;
+}
+
+static inline void apply_mapping(struct pg_context *RESTRICT ctx,
+				 const struct pg_psi_data *RESTRICT psi,
+				 q16_t th_scl, q16_t l_dem, q16_t p_eff)
 {
 	const struct pg_cpu_cfg *c = &CFG_CPU;
 	const struct pg_cpu_lim *l = &LIM_CPU;
@@ -222,27 +248,6 @@ static inline void update_sysfs(struct pg_context *RESTRICT ctx,
 	q16_t mig = 0;
 	q16_t wlt = 0;
 	q16_t ucl = 0;
-
-	int32_t n_poll;
-	int32_t t_poll;
-
-	n_poll = (int32_t)pg_poll_calc_next(&ctx->poll_state, p_eff,
-					    psi->some.avg300, psi->some.vel);
-
-	ctx->next_wake = n_poll;
-
-	bool moving = pg_cpu_trans(&ctx->load_state, c);
-	if (!moving && !ctx->remap_due)
-		return;
-
-	if (moving) {
-		t_poll = Q16_TO_INT(c->trans_poll);
-		if (n_poll > t_poll)
-			ctx->next_wake = t_poll;
-	}
-
-	ctx->load_state.psi_ref = ctx->load_state.psi_val;
-	ctx->remap_due = false;
 
 	if (ctx->sched_lat.active || ctx->sched_gran.active) {
 		th = pg_cpu_calc_therm_lat(th_scl, l);
@@ -305,7 +310,8 @@ static inline void exec_gov_logic(struct pg_context *RESTRICT ctx,
 	q16_t l_dem;
 	q16_t p_eff;
 	calc_demand(ctx, now, &psi, &th_scl, &l_dem, &p_eff);
-	update_sysfs(ctx, &psi, th_scl, l_dem, p_eff);
+	if (gov_gate(ctx, &psi, p_eff))
+		apply_mapping(ctx, &psi, th_scl, l_dem, p_eff);
 }
 
 static void dormant_tick(struct pg_context *ctx)

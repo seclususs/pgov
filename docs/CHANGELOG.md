@@ -22,6 +22,8 @@
 - Drop redundant userspace HZ detection in favor of a constant 50ms
   transition poll baseline, avoiding synthetic tick computations.
 - Drop dead `r_meas` seed assignment in thermal filter initialization.
+- Decouple transition gating decisions from hardware sysfs actuation
+  in governor update loop.
 
 ### Fixed
 
