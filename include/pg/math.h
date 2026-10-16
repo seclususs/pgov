@@ -171,11 +171,14 @@ static ALWAYS_INLINE CONST uint64_t pg_math_san_quant_u64(q16_t val,
 	q16_t sv = (UNLIKELY(val < 0)) ? fallback : val;
 	uint64_t v_ns = ((uint64_t)sv * 1000000ULL) >> Q16_SHIFT;
 
-	if (UNLIKELY(step == 0 || step == 1))
+	if (UNLIKELY(step <= 1))
 		return v_ns;
 
+	if (LIKELY((step & (step - 1)) == 0))
+		return (v_ns + (step >> 1)) & ~(step - 1);
+
 	uint64_t rem = v_ns % step;
-	if (rem >= step / 2)
+	if (rem >= (step >> 1))
 		return v_ns + step - rem;
 
 	return v_ns - rem;

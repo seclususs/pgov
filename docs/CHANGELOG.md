@@ -25,6 +25,7 @@
 - Decouple transition gating decisions from hardware sysfs actuation
   in governor update loop.
 - Optimize integer square root with CLZ bit positioning.
+- Optimize scheduler timing quantization with bitwise rounding.
 
 ### Fixed
 
