@@ -4,6 +4,7 @@
 #include "detect.h"
 #include "pg/log.h"
 #include "paths.h"
+#include <errno.h> // IWYU pragma: keep
 #include <unistd.h>
 
 bool pg_detect_cpu_psi(void)
