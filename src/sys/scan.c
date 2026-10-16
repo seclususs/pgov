@@ -141,11 +141,12 @@ static inline int find_heuristic(const struct tz_info *zones, size_t nr_zones,
 
 int pg_scan_thermal_zone(char *path, size_t len)
 {
+	if (UNLIKELY(!path || len == 0))
+		return -EINVAL;
+
 	DIR *dir = opendir(PG_PATH_THERMAL_BASE);
 	if (!dir) {
-		if (len > 0)
-			path[0] = '\0';
-
+		path[0] = '\0';
 		return -ENOENT;
 	}
 
@@ -202,14 +203,15 @@ int pg_scan_thermal_zone(char *path, size_t len)
 	if (find_heuristic(zones, nr_zones, path, len) == 0)
 		return 0;
 
-	if (len > 0)
-		path[0] = '\0';
-
+	path[0] = '\0';
 	return -ENODEV;
 }
 
 int pg_scan_backlight(char (*paths)[PG_BL_PATH_LEN], size_t max)
 {
+	if (UNLIKELY(!paths || max == 0))
+		return -EINVAL;
+
 	DIR *dir = opendir(PG_PATH_BACKLIGHT_BASE);
 	if (!dir)
 		return -ENOENT;
@@ -317,14 +319,15 @@ static int trip_point(const char *name, char *path, size_t len)
 
 int pg_scan_trip_point(char *path, size_t len)
 {
+	if (UNLIKELY(!path || len == 0))
+		return -EINVAL;
+
 	DIR *dir = opendir(PG_PATH_THERMAL_BASE);
 	struct dirent *entry;
 	int ret = -ENODEV;
 
 	if (!dir) {
-		if (len > 0)
-			path[0] = '\0';
-
+		path[0] = '\0';
 		return -ENOENT;
 	}
 
@@ -341,8 +344,7 @@ int pg_scan_trip_point(char *path, size_t len)
 		}
 	}
 
-	if (len > 0)
-		path[0] = '\0';
+	path[0] = '\0';
 
 out:
 	closedir(dir);

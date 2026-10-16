@@ -55,6 +55,7 @@
 - Fix infinite epoll timeout corruption upon signal EINTR.
 - Suppress governor trigger execution during shutdown.
 - Fix unhandled EINTR interruptions during getdents64 traversals.
+- Add fail-fast input validation across sysfs, scan, and fs APIs.
 
 ## [v1.0]
 

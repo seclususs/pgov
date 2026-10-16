@@ -24,6 +24,9 @@ static inline uint32_t mono_ms(void)
 int pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
 			const char *const *RESTRICT paths)
 {
+	if (UNLIKELY(!cache || !paths))
+		return -EINVAL;
+
 	cache->active = false;
 	cache->has_base = false;
 	cache->fails = 0;
@@ -77,6 +80,9 @@ void pg_sysfs_cache_cleanup(struct pg_sysfs_cache *cache)
 int pg_sysfs_read_i32(const char *path, int32_t *out_val)
 {
 	int ret = 0;
+
+	if (UNLIKELY(!path || !out_val))
+		return -EINVAL;
 
 	int fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {

@@ -104,12 +104,18 @@ int pg_fs_walk_fd(int dfd, pg_fs_cb cb, void *ctx, int max_depth)
 	if (dfd < 0)
 		return -EBADF;
 
+	if (UNLIKELY(!cb || max_depth < 0))
+		return -EINVAL;
+
 	return walk(dfd, cb, ctx, max_depth, 0);
 }
 
 int pg_fs_walk(const char *RESTRICT path, pg_fs_cb cb, void *RESTRICT ctx,
 	       int max_depth)
 {
+	if (UNLIKELY(!path || !cb || max_depth < 0))
+		return -EINVAL;
+
 	int fd = open(path, DIR_FLAGS);
 	if (fd < 0)
 		return -errno;

@@ -2,6 +2,7 @@
 // Copyright (C) 2026 seclususs
 
 #include "lockfile.h"
+#include "compiler.h"
 #include "pg/log.h"
 #include <errno.h>
 #include <fcntl.h>
@@ -11,6 +12,10 @@
 int pg_lockfile_init(const char *path)
 {
 	int err;
+
+	if (UNLIKELY(!path))
+		return -EINVAL;
+
 	int fd = open(path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
 	if (fd < 0) {
 		err = errno;
