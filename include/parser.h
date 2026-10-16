@@ -128,7 +128,7 @@ static ALWAYS_INLINE q16_t pg_parse_q16(const uint8_t *RESTRICT buf, size_t len,
 					size_t start, size_t *RESTRICT next)
 {
 	size_t pos = start;
-	q16_t val = 0;
+	uint32_t int_val = 0;
 	uint32_t f_val = 0;
 	uint32_t f_div = 1;
 	bool frac = false;
@@ -146,8 +146,7 @@ static ALWAYS_INLINE q16_t pg_parse_q16(const uint8_t *RESTRICT buf, size_t len,
 			break;
 
 		if (!frac) {
-			val = q16_mul(val, INT_TO_Q16(10)) +
-			      INT_TO_Q16(b - '0');
+			int_val = (int_val * 10) + (b - '0');
 			pos++;
 			continue;
 		}
@@ -162,6 +161,7 @@ static ALWAYS_INLINE q16_t pg_parse_q16(const uint8_t *RESTRICT buf, size_t len,
 
 	*next = pos;
 
+	q16_t val = (q16_t)(int_val << 16);
 	if (frac && f_div > 1) {
 		q16_t f_q16 = (q16_t)(((uint64_t)f_val << 16) / f_div);
 		return val + f_q16;
