@@ -27,6 +27,7 @@
 - Optimize integer square root with CLZ bit positioning.
 - Optimize scheduler timing quantization with bitwise rounding.
 - Optimize Q16 decimal parser with scalar integer accumulation.
+- Drop redundant covariance computations in Kalman filter.
 
 ### Fixed
 

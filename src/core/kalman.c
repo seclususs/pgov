@@ -56,10 +56,11 @@ q16_t pg_kalman_update(struct pg_kalman_state *state, q16_t z_meas,
 	q32_t q_pos_q32 = Q16_TO_Q32(q_pos);
 	q32_t q_vel_q32 = Q16_TO_Q32(state->q_vel);
 
-	q32_t q00 = (q32_mul(q_vel_q32, dt4) / 4) + q32_mul(q_pos_q32, dt_q32);
+	q32_t q_pos_dt = q32_mul(q_pos_q32, dt_q32);
+	q32_t q00 = (q32_mul(q_vel_q32, dt4) / 4) + q_pos_dt;
 	q32_t q01 = q32_mul(q_vel_q32, dt3) / 2;
 	q32_t q10 = q01;
-	q32_t q11 = q32_mul(q_vel_q32, dt2) + q32_mul(q_pos_q32, dt_q32);
+	q32_t q11 = q32_mul(q_vel_q32, dt2) + q_pos_dt;
 
 	q32_t f_p00 = state->p00 + q32_mul(state->p10, dt_q32);
 	q32_t f_p01 = state->p01 + q32_mul(state->p11, dt_q32);
@@ -96,7 +97,7 @@ q16_t pg_kalman_update(struct pg_kalman_state *state, q16_t z_meas,
 	state->q_vel =
 		pg_math_clamp(next_q, FLOAT_TO_Q16(0.01F), INT_TO_Q16(20));
 
-	q16_t s = p00_q16 + state->r_meas;
+	q16_t s = s_pred;
 	q16_t inv_s = (s > 0) ? q16_div(Q16_ONE, s) : 0;
 
 	q16_t k0 = q16_mul(p00_q16, inv_s);
