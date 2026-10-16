@@ -87,11 +87,12 @@ static ALWAYS_INLINE CONST q16_t pg_math_clamp(q16_t val, q16_t min, q16_t max)
 
 static ALWAYS_INLINE uint64_t pg_math_isqrt64(uint64_t val)
 {
-	uint64_t res = 0;
-	uint64_t bit = 1ULL << 62;
+	if (UNLIKELY(val == 0))
+		return 0;
 
-	while (bit > val)
-		bit >>= 2;
+	uint64_t res = 0;
+	int shift = (63 - __builtin_clzll(val)) & ~1;
+	uint64_t bit = 1ULL << shift;
 
 	while (bit != 0) {
 		if (val >= res + bit) {

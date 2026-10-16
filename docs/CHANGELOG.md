@@ -24,6 +24,7 @@
 - Drop dead `r_meas` seed assignment in thermal filter initialization.
 - Decouple transition gating decisions from hardware sysfs actuation
   in governor update loop.
+- Optimize integer square root with CLZ bit positioning.
 
 ### Fixed
 
