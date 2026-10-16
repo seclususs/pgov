@@ -73,7 +73,14 @@ static int walk(int dfd, pg_fs_cb cb, void *ctx, int max_depth, int cur_depth)
 	if (cur_depth > max_depth)
 		return 0;
 
-	while ((nread = syscall(SYS_getdents64, dfd, buf, sizeof(buf))) > 0) {
+	for (;;) {
+		do {
+			nread = syscall(SYS_getdents64, dfd, buf, sizeof(buf));
+		} while (nread < 0 && errno == EINTR);
+
+		if (nread <= 0)
+			break;
+
 		long bpos = 0;
 
 		while (bpos < nread) {

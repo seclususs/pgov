@@ -54,6 +54,7 @@
 - Fix core affinity fallback traversal on offline cores.
 - Fix infinite epoll timeout corruption upon signal EINTR.
 - Suppress governor trigger execution during shutdown.
+- Fix unhandled EINTR interruptions during getdents64 traversals.
 
 ## [v1.0]
 

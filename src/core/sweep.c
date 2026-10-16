@@ -142,7 +142,15 @@ static void sweep_app_data(int root_fd, struct sweep_ctx *sctx)
 	char buf[32768];
 	long nrd;
 
-	while ((nrd = syscall(SYS_getdents64, root_fd, buf, sizeof(buf))) > 0) {
+	for (;;) {
+		do {
+			nrd = syscall(SYS_getdents64, root_fd, buf,
+				      sizeof(buf));
+		} while (nrd < 0 && errno == EINTR);
+
+		if (nrd <= 0)
+			break;
+
 		long bpos = 0;
 
 		while (bpos < nrd) {
