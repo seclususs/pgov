@@ -36,28 +36,36 @@ static inline void epoll_error(struct pg_context *RESTRICT ctx,
 	}
 }
 
+static inline void handle_signal_event(struct pg_context *ctx)
+{
+	struct signalfd_siginfo s_info;
+	ssize_t s;
+
+	do {
+		s = read(ctx->sig_fd, &s_info, sizeof(s_info));
+	} while (s < 0 && errno == EINTR);
+
+	if (s == sizeof(s_info))
+		ctx->shutdown_req = true;
+}
+
+static inline void handle_trigger_event(struct pg_context *ctx)
+{
+	if (LIKELY(ctx->on_trigger != NULL && !ctx->shutdown_req))
+		ctx->on_trigger(ctx);
+}
+
 static inline void epoll_events(struct pg_context *RESTRICT ctx,
 				struct epoll_event *RESTRICT events, int nfds)
 {
 	for (int i = 0; i < nfds; ++i) {
 		int ev_fd = events[i].data.fd;
 
-		if (ev_fd == ctx->sig_fd) {
-			struct signalfd_siginfo s_info;
+		if (ev_fd == ctx->sig_fd)
+			handle_signal_event(ctx);
 
-			ssize_t s;
-			do {
-				s = read(ctx->sig_fd, &s_info, sizeof(s_info));
-			} while (s < 0 && errno == EINTR);
-
-			if (s == sizeof(s_info))
-				ctx->shutdown_req = true;
-
-		} else if (ev_fd == ctx->trg_fd) {
-			if (LIKELY(ctx->on_trigger != NULL &&
-				   !ctx->shutdown_req))
-				ctx->on_trigger(ctx);
-		}
+		else if (ev_fd == ctx->trg_fd)
+			handle_trigger_event(ctx);
 	}
 }
 

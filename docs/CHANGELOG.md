@@ -31,6 +31,9 @@
 - Decompose monolithic `calc_demand` in `gov.c` by extracting
   battery and thermal metrics polling into `poll_battery_metrics`
   and `poll_thermal_metrics` static helpers.
+- Decompose `epoll_events` in `epoll.c` by isolating signalfd draining
+  and governor trigger callback execution into `handle_signal_event`
+  and `handle_trigger_event`.
 
 ### Fixed
 
