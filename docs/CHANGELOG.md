@@ -41,6 +41,7 @@
   duplicate trailing line handling while preserving single-exit cleanup.
 - Split monolithic configuration tuning routine into modular topology
   and subsystem helpers.
+- Consolidate trailing whitespace trimming logic in configuration parser.
 
 ### Fixed
 

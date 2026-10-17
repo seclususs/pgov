@@ -13,6 +13,23 @@
 #define CONF_BUF_SZ 4096
 #define CONF_LINE_SZ 256
 
+static inline void trim_trailing(char *str)
+{
+	char *tmp = str;
+
+	while (*tmp != '\0')
+		tmp++;
+
+	if (tmp > str) {
+		tmp--;
+
+		while (tmp >= str && (*tmp == ' ' || *tmp == '\t')) {
+			*tmp = '\0';
+			tmp--;
+		}
+	}
+}
+
 static int parse_line(char *RESTRICT line, pg_conf_cb cb)
 {
 	char *key = line;
@@ -37,34 +54,12 @@ static int parse_line(char *RESTRICT line, pg_conf_cb cb)
 	while (*key == ' ' || *key == '\t')
 		key++;
 
-	tmp = key;
-	while (*tmp != '\0')
-		tmp++;
-
-	if (tmp > key) {
-		tmp--;
-
-		while (tmp >= key && (*tmp == ' ' || *tmp == '\t')) {
-			*tmp = '\0';
-			tmp--;
-		}
-	}
+	trim_trailing(key);
 
 	while (*val == ' ' || *val == '\t')
 		val++;
 
-	tmp = val;
-	while (*tmp != '\0')
-		tmp++;
-
-	if (tmp > val) {
-		tmp--;
-
-		while (tmp >= val && (*tmp == ' ' || *tmp == '\t')) {
-			*tmp = '\0';
-			tmp--;
-		}
-	}
+	trim_trailing(val);
 
 	if (UNLIKELY(*key == '\0'))
 		return 0;
