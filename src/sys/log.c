@@ -16,6 +16,9 @@
 
 void pg_log_err(const char *tag, const char *fmt, ...)
 {
+	if (UNLIKELY(!tag || !fmt))
+		return;
+
 	static uint64_t credit_ms = LOG_CREDIT_MAX;
 	static uint64_t last_ms;
 	static uint32_t dropped;
@@ -44,11 +47,16 @@ void pg_log_err(const char *tag, const char *fmt, ...)
 	va_list args;
 
 	va_start(args, fmt);
-	(void)vsnprintf(msg, sizeof(msg), fmt, args);
+	int v_len = vsnprintf(msg, sizeof(msg), fmt, args);
 	va_end(args);
 
 	if (dropped != 0) {
-		size_t len = strlen(msg);
+		size_t len = 0;
+		if (v_len > 0) {
+			len = (size_t)v_len;
+			if (len >= sizeof(msg))
+				len = sizeof(msg) - 1;
+		}
 
 		(void)snprintf(msg + len, sizeof(msg) - len,
 			       " (+%u suppressed)", dropped);
