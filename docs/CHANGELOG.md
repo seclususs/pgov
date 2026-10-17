@@ -28,6 +28,9 @@
 - Optimize scheduler timing quantization with bitwise rounding.
 - Optimize Q16 decimal parser with scalar integer accumulation.
 - Drop redundant covariance computations in Kalman filter.
+- Decompose monolithic `calc_demand` in `gov.c` by extracting
+  battery and thermal metrics polling into `poll_battery_metrics`
+  and `poll_thermal_metrics` static helpers.
 
 ### Fixed
 

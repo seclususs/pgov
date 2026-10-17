@@ -126,47 +126,60 @@ static inline bool read_psi(struct pg_context *RESTRICT ctx,
 	return false;
 }
 
+static inline void poll_battery_metrics(struct pg_context *RESTRICT ctx,
+					const struct timespec *RESTRICT now)
+{
+	q16_t elaps_bat = pg_dt_sec(&ctx->last_bat, now);
+	if (elaps_bat < INT_TO_Q16(PG_BAT_CHK_SEC))
+		return;
+
+	pg_sensor_read_bat_cap(&ctx->bat_cap_sensor, &ctx->bat_lvl);
+	pg_sensor_read_bat_temp(&ctx->bat_temp_sensor, &ctx->bat_temp);
+	ctx->last_bat = *now;
+
+	if (UNLIKELY(ctx->trg_fd < 0))
+		arm_trigger(ctx);
+}
+
+static inline void poll_thermal_metrics(struct pg_context *RESTRICT ctx,
+					const struct timespec *RESTRICT now)
+{
+	q16_t elaps_therm = pg_dt_sec(&ctx->last_therm, now);
+	if (elaps_therm < INT_TO_Q16(PG_THERM_CHK_SEC))
+		return;
+
+	q16_t cpu_temp = 0;
+	bool hold = false;
+
+	if (LIKELY(ctx->cpu_temp_sensor.fd >= 0)) {
+		if (pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor, &cpu_temp) ==
+		    0) {
+			ctx->temp_fails = 0;
+		} else if (ctx->temp_fails < PG_TEMP_FAIL_MAX) {
+			ctx->temp_fails++;
+			hold = true;
+		} else {
+			cpu_temp = 0;
+		}
+	}
+
+	if (LIKELY(!hold))
+		ctx->cached_th_scl = pg_thermal_update(&ctx->thermal_state,
+						       cpu_temp, ctx->bat_temp,
+						       &CFG_THERMAL, now);
+
+	ctx->last_therm = *now;
+	ctx->remap_due = true;
+}
+
 static inline void calc_demand(struct pg_context *RESTRICT ctx,
 			       const struct timespec *RESTRICT now,
 			       const struct pg_psi_data *RESTRICT psi,
 			       q16_t *RESTRICT th_scl, q16_t *RESTRICT l_dem,
 			       q16_t *RESTRICT p_eff)
 {
-	q16_t elaps_bat = pg_dt_sec(&ctx->last_bat, now);
-	if (elaps_bat >= INT_TO_Q16(PG_BAT_CHK_SEC)) {
-		pg_sensor_read_bat_cap(&ctx->bat_cap_sensor, &ctx->bat_lvl);
-		pg_sensor_read_bat_temp(&ctx->bat_temp_sensor, &ctx->bat_temp);
-		ctx->last_bat = *now;
-
-		if (UNLIKELY(ctx->trg_fd < 0))
-			arm_trigger(ctx);
-	}
-
-	q16_t elaps_therm = pg_dt_sec(&ctx->last_therm, now);
-	if (elaps_therm >= INT_TO_Q16(PG_THERM_CHK_SEC)) {
-		q16_t cpu_temp = 0;
-		bool hold = false;
-
-		if (LIKELY(ctx->cpu_temp_sensor.fd >= 0)) {
-			if (pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor,
-						    &cpu_temp) == 0) {
-				ctx->temp_fails = 0;
-			} else if (ctx->temp_fails < PG_TEMP_FAIL_MAX) {
-				ctx->temp_fails++;
-				hold = true;
-			} else {
-				cpu_temp = 0;
-			}
-		}
-
-		if (LIKELY(!hold))
-			ctx->cached_th_scl = pg_thermal_update(
-				&ctx->thermal_state, cpu_temp, ctx->bat_temp,
-				&CFG_THERMAL, now);
-
-		ctx->last_therm = *now;
-		ctx->remap_due = true;
-	}
+	poll_battery_metrics(ctx, now);
+	poll_thermal_metrics(ctx, now);
 
 	*th_scl = ctx->cached_th_scl;
 
