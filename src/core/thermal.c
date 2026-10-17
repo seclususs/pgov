@@ -95,8 +95,8 @@ q16_t pg_thermal_update(struct pg_thermal_state *RESTRICT state, q16_t cpu_temp,
 	q16_t fscale = Q16_ONE - q16_div(u_sat, INT_TO_Q16(100));
 
 	if (UNLIKELY(bat_temp >= cfg->limit_bat))
-		return (fscale < FLOAT_TO_Q16(0.2F)) ? fscale :
-						       FLOAT_TO_Q16(0.2F);
+		return pg_math_clamp(fscale, FLOAT_TO_Q16(0.1F),
+				     FLOAT_TO_Q16(0.2F));
 
 	return pg_math_clamp(fscale, FLOAT_TO_Q16(0.1F), Q16_ONE);
 }

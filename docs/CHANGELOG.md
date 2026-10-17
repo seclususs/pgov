@@ -79,6 +79,7 @@
 - Ensure battery level input is clamped within legal bounds in
   CPU integrator.
 - Add input validation and division-by-zero guards in sensor routines.
+- Enforce lower frequency clamp during thermal battery throttling.
 
 ## [v1.0]
 
