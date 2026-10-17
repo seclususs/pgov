@@ -132,6 +132,9 @@ static ALWAYS_INLINE CONST q16_t pg_math_decay(q16_t val, q16_t coeff)
 	if (UNLIKELY(x < 0))
 		return Q16_ONE;
 
+	if (UNLIKELY(x >= INT_TO_Q16(180)))
+		return 0;
+
 	q16_t x2 = q16_mul(x, x);
 	q16_t den = Q16_ONE + x + (x2 >> 1);
 
