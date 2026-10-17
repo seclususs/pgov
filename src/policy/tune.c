@@ -74,78 +74,59 @@ void pg_tune_limits(void)
 		pg_math_clamp(val, FLOAT_TO_Q16(0.6F), FLOAT_TO_Q16(1.2F));
 }
 
-void pg_tune_configs(void)
+static void calc_topo_metrics(q16_t *RESTRICT rat, q16_t *RESTRICT rel,
+			      q16_t *RESTRICT therm)
 {
-	int32_t khz;
+	int32_t cap = 0;
+	int32_t min_c = 0;
+	int32_t max_c = 0;
 	int32_t mhz;
-	int32_t cap;
-	int32_t min_c;
-	int32_t max_c;
-	q16_t rat;
-	q16_t rel;
-	q16_t f_val;
-	q16_t therm;
-	q16_t val;
-	q16_t trip;
-
-	cap = 0;
-	min_c = 0;
-	max_c = 0;
 
 	bool eas = (pg_topo_get_cpu_capacity(&cap, &min_c, &max_c) == 0);
-	khz = pg_topo_get_max_freq_khz();
+	int32_t khz = pg_topo_get_max_freq_khz();
 	int32_t core = pg_topo_get_core_count();
 
 	if (!eas || max_c <= 0 || khz <= 0) {
-		q16_t c;
-		q16_t f;
-		q16_t r_core;
-		q16_t r_frq;
 		mhz = (khz > 0) ? (khz / 1000) : 2000;
 
-		c = INT_TO_Q16((core > 0) ? core : 8);
-		f = INT_TO_Q16(mhz);
+		q16_t c = INT_TO_Q16((core > 0) ? core : 8);
+		q16_t f = INT_TO_Q16(mhz);
 
-		r_core = pg_math_clamp(q16_div(c, INT_TO_Q16(8)), 0, Q16_ONE);
-		r_frq = pg_math_clamp(q16_div(f, INT_TO_Q16(3500)), 0, Q16_ONE);
+		q16_t r_core =
+			pg_math_clamp(q16_div(c, INT_TO_Q16(8)), 0, Q16_ONE);
 
-		rel = q16_mul(r_core, FLOAT_TO_Q16(0.40F)) +
-		      q16_mul(r_frq, FLOAT_TO_Q16(0.60F));
-		rel = pg_math_clamp(rel, 0, Q16_ONE);
+		q16_t r_frq =
+			pg_math_clamp(q16_div(f, INT_TO_Q16(3500)), 0, Q16_ONE);
 
-		rat = (core > 4) ? FLOAT_TO_Q16(0.50F) : Q16_ONE;
+		*rel = q16_mul(r_core, FLOAT_TO_Q16(0.40F)) +
+		       q16_mul(r_frq, FLOAT_TO_Q16(0.60F));
+
+		*rel = pg_math_clamp(*rel, 0, Q16_ONE);
+		*rat = (core > 4) ? FLOAT_TO_Q16(0.50F) : Q16_ONE;
 	} else {
 		mhz = khz / 1000;
 
-		rat = q16_div(INT_TO_Q16(min_c), INT_TO_Q16(max_c));
-		rat = pg_math_clamp(rat, 0, Q16_ONE);
+		*rat = q16_div(INT_TO_Q16(min_c), INT_TO_Q16(max_c));
+		*rat = pg_math_clamp(*rat, 0, Q16_ONE);
 
-		rel = q16_div(INT_TO_Q16(cap), INT_TO_Q16(8192));
-		rel = pg_math_clamp(rel, 0, Q16_ONE);
+		*rel = q16_div(INT_TO_Q16(cap), INT_TO_Q16(8192));
+		*rel = pg_math_clamp(*rel, 0, Q16_ONE);
 	}
 
-	f_val = q16_div(INT_TO_Q16(mhz), INT_TO_Q16(3500));
+	q16_t f_val = q16_div(INT_TO_Q16(mhz), INT_TO_Q16(3500));
 	f_val = pg_math_clamp(f_val, 0, Q16_ONE);
 
-	therm = q16_mul(rel, f_val);
-	therm = pg_math_clamp(therm, 0, Q16_ONE);
+	*therm = q16_mul(*rel, f_val);
+	*therm = pg_math_clamp(*therm, 0, Q16_ONE);
+}
+
+static void tune_cpu_configs(q16_t rel, q16_t rat)
+{
+	q16_t val;
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.50F), FLOAT_TO_Q16(0.20F), rel);
 	CFG_CPU.lat_gran_rat =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.20F), FLOAT_TO_Q16(0.50F));
-
-	trip = pg_sensor_get_trip_temp(FLOAT_TO_Q16(57.5F));
-	val = trip - INT_TO_Q16(5);
-	CFG_THERMAL.limit_cpu =
-		pg_math_clamp(val, FLOAT_TO_Q16(45.0F), FLOAT_TO_Q16(90.0F));
-
-	val = pg_math_lerp(FLOAT_TO_Q16(42.0F), FLOAT_TO_Q16(38.0F), therm);
-	CFG_THERMAL.limit_bat =
-		pg_math_clamp(val, FLOAT_TO_Q16(38.0F), FLOAT_TO_Q16(42.0F));
-
-	val = pg_math_lerp(FLOAT_TO_Q16(0.005F), FLOAT_TO_Q16(0.015F), therm);
-	CFG_THERMAL.ki_base =
-		pg_math_clamp(val, FLOAT_TO_Q16(0.005F), FLOAT_TO_Q16(0.015F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.12F), FLOAT_TO_Q16(0.25F), rat);
 	CFG_CPU.uclamp_k =
@@ -166,6 +147,22 @@ void pg_tune_configs(void)
 	val = pg_math_lerp(FLOAT_TO_Q16(0.40F), FLOAT_TO_Q16(0.90F), rel);
 	CFG_CPU.trans_diff =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.40F), FLOAT_TO_Q16(0.90F));
+}
+
+static void tune_thermal_configs(q16_t therm)
+{
+	q16_t trip = pg_sensor_get_trip_temp(FLOAT_TO_Q16(57.5F));
+	q16_t val = trip - INT_TO_Q16(5);
+	CFG_THERMAL.limit_cpu =
+		pg_math_clamp(val, FLOAT_TO_Q16(45.0F), FLOAT_TO_Q16(90.0F));
+
+	val = pg_math_lerp(FLOAT_TO_Q16(42.0F), FLOAT_TO_Q16(38.0F), therm);
+	CFG_THERMAL.limit_bat =
+		pg_math_clamp(val, FLOAT_TO_Q16(38.0F), FLOAT_TO_Q16(42.0F));
+
+	val = pg_math_lerp(FLOAT_TO_Q16(0.005F), FLOAT_TO_Q16(0.015F), therm);
+	CFG_THERMAL.ki_base =
+		pg_math_clamp(val, FLOAT_TO_Q16(0.005F), FLOAT_TO_Q16(0.015F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.45F), FLOAT_TO_Q16(0.90F), therm);
 	CFG_THERMAL.kp_base =
@@ -174,4 +171,15 @@ void pg_tune_configs(void)
 	val = pg_math_lerp(FLOAT_TO_Q16(0.60F), FLOAT_TO_Q16(1.30F), therm);
 	CFG_THERMAL.kd_base =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.60F), FLOAT_TO_Q16(1.30F));
+}
+
+void pg_tune_configs(void)
+{
+	q16_t rat = 0;
+	q16_t rel = 0;
+	q16_t therm = 0;
+
+	calc_topo_metrics(&rat, &rel, &therm);
+	tune_cpu_configs(rel, rat);
+	tune_thermal_configs(therm);
 }

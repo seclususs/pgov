@@ -39,6 +39,8 @@
 - Modularize `pg_conf_parse` in `conf.c` by extracting buffer refilling
   into `refill_buffer` and line dispatching into `dispatch_line`, removing
   duplicate trailing line handling while preserving single-exit cleanup.
+- Split monolithic configuration tuning routine into modular topology
+  and subsystem helpers.
 
 ### Fixed
 
