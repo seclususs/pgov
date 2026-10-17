@@ -14,10 +14,11 @@ PURE bool pg_cpu_trans(const struct pg_load_state *RESTRICT state,
 void pg_cpu_upd_intg(struct pg_load_state *RESTRICT state, q16_t bat_lvl,
 		     q16_t dt_real, q16_t *RESTRICT i, q16_t *RESTRICT i_dt)
 {
-	q16_t d_bat = INT_TO_Q16(100) - bat_lvl;
-	if (d_bat < 0)
-		d_bat = 0;
+	if (UNLIKELY(!state || !i || !i_dt))
+		return;
 
+	q16_t b_lvl = pg_math_clamp(bat_lvl, 0, INT_TO_Q16(100));
+	q16_t d_bat = INT_TO_Q16(100) - b_lvl;
 	q16_t depl = q16_div(d_bat, INT_TO_Q16(100));
 	q16_t depl2 = q16_mul(depl, depl);
 	q16_t depl3 = q16_mul(depl2, depl);

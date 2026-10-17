@@ -76,6 +76,8 @@
 - Add fail-fast input validation across sysfs, scan, and fs APIs.
 - Fix potential integer overflow in exponential decay calculation
   for large inputs.
+- Ensure battery level input is clamped within legal bounds in
+  CPU integrator.
 
 ## [v1.0]
 
