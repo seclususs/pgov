@@ -34,6 +34,8 @@
 - Decompose `epoll_events` in `epoll.c` by isolating signalfd draining
   and governor trigger callback execution into `handle_signal_event`
   and `handle_trigger_event`.
+- Deduplicate non-whitespace token skipping in `psi.c` via static inline
+  helper `skip_token`, reducing nested parser loops.
 
 ### Fixed
 

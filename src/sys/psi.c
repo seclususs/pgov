@@ -104,6 +104,14 @@ static inline int buffer_cmp(const uint8_t *RESTRICT buf,
 	return 0;
 }
 
+static inline size_t skip_token(const uint8_t *buf, size_t len, size_t pos)
+{
+	while (pos < len && buf[pos] != ' ' && buf[pos] != '\n')
+		pos++;
+
+	return pos;
+}
+
 static inline size_t parse(const uint8_t *RESTRICT buf, size_t len, size_t pos,
 			   bool first_run, struct pg_psi_trend *RESTRICT trend,
 			   uint64_t *RESTRICT cur_tot)
@@ -116,11 +124,7 @@ static inline size_t parse(const uint8_t *RESTRICT buf, size_t len, size_t pos,
 
 		if (pos + 6 <= len && buffer_cmp(&buf[pos], "avg10=", 6) == 0) {
 			if (LIKELY(!first_run)) {
-				pos += 6;
-				while (pos < len && buf[pos] != ' ' &&
-				       buf[pos] != '\n')
-					pos++;
-
+				pos = skip_token(buf, len, pos + 6);
 				continue;
 			}
 
@@ -150,8 +154,7 @@ static inline size_t parse(const uint8_t *RESTRICT buf, size_t len, size_t pos,
 			continue;
 		}
 
-		while (pos < len && buf[pos] != ' ' && buf[pos] != '\n')
-			pos++;
+		pos = skip_token(buf, len, pos);
 	}
 
 	return pos;
