@@ -21,8 +21,16 @@
 void pg_sensor_init_cpu_temp(struct pg_temp_sensor *RESTRICT sensor,
 			     const char *RESTRICT path)
 {
-	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (UNLIKELY(!sensor))
+		return;
+
+	sensor->fd = -1;
 	sensor->scale = SCALE_MILLI;
+
+	if (UNLIKELY(!path || path[0] == '\0'))
+		return;
+
+	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (sensor->fd < 0)
 		LOGW("sensor: failed to open node %s err=%d", path, errno);
 }
@@ -30,14 +38,25 @@ void pg_sensor_init_cpu_temp(struct pg_temp_sensor *RESTRICT sensor,
 void pg_sensor_init_bat_temp(struct pg_temp_sensor *RESTRICT sensor,
 			     const char *RESTRICT path)
 {
-	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (UNLIKELY(!sensor))
+		return;
+
+	sensor->fd = -1;
 	sensor->scale = SCALE_DECI;
+
+	if (UNLIKELY(!path || path[0] == '\0'))
+		return;
+
+	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (sensor->fd < 0)
 		LOGW("sensor: failed to open node %s err=%d", path, errno);
 }
 
 void pg_sensor_temp_close(struct pg_temp_sensor *sensor)
 {
+	if (UNLIKELY(!sensor))
+		return;
+
 	if (sensor->fd >= 0) {
 		close(sensor->fd);
 		sensor->fd = -1;
@@ -47,6 +66,14 @@ void pg_sensor_temp_close(struct pg_temp_sensor *sensor)
 void pg_sensor_init_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 			    const char *RESTRICT path)
 {
+	if (UNLIKELY(!sensor))
+		return;
+
+	sensor->fd = -1;
+
+	if (UNLIKELY(!path || path[0] == '\0'))
+		return;
+
 	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (sensor->fd < 0)
 		LOGW("sensor: failed to open node %s err=%d", path, errno);
@@ -54,6 +81,9 @@ void pg_sensor_init_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 
 void pg_sensor_bat_close(struct pg_bat_sensor *sensor)
 {
+	if (UNLIKELY(!sensor))
+		return;
+
 	if (sensor->fd >= 0) {
 		close(sensor->fd);
 		sensor->fd = -1;
@@ -63,6 +93,9 @@ void pg_sensor_bat_close(struct pg_bat_sensor *sensor)
 void pg_sensor_init_bl(struct pg_bl_sensor *RESTRICT sensor,
 		       const char *RESTRICT path)
 {
+	if (UNLIKELY(!sensor || !path || path[0] == '\0'))
+		return;
+
 	if (sensor->n >= PG_BL_MAX)
 		return;
 
@@ -77,6 +110,9 @@ void pg_sensor_init_bl(struct pg_bl_sensor *RESTRICT sensor,
 
 void pg_sensor_bl_close(struct pg_bl_sensor *sensor)
 {
+	if (UNLIKELY(!sensor))
+		return;
+
 	for (uint8_t i = 0; i < sensor->n; i++) {
 		if (sensor->fd[i] >= 0) {
 			close(sensor->fd[i]);
@@ -91,6 +127,9 @@ static inline int read_temp(struct pg_temp_sensor *RESTRICT sensor,
 			    q16_t *RESTRICT temp, q16_t fallback)
 {
 	ssize_t sz;
+
+	if (UNLIKELY(!sensor || !temp))
+		return -EINVAL;
 
 	if (sensor->fd < 0) {
 		*temp = fallback;
@@ -109,6 +148,11 @@ static inline int read_temp(struct pg_temp_sensor *RESTRICT sensor,
 	bool valid;
 	int32_t val = pg_parse_i32(sensor->buf, (size_t)sz, &valid);
 	if (!valid) {
+		*temp = fallback;
+		return -EINVAL;
+	}
+
+	if (UNLIKELY(sensor->scale <= 0)) {
 		*temp = fallback;
 		return -EINVAL;
 	}
@@ -133,6 +177,9 @@ int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 			   q16_t *RESTRICT cap)
 {
 	ssize_t sz;
+
+	if (UNLIKELY(!sensor || !cap))
+		return -EINVAL;
 
 	if (sensor->fd < 0) {
 		*cap = FALLBACK_BAT_CAP;
@@ -162,6 +209,9 @@ int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 int pg_sensor_read_bl(struct pg_bl_sensor *RESTRICT sensor,
 		      int32_t *RESTRICT brightness)
 {
+	if (UNLIKELY(!sensor || !brightness))
+		return -EINVAL;
+
 	if (sensor->n == 0) {
 		*brightness = FALLBACK_BL;
 		return -EBADF;

@@ -78,6 +78,7 @@
   for large inputs.
 - Ensure battery level input is clamped within legal bounds in
   CPU integrator.
+- Add input validation and division-by-zero guards in sensor routines.
 
 ## [v1.0]
 
