@@ -72,6 +72,26 @@ static int parse_line(char *RESTRICT line, pg_conf_cb cb)
 	return cb(key, val);
 }
 
+static inline ssize_t refill_buffer(int fd, char *buf, size_t size)
+{
+	ssize_t sz;
+
+	do {
+		sz = read(fd, buf, size);
+	} while (sz < 0 && errno == EINTR);
+
+	return sz;
+}
+
+static inline int dispatch_line(char *line, size_t len, pg_conf_cb cb)
+{
+	if (len == 0)
+		return 0;
+
+	line[len] = '\0';
+	return parse_line(line, cb);
+}
+
 int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 {
 	char buf[CONF_BUF_SZ];
@@ -92,10 +112,7 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 
 	for (;;) {
 		if (i >= (size_t)sz) {
-			do {
-				sz = read(fd, buf, sizeof(buf));
-			} while (sz < 0 && errno == EINTR);
-
+			sz = refill_buffer(fd, buf, sizeof(buf));
 			if (sz <= 0)
 				break;
 			i = 0;
@@ -110,14 +127,11 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 				continue;
 			}
 
-			if (l_pos > 0) {
-				line[l_pos] = '\0';
-				ret = parse_line(line, cb);
-				if (ret < 0)
-					goto out;
-			}
-
+			ret = dispatch_line(line, l_pos, cb);
 			l_pos = 0;
+			if (ret < 0)
+				goto out;
+
 			continue;
 		}
 
@@ -137,10 +151,8 @@ int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
 		goto out;
 	}
 
-	if (l_pos > 0 && !skip) {
-		line[l_pos] = '\0';
-		ret = parse_line(line, cb);
-	}
+	if (!skip)
+		ret = dispatch_line(line, l_pos, cb);
 
 out:
 	close(fd);

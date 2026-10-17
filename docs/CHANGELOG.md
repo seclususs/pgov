@@ -36,6 +36,9 @@
   and `handle_trigger_event`.
 - Deduplicate non-whitespace token skipping in `psi.c` via static inline
   helper `skip_token`, reducing nested parser loops.
+- Modularize `pg_conf_parse` in `conf.c` by extracting buffer refilling
+  into `refill_buffer` and line dispatching into `dispatch_line`, removing
+  duplicate trailing line handling while preserving single-exit cleanup.
 
 ### Fixed
 
