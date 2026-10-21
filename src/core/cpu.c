@@ -89,7 +89,8 @@ static inline q16_t calc_c_final(q16_t k_fin, q16_t vel, q16_t i_dt,
 void pg_cpu_upd_eff(struct pg_cpu_eff *RESTRICT eff, q16_t bat_lvl,
 		    q16_t th_scl, q16_t avg300)
 {
-	q16_t bat_fact = q16_div(bat_lvl, INT_TO_Q16(100));
+	q16_t b_lvl = pg_math_clamp(bat_lvl, 0, INT_TO_Q16(100));
+	q16_t bat_fact = q16_div(b_lvl, INT_TO_Q16(100));
 	q16_t health = q16_mul(bat_fact, th_scl);
 
 	eff->resp_gain = q16_mul(FLOAT_TO_Q16(31.0F), health);

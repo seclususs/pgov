@@ -43,8 +43,8 @@
   and subsystem helpers.
 - Consolidate trailing whitespace trimming logic in configuration parser.
 - Add fail-fast input validation across sysfs, scan, and fs APIs.
-- Ensure battery level input is clamped within legal bounds in
-  CPU integrator.
+- Ensure battery level input is clamped within legal bounds across
+  CPU calculations.
 - Add input validation, range checks, and division-by-zero guards
   in sensor routines.
 
