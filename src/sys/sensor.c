@@ -197,7 +197,7 @@ int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
 
 	bool valid;
 	int32_t val = pg_parse_i32(sensor->buf, (size_t)sz, &valid);
-	if (UNLIKELY(!valid)) {
+	if (UNLIKELY(!valid || val < 0 || val > 100)) {
 		*cap = FALLBACK_BAT_CAP;
 		return -EINVAL;
 	}

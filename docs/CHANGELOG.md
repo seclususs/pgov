@@ -45,7 +45,8 @@
 - Add fail-fast input validation across sysfs, scan, and fs APIs.
 - Ensure battery level input is clamped within legal bounds in
   CPU integrator.
-- Add input validation and division-by-zero guards in sensor routines.
+- Add input validation, range checks, and division-by-zero guards
+  in sensor routines.
 
 ### Fixed
 
