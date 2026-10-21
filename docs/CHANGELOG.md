@@ -42,7 +42,8 @@
 - Split monolithic configuration tuning routine into modular topology
   and subsystem helpers.
 - Consolidate trailing whitespace trimming logic in configuration parser.
-- Add fail-fast input validation across sysfs, scan, and fs APIs.
+- Add fail-fast input validation across CPU core, sysfs, scan,
+  and fs APIs.
 - Ensure battery level input is clamped within legal bounds across
   CPU calculations.
 - Add input validation, range checks, and division-by-zero guards
