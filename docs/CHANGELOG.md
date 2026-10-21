@@ -81,6 +81,8 @@
 - Fix potential integer overflow in exponential decay calculation
   for large inputs.
 - Enforce lower frequency clamp during thermal battery throttling.
+- Fix unclamped pressure ratio in CPU WALT calculation to prevent
+  bound violations during pressure spikes.
 
 ## [v1.0]
 

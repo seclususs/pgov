@@ -254,7 +254,7 @@ PURE q16_t pg_cpu_calc_migration(q16_t vel, q16_t p_eff,
 
 PURE q16_t pg_cpu_calc_walt(q16_t press, const struct pg_cpu_lim *lim)
 {
-	q16_t rat = q16_div(press, INT_TO_Q16(100));
+	q16_t rat = pg_math_clamp(q16_div(press, INT_TO_Q16(100)), 0, Q16_ONE);
 	q16_t crv = q16_mul(rat, rat);
 	q16_t rng = lim->max_walt - lim->min_walt;
 	q16_t val = lim->min_walt + q16_mul(rng, crv);
