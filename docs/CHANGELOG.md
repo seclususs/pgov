@@ -42,6 +42,10 @@
 - Split monolithic configuration tuning routine into modular topology
   and subsystem helpers.
 - Consolidate trailing whitespace trimming logic in configuration parser.
+- Add fail-fast input validation across sysfs, scan, and fs APIs.
+- Ensure battery level input is clamped within legal bounds in
+  CPU integrator.
+- Add input validation and division-by-zero guards in sensor routines.
 
 ### Fixed
 
@@ -73,12 +77,8 @@
 - Fix infinite epoll timeout corruption upon signal EINTR.
 - Suppress governor trigger execution during shutdown.
 - Fix unhandled EINTR interruptions during getdents64 traversals.
-- Add fail-fast input validation across sysfs, scan, and fs APIs.
 - Fix potential integer overflow in exponential decay calculation
   for large inputs.
-- Ensure battery level input is clamped within legal bounds in
-  CPU integrator.
-- Add input validation and division-by-zero guards in sensor routines.
 - Enforce lower frequency clamp during thermal battery throttling.
 
 ## [v1.0]
