@@ -12,6 +12,10 @@
 int pg_psi_open_trg(const char *path, int32_t threshold_us, int32_t window_us)
 {
 	int err;
+
+	if (UNLIKELY(!path))
+		return -EINVAL;
+
 	int fd = open(path, O_RDWR | O_CLOEXEC | O_NONBLOCK);
 	if (fd < 0) {
 		err = errno;
@@ -60,6 +64,9 @@ void pg_psi_close_trg(int fd)
 
 int pg_psi_recov(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path)
 {
+	if (UNLIKELY(!mon || !path))
+		return -EINVAL;
+
 	if (mon->fd >= 0) {
 		close(mon->fd);
 		mon->fd = -1;
@@ -76,6 +83,9 @@ int pg_psi_recov(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path)
 
 void pg_psi_init(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path)
 {
+	if (UNLIKELY(!mon || !path))
+		return;
+
 	mon->fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (mon->fd < 0)
 		LOGE("psi: failed to open node %s", path);
@@ -88,6 +98,9 @@ void pg_psi_init(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path)
 
 void pg_psi_cleanup(struct pg_psi_monitor *mon)
 {
+	if (UNLIKELY(!mon))
+		return;
+
 	if (mon->fd >= 0) {
 		close(mon->fd);
 		mon->fd = -1;
@@ -181,7 +194,10 @@ static inline void calc_kalman(struct pg_psi_monitor *RESTRICT mon,
 				dt_us = 1;
 
 			uint64_t raw_u64 = (delta * 100ULL << 16) / dt_us;
-			r_some = (q16_t)raw_u64;
+			if (raw_u64 > (uint64_t)INT_TO_Q16(500))
+				r_some = INT_TO_Q16(500);
+			else
+				r_some = (q16_t)raw_u64;
 		}
 
 		trend->cur = pg_kalman_update(&mon->filter, r_some, dt_sec);
@@ -194,6 +210,9 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT mon,
 		struct pg_psi_data *RESTRICT data,
 		const struct timespec *RESTRICT now)
 {
+	if (UNLIKELY(!mon || !data || !now))
+		return -EINVAL;
+
 	if (mon->fd < 0) {
 		LOGE("psi: invalid fd for read");
 		return -EBADF;
@@ -255,6 +274,9 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT mon,
 
 int pg_psi_read_raw(const char *RESTRICT path, q16_t *RESTRICT avg10)
 {
+	if (UNLIKELY(!path || !avg10))
+		return -EINVAL;
+
 	int fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0)
 		return -errno;

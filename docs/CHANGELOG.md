@@ -42,7 +42,7 @@
 - Split monolithic configuration tuning routine into modular topology
   and subsystem helpers.
 - Consolidate trailing whitespace trimming logic in configuration parser.
-- Add fail-fast input validation across CPU core, sysfs, scan,
+- Add fail-fast input validation across CPU core, PSI, sysfs, scan,
   and fs APIs.
 - Ensure battery level input is clamped within legal bounds across
   CPU calculations.
@@ -84,6 +84,7 @@
 - Enforce lower frequency clamp during thermal battery throttling.
 - Fix unclamped pressure ratio in CPU WALT calculation to prevent
   bound violations during pressure spikes.
+- Fix potential integer overflow in PSI total delta calculation.
 
 ## [v1.0]
 
