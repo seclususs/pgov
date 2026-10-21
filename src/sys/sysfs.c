@@ -59,6 +59,9 @@ int pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
 
 void pg_sysfs_restore(struct pg_sysfs_cache *cache)
 {
+	if (UNLIKELY(!cache))
+		return;
+
 	if (!cache->active || !cache->has_base || cache->last == UINT64_MAX ||
 	    cache->last == cache->base)
 		return;
@@ -69,6 +72,9 @@ void pg_sysfs_restore(struct pg_sysfs_cache *cache)
 
 void pg_sysfs_cache_cleanup(struct pg_sysfs_cache *cache)
 {
+	if (UNLIKELY(!cache))
+		return;
+
 	if (cache->fd >= 0) {
 		close(cache->fd);
 		cache->fd = -1;
@@ -228,6 +234,9 @@ static inline bool relative(uint64_t cur, uint64_t tgt, uint64_t tol)
 void pg_sysfs_update(struct pg_sysfs_cache *RESTRICT cache, uint64_t value,
 		     bool force, const struct pg_sysfs_chk *RESTRICT strat)
 {
+	if (UNLIKELY(!cache))
+		return;
+
 	if (!cache->active)
 		return;
 
@@ -236,6 +245,9 @@ void pg_sysfs_update(struct pg_sysfs_cache *RESTRICT cache, uint64_t value,
 	if (force) {
 		update = true;
 	} else {
+		if (UNLIKELY(!strat))
+			return;
+
 		switch (strat->type) {
 		case PG_CHK_ABS:
 			update = absolute(cache->last, value, strat->thresh);
