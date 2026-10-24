@@ -105,6 +105,18 @@ static bool type_valid(const char *name)
 
 	buf[bytes] = '\0';
 
+	for (ssize_t i = 0; i < bytes; ++i) {
+		if (buf[i] == '\n' || buf[i] == '\r') {
+			buf[i] = '\0';
+			break;
+		}
+	}
+
+	for (size_t i = 0; i < ARRAY_SIZE(PRIORITY); ++i) {
+		if (strcmp(buf, PRIORITY[i]) == 0)
+			return true;
+	}
+
 	return thermal_valid(buf);
 }
 
