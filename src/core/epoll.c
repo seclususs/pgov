@@ -71,6 +71,9 @@ static inline void epoll_events(struct pg_context *RESTRICT ctx,
 
 int pg_epoll_add_trg(struct pg_context *ctx)
 {
+	if (UNLIKELY(!ctx))
+		return -EINVAL;
+
 	if (ctx->trg_fd < 0 || ctx->epoll_fd < 0)
 		return -EBADF;
 
@@ -86,6 +89,9 @@ int pg_epoll_add_trg(struct pg_context *ctx)
 
 void pg_epoll_rm_trg(struct pg_context *ctx)
 {
+	if (UNLIKELY(!ctx))
+		return;
+
 	if (ctx->trg_fd >= 0 && ctx->epoll_fd >= 0)
 		epoll_ctl(ctx->epoll_fd, EPOLL_CTL_DEL, ctx->trg_fd, NULL);
 }
@@ -93,6 +99,9 @@ void pg_epoll_rm_trg(struct pg_context *ctx)
 int pg_epoll_run(struct pg_context *ctx)
 {
 	int ret = 0;
+
+	if (UNLIKELY(!ctx))
+		return -EINVAL;
 
 	ctx->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
 	if (ctx->epoll_fd < 0)

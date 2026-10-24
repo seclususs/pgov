@@ -27,6 +27,9 @@ static const struct pg_sysfs_chk CHK_UCL = { PG_CHK_ABS, PG_CHK_UCL };
 
 int pg_gov_init(struct pg_context *ctx)
 {
+	if (UNLIKELY(!ctx))
+		return -EINVAL;
+
 	clock_gettime(CLOCK_MONOTONIC, &ctx->last_tick);
 	return 0;
 }
@@ -340,6 +343,9 @@ static void dormant_tick(struct pg_context *ctx)
 
 void pg_gov_process(struct pg_context *ctx)
 {
+	if (UNLIKELY(!ctx))
+		return;
+
 	if (UNLIKELY(ctx->dormant)) {
 		dormant_tick(ctx);
 		return;

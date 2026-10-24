@@ -43,7 +43,7 @@
   and subsystem helpers.
 - Consolidate trailing whitespace trimming logic in configuration parser.
 - Add fail-fast input validation across CPU core, PSI, sysfs, scan,
-  and fs APIs.
+  fs, epoll, and gov APIs.
 - Ensure battery level input is clamped within legal bounds across
   CPU calculations.
 - Add input validation, range checks, and division-by-zero guards
