@@ -157,7 +157,15 @@ static inline int read_temp(struct pg_temp_sensor *RESTRICT sensor,
 		return -EINVAL;
 	}
 
-	*temp = (q16_t)(((q32_t)val * Q16_ONE) / sensor->scale);
+	q32_t raw_q32 = ((q32_t)val * Q16_ONE) / sensor->scale;
+
+	if (UNLIKELY(raw_q32 < (q32_t)INT_TO_Q16(-30) ||
+		     raw_q32 > (q32_t)INT_TO_Q16(150))) {
+		*temp = fallback;
+		return -ERANGE;
+	}
+
+	*temp = (q16_t)raw_q32;
 	return 0;
 }
 
