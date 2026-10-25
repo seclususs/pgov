@@ -52,6 +52,8 @@
   eliminate response lag while preserving relaxation hysteresis.
 - Deduplicate thermal trip point node path formatting in scan module
   via static inline helper.
+- Deduplicate heuristic topology capacity calculation across limit
+  and config tuning routines.
 
 ### Fixed
 

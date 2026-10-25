@@ -6,36 +6,30 @@
 #include "topo.h"
 #include "sensor.h"
 
+static inline q16_t calc_heuristic_cap(int32_t core, int32_t mhz)
+{
+	q16_t c_val = INT_TO_Q16((core > 0) ? core : 8);
+	q16_t f_val = INT_TO_Q16((mhz > 0) ? mhz : 2000);
+
+	q16_t r_core = pg_math_clamp(q16_div(c_val, INT_TO_Q16(8)), 0, Q16_ONE);
+	q16_t r_freq =
+		pg_math_clamp(q16_div(f_val, INT_TO_Q16(3500)), 0, Q16_ONE);
+
+	q16_t cap = q16_mul(r_core, FLOAT_TO_Q16(0.40F)) +
+		    q16_mul(r_freq, FLOAT_TO_Q16(0.60F));
+
+	return pg_math_clamp(cap, 0, Q16_ONE);
+}
+
 void pg_tune_limits(void)
 {
-	int32_t core;
-	int32_t freq_khz;
-	int32_t freq_mhz;
-	q16_t c_val;
-	q16_t f_val;
-	q16_t r_core;
-	q16_t r_freq;
-	q16_t w_core;
-	q16_t w_freq;
-	q16_t cap;
-	q16_t val;
-
-	core = pg_topo_get_core_count();
-	freq_khz = pg_topo_get_max_freq_khz();
+	int32_t core = pg_topo_get_core_count();
+	int32_t freq_khz = pg_topo_get_max_freq_khz();
 	if (core <= 0 || freq_khz <= 0)
 		return;
 
-	freq_mhz = freq_khz / 1000;
-	c_val = INT_TO_Q16(core);
-	f_val = INT_TO_Q16(freq_mhz);
-
-	r_core = pg_math_clamp(q16_div(c_val, INT_TO_Q16(8)), 0, Q16_ONE);
-	r_freq = pg_math_clamp(q16_div(f_val, INT_TO_Q16(3500)), 0, Q16_ONE);
-	w_core = FLOAT_TO_Q16(0.40F);
-	w_freq = FLOAT_TO_Q16(0.60F);
-
-	cap = q16_mul(r_core, w_core) + q16_mul(r_freq, w_freq);
-	cap = pg_math_clamp(cap, 0, Q16_ONE);
+	q16_t cap = calc_heuristic_cap(core, freq_khz / 1000);
+	q16_t val;
 
 	val = pg_math_lerp(FLOAT_TO_Q16(384.0F), FLOAT_TO_Q16(1024.0F), cap);
 	LIM_CPU.max_ucl =
@@ -88,20 +82,7 @@ static void calc_topo_metrics(q16_t *RESTRICT rat, q16_t *RESTRICT rel,
 
 	if (!eas || max_c <= 0 || khz <= 0) {
 		mhz = (khz > 0) ? (khz / 1000) : 2000;
-
-		q16_t c = INT_TO_Q16((core > 0) ? core : 8);
-		q16_t f = INT_TO_Q16(mhz);
-
-		q16_t r_core =
-			pg_math_clamp(q16_div(c, INT_TO_Q16(8)), 0, Q16_ONE);
-
-		q16_t r_frq =
-			pg_math_clamp(q16_div(f, INT_TO_Q16(3500)), 0, Q16_ONE);
-
-		*rel = q16_mul(r_core, FLOAT_TO_Q16(0.40F)) +
-		       q16_mul(r_frq, FLOAT_TO_Q16(0.60F));
-
-		*rel = pg_math_clamp(*rel, 0, Q16_ONE);
+		*rel = calc_heuristic_cap(core, mhz);
 		*rat = (core > 4) ? FLOAT_TO_Q16(0.50F) : Q16_ONE;
 	} else {
 		mhz = khz / 1000;
