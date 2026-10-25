@@ -48,6 +48,8 @@
   CPU calculations.
 - Add input validation, range checks, and division-by-zero guards
   in sensor routines.
+- Enable immediate polling interval downscaling on workload surges to
+  eliminate response lag while preserving relaxation hysteresis.
 
 ### Fixed
 

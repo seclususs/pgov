@@ -7,6 +7,9 @@
 
 void pg_poll_init(struct pg_poll_state *RESTRICT state)
 {
+	if (UNLIKELY(!state))
+		return;
+
 	state->cur_ivl = PG_MIN_POLL_MS;
 	state->last_wait = PG_MIN_POLL_MS;
 	clock_gettime(CLOCK_MONOTONIC, &state->last_tick);
@@ -77,10 +80,16 @@ static inline uint64_t jitter(struct pg_poll_state *state, uint64_t ivl,
 uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
 			   q16_t avg300, q16_t press_vel)
 {
+	if (UNLIKELY(!state))
+		return PG_MIN_POLL_MS;
+
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
 	q16_t elapsed = pg_dt_sec(&state->last_tick, &now);
+	if (UNLIKELY(elapsed < 0))
+		elapsed = 0;
+
 	uint64_t ms = (uint64_t)((((q32_t)elapsed) * 1000) >> Q16_SHIFT);
 	if (UNLIKELY(ms > ((uint64_t)state->last_wait + 200))) {
 		state->last_tick = now;
@@ -109,7 +118,7 @@ uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
 	uint64_t diff = (nxt_ivl > state->cur_ivl) ?
 				(nxt_ivl - state->cur_ivl) :
 				(state->cur_ivl - nxt_ivl);
-	if (diff >= 200)
+	if (nxt_ivl < state->cur_ivl || diff >= 200)
 		state->cur_ivl = (uint32_t)nxt_ivl;
 
 	uint64_t wait =
