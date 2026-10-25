@@ -54,6 +54,8 @@
   via static inline helper.
 - Deduplicate heuristic topology capacity calculation across limit
   and config tuning routines.
+- Decompose epoll reactor by extracting descriptor setup and reusing
+  trigger registration helper.
 
 ### Fixed
 
