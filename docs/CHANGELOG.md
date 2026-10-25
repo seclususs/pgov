@@ -50,6 +50,8 @@
   in sensor routines.
 - Enable immediate polling interval downscaling on workload surges to
   eliminate response lag while preserving relaxation hysteresis.
+- Deduplicate thermal trip point node path formatting in scan module
+  via static inline helper.
 
 ### Fixed
 

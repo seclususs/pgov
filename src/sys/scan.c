@@ -253,6 +253,28 @@ int pg_scan_backlight(char (*paths)[PG_BL_PATH_LEN], size_t max)
 	return (int)n;
 }
 
+static inline void format_trip_node(char *RESTRICT buf, size_t i,
+				    const char *RESTRICT suffix)
+{
+	const char prefix[] = "trip_point_";
+	size_t p = 0;
+
+	while (prefix[p] != '\0') {
+		buf[p] = prefix[p];
+		p++;
+	}
+
+	buf[p++] = (char)('0' + i);
+	buf[p++] = '_';
+
+	size_t s = 0;
+	while (suffix[s] != '\0') {
+		buf[p++] = suffix[s++];
+	}
+
+	buf[p] = '\0';
+}
+
 static int trip_point(const char *name, char *path, size_t len)
 {
 	char type[256];
@@ -261,25 +283,7 @@ static int trip_point(const char *name, char *path, size_t len)
 	char temp[32];
 
 	for (size_t i = 0; i <= 9; ++i) {
-		file[0] = 't';
-		file[1] = 'r';
-		file[2] = 'i';
-		file[3] = 'p';
-		file[4] = '_';
-		file[5] = 'p';
-		file[6] = 'o';
-		file[7] = 'i';
-		file[8] = 'n';
-		file[9] = 't';
-		file[10] = '_';
-		file[11] = (char)('0' + i);
-		file[12] = '_';
-		file[13] = 't';
-		file[14] = 'y';
-		file[15] = 'p';
-		file[16] = 'e';
-		file[17] = '\0';
-
+		format_trip_node(file, i, "type");
 		pg_str_build_path(type, sizeof(type), PG_PATH_THERMAL_BASE,
 				  name, file);
 
@@ -301,25 +305,7 @@ static int trip_point(const char *name, char *path, size_t len)
 
 		if (pg_str_contains(buf, "passive") ||
 		    pg_str_contains(buf, "critical")) {
-			temp[0] = 't';
-			temp[1] = 'r';
-			temp[2] = 'i';
-			temp[3] = 'p';
-			temp[4] = '_';
-			temp[5] = 'p';
-			temp[6] = 'o';
-			temp[7] = 'i';
-			temp[8] = 'n';
-			temp[9] = 't';
-			temp[10] = '_';
-			temp[11] = (char)('0' + i);
-			temp[12] = '_';
-			temp[13] = 't';
-			temp[14] = 'e';
-			temp[15] = 'm';
-			temp[16] = 'p';
-			temp[17] = '\0';
-
+			format_trip_node(temp, i, "temp");
 			pg_str_build_path(path, len, PG_PATH_THERMAL_BASE, name,
 					  temp);
 			return 0;
