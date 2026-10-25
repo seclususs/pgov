@@ -220,6 +220,34 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	return 0;
 }
 
+static void cleanup_context(struct pg_context *ctx)
+{
+	restore_all(ctx);
+
+#ifdef NDK_BUILD
+	pg_opt_exit();
+#endif // NDK_BUILD
+
+	if (ctx->trg_fd >= 0)
+		pg_psi_close_trg(ctx->trg_fd);
+
+	if (ctx->sig_fd >= 0)
+		pg_signal_close(ctx->sig_fd);
+
+	pg_lockfile_close(ctx->lock_fd);
+	pg_psi_cleanup(&ctx->psi);
+	pg_sensor_temp_close(&ctx->cpu_temp_sensor);
+	pg_sensor_temp_close(&ctx->bat_temp_sensor);
+	pg_sensor_bat_close(&ctx->bat_cap_sensor);
+	pg_sensor_bl_close(&ctx->bl_sensor);
+	pg_sysfs_cache_cleanup(&ctx->sched_lat);
+	pg_sysfs_cache_cleanup(&ctx->sched_gran);
+	pg_sysfs_cache_cleanup(&ctx->sched_wake);
+	pg_sysfs_cache_cleanup(&ctx->sched_mig);
+	pg_sysfs_cache_cleanup(&ctx->sched_walt);
+	pg_sysfs_cache_cleanup(&ctx->sched_ucl);
+}
+
 int pg_daemon_init(void)
 {
 	int ret = 0;
@@ -293,30 +321,6 @@ int pg_daemon_init(void)
 	LOGI("daemon: reactor shutdown cleanly status=%d", ret);
 
 cleanup:
-	restore_all(&context);
-
-#ifdef NDK_BUILD
-	pg_opt_exit();
-#endif // NDK_BUILD
-
-	if (context.trg_fd >= 0)
-		pg_psi_close_trg(context.trg_fd);
-
-	if (context.sig_fd >= 0)
-		pg_signal_close(context.sig_fd);
-
-	pg_lockfile_close(context.lock_fd);
-	pg_psi_cleanup(&context.psi);
-	pg_sensor_temp_close(&context.cpu_temp_sensor);
-	pg_sensor_temp_close(&context.bat_temp_sensor);
-	pg_sensor_bat_close(&context.bat_cap_sensor);
-	pg_sensor_bl_close(&context.bl_sensor);
-	pg_sysfs_cache_cleanup(&context.sched_lat);
-	pg_sysfs_cache_cleanup(&context.sched_gran);
-	pg_sysfs_cache_cleanup(&context.sched_wake);
-	pg_sysfs_cache_cleanup(&context.sched_mig);
-	pg_sysfs_cache_cleanup(&context.sched_walt);
-	pg_sysfs_cache_cleanup(&context.sched_ucl);
-
+	cleanup_context(&context);
 	return ret;
 }

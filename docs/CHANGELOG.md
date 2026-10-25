@@ -56,6 +56,8 @@
   and config tuning routines.
 - Decompose epoll reactor by extracting descriptor setup and reusing
   trigger registration helper.
+- Extract context teardown and sensor cleanup into dedicated helper
+  in daemon bootstrap.
 
 ### Fixed
 
