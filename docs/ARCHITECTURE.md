@@ -52,7 +52,6 @@ sample turns into six sysfs writes on a given tick.
 16. [Calibrating for the device it's running on](#calibrating-for-the-device-its-running-on)
 17. [The optional config file](#the-optional-config-file)
 18. [Shutting down](#shutting-down)
-19. [Closing notes](#closing-notes)
 
 ## Source layout
 
@@ -254,8 +253,8 @@ touches `sscanf`/`snprintf`.
 
 ## Runtime state
 
-I keep exactly four mutable globals, on purpose - I'd rather have all of
-them visible in one place than scattered:
+A few mutable global structures are retained intentionally in
+centralized locations:
 
 - `static struct pg_context context;` in `daemon.c` - the entire runtime
   state.
@@ -269,8 +268,9 @@ them visible in one place than scattered:
 
 `struct pg_context` (`pg/state.h`), `ALIGNED(64)`, is where everything
 else lives: the PSI monitor, four sensor handles (CPU temp, battery
-temp, battery capacity, backlight - each with its own fd and a small
-read buffer), six `pg_sysfs_cache` entries, thermal-loop state,
+temp, battery capacity, backlight - with CPU and battery using dedicated
+single descriptors, while backlight maintains an array of up to `PG_BL_MAX`
+fds for multi-panel displays), six `pg_sysfs_cache` entries, thermal-loop state,
 load-demand state, poll state, the display-state enum, cached battery
 level/temp and thermal scale, timestamps, four file descriptors,
 `next_wake` - a bare `int` alongside them holding the poll timeout in
@@ -425,16 +425,14 @@ vendors, so I don't hardcode paths - `sys/scan.c` discovers them:
   that accepts anything containing `cpu`, `soc`, `cluster`, or `ap` and
   not on a denylist of unrelated zones (`battery`, `gpu`, `camera`,
   `wifi`, `pmic`, `backlight`, others).
-- `pg_scan_backlight()` walks `/sys/class/backlight/*` and takes the first
-  entry whose `brightness` file opens.
-- `pg_scan_trip_point()` walks the zones again with the same heuristic
-  filter, but never consults the priority list, and probes
-  `trip_point_{0..9}_type` for anything containing `passive` or
-  `critical`, returning the matching `_temp` sibling path on the first
-  zone that has one. This makes it independent from the CPU-zone
-  temperature scan above - on a device where the priority list matches a
-  different zone than the heuristic pass would reach first, the two can
-  end up pointed at different thermal zones.
+- `pg_scan_backlight()` walks `/sys/class/backlight/*` and discovers all
+  accessible panel brightness nodes up to `PG_BL_MAX` (4), allowing
+  `pg_sensor_read_bl()` to evaluate the maximum brightness across all panels.
+- `pg_scan_trip_point()` walks the zones again, checking candidate zone
+  types against the `PRIORITY` list first before falling back to the heuristic
+  filter, then probes `trip_point_{0..9}_type` for anything containing
+  `passive` or `critical`, returning the matching `_temp` sibling path on the
+  first matching zone that has one.
 
 `pg_scan_thermal_zone()` caps its zone table at 256 entries; all three
 functions otherwise rely on fixed-size stack buffers and the string
@@ -461,10 +459,8 @@ capacity data isn't there, and to binding every core with a logged warning
 if neither is) and applies it with `sched_setaffinity(0, ...)` - this is
 what actually confines the daemon to the SoC's efficiency cluster.
 
-`sys/detect.c` covers three boot-time checks: PSI access, root privilege,
-and userspace HZ (`sysconf(_SC_CLK_TCK)`). On Android's Bionic libc, this
-always returns a hardcoded `USER_HZ` (100), meaning the downstream
-calibration pass effectively yields a static 10ms baseline on all devices.
+`sys/detect.c` covers two boot-time checks: `/proc/pressure/cpu`
+read/write accessibility and root privilege (`getuid() == 0`).
 
 ## Reading PSI and filtering it
 
@@ -549,14 +545,12 @@ stayed saturated.
 The output gets inverted and normalized into a thermal scale factor,
 `th_scl = 1 - u_sat/100` - 1.0 meaning no restriction, lower meaning
 progressively more - clamped to [0.1, 1.0] on the normal path. If battery
-temperature has hit its own limit outright, that clamp is bypassed
-instead of tightened: I take whichever is lower, 0.2 or whatever the raw
-CPU-temperature PID alone produced, so the 0.1 floor doesn't apply in
-this branch and `th_scl` can in principle run lower than the normal path
-ever allows; battery safety wins that argument every time. `th_scl` then
-feeds into the load-demand model's gain term, the latency and uclamp
-shaping, and the wakeup-granularity curve - it touches almost everything
-downstream.
+temperature has hit its own limit outright, that clamp is tightened from
+[0.1, 1.0] to [0.1, 0.2], heavily capping CPU thermal scale headroom while
+preserving the 0.1 safety floor; battery safety wins that argument every
+time. `th_scl` then feeds into the load-demand model's gain term, the latency
+and uclamp shaping, and the wakeup-granularity curve - it touches almost
+everything downstream.
 
 ## From pressure to scheduler knobs
 
@@ -601,7 +595,7 @@ follows the same shape at a tighter one-second cadence
 actually consumes.
 
 **Effectiveness parameters** get recomputed first, every tick, from
-current battery level and `th_scl`: a `health` factor (`battery_fraction - th_scl`)
+current battery level and `th_scl`: a `health` factor (`battery_fraction * th_scl`)
 scales response gain, surge gain, and trend-amplification;
 thermal scale alone scales lookahead and decay; and the sigmoid
 midpoints used later for latency and uclamp shaping shift upward with
@@ -653,12 +647,10 @@ any of that:
 - An integral term contributing `integ * psi_val`, capped at 1.5× a
   reference magnitude derived from `k_fin`.
 - The net force is hard-clamped to ±32000 (Q16) before it's applied.
-- Velocity integrates against `dt_safe` - `dt_real` clamped to a tiny
-  epsilon floor and a 100ms ceiling - while position integrates against
-  the true, unclamped `dt_real`. I split these on purpose: it bounds how
-  much a single tick's velocity update can move the system after a long
-  gap between ticks, without distorting the position integration the same
-  way.
+- Both velocity and position integrate against `dt_safe` - `dt_real` clamped
+  to a 1us floor and a 100ms ceiling. Clamping bounds how much a single tick's
+  update can move the system after a long gap between ticks or a suspend
+  event, guaranteeing numerical stability across all execution paths.
 - `psi_val` clamps to [0, 500]; `rate` zeroes out whenever that clamp
   actually gets hit.
 - If the PSI filter's own NIS exceeded `nis_thresh` that tick, `psi_val`
@@ -752,11 +744,11 @@ config-file directives), never the per-tick governance path.
 pressure over 5, or velocity alone over 2, snaps the interval straight to
 `PG_MIN_POLL_MS` (100ms); predicted pressure over 1.5 halves it; if the
 300-second baseline is under 2 and neither faster condition applies, the
-interval grows by 200ms instead. The result clamps to
-[`PG_MIN_POLL_MS`, `PG_MAX_POLL_MS`] (100–10000ms), and I only actually
-update the stored interval if the change exceeds 200ms - small
-fluctuations near a decision boundary shouldn't make the interval jitter
-back and forth. If more wall-clock time has passed than the current
+interval grows by 200ms instead. The result clamps to (100–10000ms).
+Interval downscaling applies immediately upon workload surges to eliminate
+response lag, while interval relaxation requires a change of at least 200ms
+to prevent fluctuations near decision boundaries from jittering back and
+forth. If more wall-clock time has passed than the current
 interval plus a 200ms tolerance - the process got frozen, or the reactor
 was delayed well past its requested wake - the interval resets straight to
 the minimum instead of trusting whatever state it had before.
@@ -842,8 +834,6 @@ bounds:
   capacity ratio when EAS data exists, otherwise a fixed 0.5 above 4 cores
   or 1.0 at or below.
 - **`therm`** - `rel * (max_freq_mhz / 3500)`, clamped [0, 1].
-- **`tick`** - `1000 / kernel_hz`, with a 10ms fallback if
-  `pg_detect_kernel_hz()` comes back unusable.
 
 | Field                   | Baseline | Tuned range  | Driven by                                   | Direction                  |
 | ----------------------- | -------- | ------------ | ------------------------------------------- | -------------------------- |
@@ -856,7 +846,6 @@ bounds:
 | `LIM_CPU.min_mig`       | 0.2 ms   | 0.2–0.6 ms   | `cap`                                       | higher capability → lower  |
 | `LIM_CPU.max_mig`       | 0.6 ms   | 0.6–1.2 ms   | `cap`                                       | higher capability → lower  |
 | `LIM_CPU.max_ucl`       | 384      | 384–1024     | `cap`                                       | higher capability → higher |
-| `CFG_CPU.trans_poll`    | 52.0 ms  | 20–100 ms    | `tick`                                      | `clamp(tick * 5, 20, 100)` |
 | `CFG_CPU.lat_gran_rat`  | 0.34     | 0.20–0.50    | `rel`                                       | higher `rel` → lower       |
 | `CFG_CPU.uclamp_k`      | 0.185    | 0.12–0.25    | `rat`                                       | higher `rat` → higher      |
 | `CFG_CPU.sigmoid_k`     | 0.072    | 0.04–0.12    | `rat`                                       | higher `rat` → higher      |
@@ -870,10 +859,10 @@ bounds:
 | `CFG_THERMAL.kd_base`   | 0.82     | 0.60–1.30    | `therm`                                     | higher `therm` → higher    |
 
 Both functions bail out untouched if core count or max frequency can't be
-read at all, leaving the static baselines in effect rather than
-interpolating from garbage. `LIM_CPU` also carries `min_walt`/`max_walt`
-and `min_ucl`, which `pg_tune_limits()` never touches at all - they stay
-at their `config.c` baselines (10.0/40.0 and 0) for the life of the
+read at all, leaving the static baselines in effect rather than interpolating
+from garbage. `LIM_CPU` also carries `min_walt`/`max_walt` and `min_ucl`, and
+`CFG_CPU` carries `trans_poll`, which tuning routines never touch at all - they
+stay at their `config.c` baselines (10.0/40.0, 0, and 50 ms) for the life of the
 process, same as everything else that isn't in the table above.
 
 ## The optional config file
@@ -899,10 +888,3 @@ Property overrides get reversed, the trigger and signal descriptors close,
 the lockfile releases, the PSI monitor and all four sensors close, and all
 six sysfs caches release. Same sequence, every time - that's what letting
 every close/cleanup helper guard on its own handle buys me.
-
-## Closing notes
-
-Things that are true by design and I don't expect to change: single
-thread, no heap, no runtime floating point, one lockfile enforcing a
-single instance, six independent sysfs channels that degrade gracefully
-per-node instead of all-or-nothing.
