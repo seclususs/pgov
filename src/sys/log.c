@@ -14,11 +14,8 @@
 #define LOG_REFILL_MS 10000ULL
 #define LOG_CREDIT_MAX ((uint64_t)LOG_BURST * LOG_REFILL_MS)
 
-void pg_log_err(const char *tag, const char *fmt, ...)
+static bool should_rate_limit(uint32_t *dropped_count)
 {
-	if (UNLIKELY(!tag || !fmt))
-		return;
-
 	static uint64_t credit_ms = LOG_CREDIT_MAX;
 	static uint64_t last_ms;
 	static uint32_t dropped;
@@ -39,9 +36,23 @@ void pg_log_err(const char *tag, const char *fmt, ...)
 
 	if (credit_ms < LOG_REFILL_MS) {
 		dropped++;
-		return;
+		return true;
 	}
 	credit_ms -= LOG_REFILL_MS;
+
+	*dropped_count = dropped;
+	dropped = 0;
+	return false;
+}
+
+void pg_log_err(const char *tag, const char *fmt, ...)
+{
+	if (UNLIKELY(!tag || !fmt))
+		return;
+
+	uint32_t dropped = 0;
+	if (should_rate_limit(&dropped))
+		return;
 
 	char msg[256];
 	va_list args;
@@ -60,7 +71,6 @@ void pg_log_err(const char *tag, const char *fmt, ...)
 
 		(void)snprintf(msg + len, sizeof(msg) - len,
 			       " (+%u suppressed)", dropped);
-		dropped = 0;
 	}
 
 	__android_log_write(ANDROID_LOG_ERROR, tag, msg);
