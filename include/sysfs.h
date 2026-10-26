@@ -26,17 +26,20 @@ struct pg_sysfs_cache {
 };
 
 /**
- * @brief Acquires a persistent file descriptor for a target sysfs node.
+ * @brief Acquires a persistent file descriptor from candidate sysfs paths.
  *
- * @param cache Pointer to an uninitialized cache structure. Memory is owned by the caller.
- * @param path  Null-terminated absolute path to the sysfs node. Read-only borrow.
+ * @param cache Pointer to an uninitialized cache structure. Owned by caller.
+ * @param paths NULL-terminated array of candidate paths. Read-only borrow.
  *
  * @note SIDE EFFECTS & MEMORY OWNERSHIP:
- *       - Attempts to acquire a file descriptor with O_WRONLY | O_CLOEXEC flags.
- *       - If successful, `cache->fd` takes explicit ownership of the open file description.
+ *       - Probes candidate paths sequentially with O_WRONLY | O_CLOEXEC flags.
+ *       - If successful, `cache->fd` takes ownership of the open description.
  *         The caller must eventually release it via pg_sysfs_cache_cleanup().
- *       - Fails gracefully: Does NOT return an error code on permission denial; instead,
- *         it flags `cache->active = false`. Downstream updates will become zero-cost no-ops.
+ *       - Fails gracefully: If no candidate opens, flags `cache->active = false`
+ *         and downstream updates become zero-cost no-ops.
+ *
+ * @return 1 if a candidate node is opened and activated, 0 if none opened,
+ *         or a negative POSIX error code (-EINVAL) on invalid arguments.
  */
 int pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
 			const char *const *RESTRICT paths);
