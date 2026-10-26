@@ -11,29 +11,25 @@
 
 </div>
 
-# pgov
+pgov is a userspace scheduler daemon for Android that reads
+`/proc/pressure/cpu` and maps the metrics into six CFS tunable
+writes latency, granularity, wakeup granularity, migration cost,
+WALT init-task load, and `uclamp_util_min` gated by thermal and
+battery state. It filters kernel PSI accounting through an adaptive
+Kalman filter and writes the computed parameters to sysfs to adjust
+scheduler behavior based on workload.
 
-A userspace scheduler daemon for Android that reads
-`/proc/pressure/cpu` and turns it into six CFS tunable writes -
-latency, granularity, wakeup granularity, migration cost, WALT
-init-task load, and `uclamp_util_min` - gated by thermal and battery
-state. It doesn't invent its own load metric; it filters the kernel's
-own PSI accounting through an adaptive Kalman filter and maps the
-result to sysfs, so the scheduler's behavior tracks what the system is
-actually doing instead of sitting on one static configuration.
+The daemon operates as a single thread with zero heap allocation.
+Every buffer is a stack array or a member of a single static context
+struct, with no calls to `malloc`, `free`, or `pthread`. The control
+loop relies exclusively on fixed-point arithmetic without runtime
+floating-point operations; `float` is restricted to compile-time
+conversion macros.
 
-A few constraints I settled on early and don't plan to revisit:
-
-- **Single thread, no heap.** Every buffer is a stack array or a field
-  of one static context struct. No `malloc`, no `free`, no `pthread`.
-- **No runtime floating point.** The entire control loop is Q16.16
-  fixed-point. `float` only appears inside compile-time conversion
-  macros.
-- **Invisible by default.** The process runs `SCHED_FIFO` but pins
-  itself to the efficiency cluster, caps its own `uclamp_max` at
-  102/1024, and relaxes timer slack to 50ms - it outranks most things
-  on the system but goes out of its way not to show up in battery
-  stats.
+Execution runs under the `SCHED_FIFO` real-time scheduling policy pinned
+to the efficiency CPU cluster. The process caps its own `uclamp_max` at
+102/1024 and sets timer slack to 50ms, bounding CPU utilization and
+overhead within the scheduler.
 
 ## Requirements
 
@@ -56,20 +52,17 @@ python3 tools/build.py --abi arm32 --type release
 python3 tools/mkmod.py
 ```
 
-Flash the zip, reboot, done - `service.sh` starts the daemon
-automatically.
+Flash the zip, reboot, done
 
-For raw CMake preset commands, on-device Termux builds, or building
-into an AOSP vendor tree via Soong, see [`BUILD`](docs/BUILD.md).
+For CMake preset commands, on Termux builds, or building
+into an AOSP vendor tree via Soong, see [`BUILD`](docs/BUILD.md)
 
 ## Documentation
 
-- [`ARCHITECTURE`](docs/ARCHITECTURE.md) - start here if
-  you want to understand what the code is doing and why.
-- [`BUILD`](docs/BUILD.md) - detailed build instructions.
-- [`CHANGELOG`](docs/CHANGELOG.md) - release history.
-- [`CONFIGURATION`](docs/CONFIGURATION.md) - the optional config
-  file's syntax and directives.
+- [`ARCHITECTURE`](docs/ARCHITECTURE.md)
+- [`BUILD`](docs/BUILD.md)
+- [`CHANGELOG`](docs/CHANGELOG.md)
+- [`CONFIGURATION`](docs/CONFIGURATION.md)
 
 ## Disclaimer
 
@@ -78,4 +71,4 @@ Tested on my own hardware, not yours - use it at your own risk.
 
 ## License
 
-GPL-3.0. See [LICENSE](LICENSE).
+GPL-3.0. See [LICENSE](LICENSE)
