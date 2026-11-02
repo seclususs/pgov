@@ -11,8 +11,9 @@ int pg_gov_init(struct pg_context *ctx);
 /**
  * @brief Executes a single iteration of the governor's control loop.
  *
- * @pre The context `ctx` must have been successfully initialized via pg_gov_init()
- *      and its file descriptors (e.g., PSI triggers) must be valid and actively monitored.
+ * @pre The context `ctx` must have been successfully initialized via pg_gov_init().
+ *      The PSI trigger descriptor (`ctx->trg_fd`) may be absent: a dormant governor
+ *      never registers one, and an active governor re-arms a lost one on its own.
  *
  * @param ctx Mutable reference to the global governor state machine.
  *
@@ -22,6 +23,9 @@ int pg_gov_init(struct pg_context *ctx);
  *       - Modifies `ctx->next_wake` to dictate the caller's subsequent sleep/poll duration.
  *       - In cases of system pressure read failure, it may automatically close and reopen
  *         epoll triggers for PSI recovery.
+ *       - On `NDK_BUILD`, while the display is suspended and the sweep interval has elapsed,
+ *         it may invoke `pg_sweep_run()`, which deletes stale files from application cache
+ *         directories.
  *
  * @warning This function is strictly designed for a single-threaded execution context.
  *          Concurrent invocation leads to undefined behavior and race conditions.
