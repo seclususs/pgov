@@ -19,17 +19,12 @@ battery state. It filters kernel PSI accounting through an adaptive
 Kalman filter and writes the computed parameters to sysfs to adjust
 scheduler behavior based on workload.
 
-The daemon operates as a single thread with zero heap allocation.
-Every buffer is a stack array or a member of a single static context
-struct, with no calls to `malloc`, `free`, or `pthread`. The control
-loop relies exclusively on fixed-point arithmetic without runtime
-floating-point operations; `float` is restricted to compile-time
-conversion macros.
-
-Execution runs under the `SCHED_FIFO` real-time scheduling policy pinned
-to the efficiency CPU cluster. The process caps its own `uclamp_max` at
-102/1024 and sets timer slack to 50ms, bounding CPU utilization and
-overhead within the scheduler.
+The daemon operates as a single thread, and its own code makes no calls
+to `malloc`, `free`, or `pthread`. Every buffer is a stack array or
+static storage, chiefly a single static context struct; any heap use
+comes from libc internals. The control loop relies exclusively on
+fixed-point arithmetic without runtime floating-point operations;
+`float` is restricted to compile-time conversion macros.
 
 ## Requirements
 
