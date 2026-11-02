@@ -9,7 +9,8 @@
  *
  * @note ARCHITECTURAL LIFECYCLE & CONTRACTS:
  *       - **Initialization Phase**: Executes a rigid sequence of privilege checks,
- *         PID lockfile creation, OS shielding (`mlockall`, `rlimit`), and topology discovery.
+ *         single-instance `flock()` lockfile acquisition, OS shielding
+ *         (`mlockall`, `rlimit`), and topology discovery.
  *       - **Reactor Phase**: Transfers execution ownership to the `epoll` blocking loop.
  *       - **Teardown Phase**: Features a unified `cleanup:` jump label that guarantees 
  *         deterministic destruction of all acquired file descriptors
