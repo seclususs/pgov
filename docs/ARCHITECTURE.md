@@ -192,10 +192,10 @@ values such as core counts and sensor readings.
 (where division by zero returns `INT32_MAX` or `INT32_MIN` by dividend sign rather than
 trapping, and overflow wraps without saturation), a 64-bit integer square root and its Q16
 wrapper, `pg_math_clamp`, `pg_math_lerp`, a rational sigmoid `pg_math_sigmoid(val, k, mid)`
-evaluating $x / (1 + \vert{}x\vert{})$ with $x = k \cdot (\text{val} - \text{mid})$ rescaled into $[0, 1]$,
-an exponential-decay approximation `pg_math_decay`, and an algebraic sigmoid `pg_math_alg_sig(x)`
-evaluating $x / \sqrt{1 + x^2}$ (saturating past $\pm 180$ in real units). Two sanitizers convert
-signed Q16 values into unsigned 64-bit integers for sysfs output: `pg_math_san_u64` (round-to-nearest)
+evaluating `x / (1 + |x|)` with `x = k * (val - mid)` rescaled into [0, 1], an exponential-decay
+approximation `pg_math_decay`, and an algebraic sigmoid `pg_math_alg_sig(x)` evaluating
+`x / sqrt(1 + x^2)` (saturating past ±180 in real units). Two sanitizers convert signed Q16
+values into unsigned 64-bit integers for sysfs output: `pg_math_san_u64` (round-to-nearest)
 and `pg_math_san_quant_u64` (millisecond-to-nanosecond scaling plus step quantization). `q32_mul`
 selects between a 128-bit multiplication path when `__SIZEOF_INT128__` is defined and a four-way
 32-bit partial-product fallback otherwise.
@@ -280,7 +280,7 @@ to its hard ceiling and clamp `RLIMIT_STACK` to `PG_STACK_SIZE` (512 KiB).
 
 Task scheduling (`task.c`) pins CPU affinity to the lowest-capacity cluster (`pg_topo_set_little_core()`),
 switches policy to `SCHED_FIFO` at `PG_RT_PRIORITY` (50), and sets timer slack to `PG_TIMER_SLACK_NS`
-(50 ms; ignored by the kernel for RT tasks, leaving the daemon's $\pm 5\%$ PRNG jitter to de-align wakeups).
+(50 ms; ignored by the kernel for RT tasks, leaving the daemon's ±5% PRNG jitter to de-align wakeups).
 A raw `sched_setattr` syscall applies `PG_UCLAMP_MAX` (102 of 1024) alongside `sched_util_min = 0` under
 `SCHED_FLAG_UTIL_CLAMP_MAX | SCHED_FLAG_UTIL_CLAMP_MIN | SCHED_FLAG_KEEP_POLICY | SCHED_FLAG_KEEP_PARAMS`,
 overriding the default RT `uclamp_min` of 1024 so the kernel does not reject the lower maximum with `-EINVAL`.
@@ -335,15 +335,14 @@ stack buffers and `str.h` helpers, with heap allocation limited to Bionic's `DIR
 (also used by `pg_block_tune()` under `NDK_BUILD`).
 
 `sys/sensor.c` wraps four sensor types using persistent descriptors and `pread`: CPU temperature
-(millidegrees $\div 1000$), battery temperature (decidegrees $\div 10$ from `/sys/class/power_supply/battery/temp`),
+(millidegrees ÷1000), battery temperature (decidegrees ÷10 from `/sys/class/power_supply/battery/temp`),
 battery capacity (percentage), and backlight brightness (raw integer). On open, I/O, parse, or range
-failure (temperatures outside $-30\text{--}150^\circ\text{C}$, capacity outside $0\text{--}100$),
-reads write a typed fallback ($65^\circ\text{C}$, $35^\circ\text{C}$, $100\%$, $0$) and return a
-negative `errno`. Battery reads retain their fallback values, failed backlight reads count as
-display-on, and CPU temperature failures hold the previous thermal scale for up to `PG_TEMP_FAIL_MAX`
-(10) consecutive errors before feeding $0^\circ\text{C}$ to relax thermal restriction
+failure (temperatures outside -30–150°C, capacity outside 0–100), reads write a typed fallback
+(65°C, 35°C, 100%, 0) and return a negative `errno`. Battery reads retain their fallback values,
+failed backlight reads count as display-on, and CPU temperature failures hold the previous thermal
+scale for up to `PG_TEMP_FAIL_MAX` (10) consecutive errors before feeding 0°C to relax thermal restriction
 (or from boot if no CPU thermal node exists). `pg_sensor_get_trip_temp()` discards trip points outside
-$40\text{--}115^\circ\text{C}$ in favor of the fallback.
+40–115°C in favor of the fallback.
 
 `sys/topo.c` obtains the core count via `sysconf(_SC_NPROCESSORS_CONF)` and reads
 `/sys/devices/system/cpu/cpu%d/{cpufreq/cpuinfo_max_freq,cpu_capacity}` for maximum frequency
@@ -369,20 +368,20 @@ If `total` has not advanced since the prior read, the tick's measurement is 0. D
 directly from the cumulative counter avoids the fixed decay lag of `avg10` during rapid polling.
 
 The computed `rate` (or initial `avg10`) feeds a two-state constant-velocity Kalman filter
-(tracking position and velocity) shared with the thermal loop. Its $2 \times 2$ state covariance
-propagates through a discretized process-noise matrix built from $dt$, $dt^2$, $dt^3$, and $dt^4$
+(tracking position and velocity) shared with the thermal loop. Its 2×2 state covariance
+propagates through a discretized process-noise matrix built from `dt`, `dt²`, `dt³`, and `dt⁴`
 terms. Noise parameters adapt each tick: the clamped innovation is squared and folded into a
-$5\% / 95\%$ EMA of observed innovation covariance. Subtracting predicted position covariance from
-this EMA yields the measurement noise `r_meas` (clamped to $[0.1, 50]$). Comparing the EMA against
+5% / 95% EMA of observed innovation covariance. Subtracting predicted position covariance from
+this EMA yields the measurement noise `r_meas` (clamped to [0.1, 50]). Comparing the EMA against
 the full predicted innovation covariance (position covariance plus `r_meas`) adjusts velocity process
-noise `q_vel`: above prediction, `q_vel` increases by $5\%$ of the gap; at or below prediction, `q_vel`
-decays by $5\%$ toward zero (clamped to $[0.01, 20]$). Normalized Innovation Squared (NIS) is calculated
+noise `q_vel`: above prediction, `q_vel` increases by 5% of the gap; at or below prediction, `q_vel`
+decays by 5% toward zero (clamped to [0.01, 20]). Normalized Innovation Squared (NIS) is calculated
 from the unclamped innovation to detect structural breaks without outliers distorting the learned noise
 floor. If elapsed time between reads exceeds 5 seconds, the filter resets before updating.
 
 `pg_psi_open_trg()` registers the kernel monitor by opening `/proc/pressure/cpu` with
 `O_RDWR | O_NONBLOCK` and writing `some <threshold_us> <window_us>\n`
-(`PG_PSI_THRESHOLD_US` = 100000 $\mu\text{s}$ over `PG_PSI_WINDOW_US` = 1000000 $\mu\text{s}$).
+(`PG_PSI_THRESHOLD_US` = 100000 µs over `PG_PSI_WINDOW_US` = 1000000 µs).
 `pg_psi_recov()` closes, reopens, and resets the filter upon read failure, while `pg_psi_read_raw()`
 performs a stateless one-shot `avg10` read for the idle sweep interrupt check.
 
@@ -393,18 +392,17 @@ performs a stateless one-shot `avg10` read for the idle sweep interrupt check.
 CPU temperature through a dedicated Kalman filter instance initialized with `q_vel = 0.01`
 (tighter than the PSI filter's `1.0` default) to obtain smoothed temperature and velocity estimates.
 
-The temperature setpoint begins at `cfg->limit_cpu` and is reduced by up to $5^\circ\text{C}$ as
-battery temperature approaches `cfg->limit_bat`. Proportional and integral gains scale inversely
+The temperature setpoint begins at `cfg->limit_cpu` and is reduced by up to 5°C as battery
+temperature approaches `cfg->limit_bat`. Proportional and integral gains scale inversely
 with distance to the setpoint, and the derivative gain receives an additional boost during positive
-velocity (heating). The integral term is clamped to $[-50, 50]$ and bleeds off via anti-windup
-whenever the raw unsaturated output diverges from the saturated $[0, 100]$ output, at a rate that
+velocity (heating). The integral term is clamped to [-50, 50] and bleeds off via anti-windup
+whenever the raw unsaturated output diverges from the saturated [0, 100] output, at a rate that
 increases with saturation duration.
 
-The saturated output is inverted into the thermal scale factor
-$\text{th}_{\text{scl}} = 1 - u_{\text{sat}} / 100$, clamped to $[0.1, 1.0]$ during normal operation
-(where $1.0$ means no restriction). If battery temperature reaches `cfg->limit_bat`, the clamp
-tightens to $[0.1, 0.2]$. `th_scl` modulates load-demand gain, latency shaping, `uclamp` shaping,
-and wakeup granularity.
+The saturated output is inverted into the thermal scale factor `th_scl = 1 - u_sat / 100`,
+clamped to [0.1, 1.0] during normal operation (where 1.0 means no restriction). If battery
+temperature reaches `cfg->limit_bat`, the clamp tightens to [0.1, 0.2]. `th_scl` modulates
+load-demand gain, latency shaping, `uclamp` shaping, and wakeup granularity.
 
 ## From pressure to scheduler knobs
 
@@ -443,37 +441,33 @@ Battery level and temperature are sampled every `PG_BAT_CHK_SEC` (5 s) and therm
 runs every `PG_THERM_CHK_SEC` (1 s), with cached values consumed on intermediate ticks.
 
 Effectiveness parameters are recomputed each tick from battery capacity, `th_scl`, and
-the 300-second PSI baseline (`avg300`). A composite `health` factor
-($\text{battery}_{\text{fraction}} \cdot \text{th}_{\text{scl}}$) scales response gain, surge gain, and
-trend amplification, while `th_scl` alone scales lookahead and decay. Sigmoid midpoints
-for latency and `uclamp` shift upward with `avg300` so sustained load requires higher
-instantaneous pressure to trigger aggressive response. Scaling `avg300` by $0.1$ and
-clamping to $[0, 1]$ yields a `noise` term ($10\%$ baseline equals $1.0$) that interpolates
-the structural-break NIS threshold ($3.0$ to $12.0$), the load-demand damping ratio
-($1.5$ to $3.5$), and trend gain ($0.99$ down to $0.85$). Meanwhile, the battery-depletion
-integrator evaluates $97 \cdot ((100 - \text{level}) / 100)^3$ and computes its tick-to-tick
-finite difference divided by a 5-second time constant ($\tau$), passing both values to the
+the 300-second PSI baseline (`avg300`). A composite `health` factor (`battery_fraction * th_scl`)
+scales response gain, surge gain, and trend amplification, while `th_scl` alone scales
+lookahead and decay. Sigmoid midpoints for latency and `uclamp` shift upward with `avg300`
+so sustained load requires higher instantaneous pressure to trigger aggressive response.
+Scaling `avg300` by 0.1 and clamping to [0, 1] yields a `noise` term (10% baseline equals 1.0)
+that interpolates the structural-break NIS threshold (3.0 to 12.0), the load-demand damping
+ratio (1.5 to 3.5), and trend gain (0.99 down to 0.85). Meanwhile, the battery-depletion
+integrator evaluates `97 * ((100 - level) / 100)^3` and computes its tick-to-tick finite
+difference divided by a 5-second time constant (`tau`), passing both values to the
 load-demand model.
 
 The load-demand model (`pg_cpu_calc_load_demand()`) treats running PSI as an overdamped
-second-order system chasing a lookahead target
-($\text{pred} = \text{tgt}_{\text{psi}} + \text{vel} \cdot \text{lookahead}$). If incoming target
-PSI is under $1.0$, velocity magnitude is under $0.01$, and tracked `psi_val` and `rate` are
-already below those bounds, both reset to zero and the function returns immediately. Otherwise,
-if the PSI filter's NIS exceeds `nis_thresh`, `psi_val` snaps to the raw target and `rate`
-zeroes before force evaluation. When raw velocity magnitude exceeds `surge_thresh`, `rate`
-receives an immediate additive nudge ($\text{vel} \cdot \text{surge}_{\text{gain}}$) prior to computing
-`pred`. The net force combines a proportional spring term
-$k_{\text{fin}} \cdot (\text{pred} - \text{psi}_{\text{val}})$ (where $k_{\text{fin}}$ incorporates response
-gain, positive-velocity trend multiplier, and $\text{th}_{\text{scl}}^2$), a damping dashpot term
-$c_{\text{fin}} \cdot \text{rate}$ (where $c_{\text{fin}}$ is the larger of
-$c_{\text{base}} / \sqrt{\text{th}_{\text{scl}}}$ and a battery-integrator-scaled term capped at
-$4 \cdot c_{\text{base}}$ and multiplied by $3.1$, with
-$c_{\text{base}} = 2\sqrt{k_{\text{fin}}} \cdot \text{stab}_{\text{rat}}$), and an integral term
-$\text{integ} \cdot \text{psi}_{\text{val}}$ capped at $1.5\times$ a reference magnitude derived from
-$k_{\text{fin}}$. Net force is clamped to $\pm 32000$ (Q16), and velocity and position integrate
-over `dt_safe` (`dt_real` clamped to $[2^{-16}\text{ s}, 100\text{ ms}]$). `psi_val` clamps to
-$[0, 500]$, zeroing `rate` whenever that boundary is hit.
+second-order system chasing a lookahead target (`pred = tgt_psi + vel * lookahead`).
+If incoming target PSI is under 1.0, velocity magnitude is under 0.01, and tracked `psi_val`
+and `rate` are already below those bounds, both reset to zero and the function returns
+immediately. Otherwise, if the PSI filter's NIS exceeds `nis_thresh`, `psi_val` snaps
+to the raw target and `rate` zeroes before force evaluation. When raw velocity magnitude
+exceeds `surge_thresh`, `rate` receives an immediate additive nudge (`vel * surge_gain`)
+prior to computing `pred`. The net force combines a proportional spring term
+`k_fin * (pred - psi_val)` (where `k_fin` incorporates response gain, positive-velocity
+trend multiplier, and `th_scl`²), a damping dashpot term `c_fin * rate`
+(where `c_fin` is the larger of `c_base / sqrt(th_scl)` and a battery-integrator-scaled
+term capped at `4 * c_base` and multiplied by 3.1, with `c_base = 2 * sqrt(k_fin) * stab_rat`),
+and an integral term `integ * psi_val` capped at 1.5× a reference magnitude derived from
+`k_fin`. Net force is clamped to ±32000 (Q16), and velocity and position integrate
+over `dt_safe` (`dt_real` clamped to [2^-16 s, 100 ms]). `psi_val` clamps to
+[0, 500], zeroing `rate` whenever that boundary is hit.
 
 Load demand is multiplied by trend amplification to yield effective pressure,
 which drives six `PURE` shaping functions:
@@ -491,7 +485,7 @@ which drives six `PURE` shaping functions:
 floored by a thermal term that rises as headroom shrinks. `pg_cpu_calc_gran` applies a
 fixed ratio to latency and clamps the result so it never exceeds latency itself.
 `pg_cpu_calc_migration` follows an inverse-quadratic curve in effective pressure and
-reduces output by up to $50\%$ as velocity magnitude grows toward a 25-unit cap. The
+reduces output by up to 50% as velocity magnitude grows toward a 25-unit cap. The
 first four functions output milliseconds (converted to nanoseconds in `gov.c` via `math.h` sanitizers)
 and the last two output raw units. `gov_gate()` runs `apply_mapping()` only if `pg_cpu_trans()`
 detects a transition (smoothed rate magnitude exceeds `trans_rate` or `psi_val` diverges from
@@ -503,14 +497,14 @@ transitions also clamp `next_wake` to at most `trans_poll`.
 Each tunable maintains a `pg_sysfs_cache` holding its file descriptor, last-written value,
 captured boot-time value, write-failure backoff state, and `active` flag, opened once at boot:
 
-| Field        | `/proc/sys/kernel/` Node        | Unit             |
-| :----------- | :------------------------------ | :--------------- |
-| `sched_lat`  | `sched_latency_ns`              | ns               |
-| `sched_gran` | `sched_min_granularity_ns`      | ns               |
-| `sched_wake` | `sched_wakeup_granularity_ns`   | ns               |
-| `sched_mig`  | `sched_migration_cost_ns`       | ns               |
-| `sched_walt` | `sched_walt_init_task_load_pct` | $\%$             |
-| `sched_ucl`  | `sched_uclamp_util_min`         | $0\text{--}1024$ |
+| Field        | `/proc/sys/kernel/` Node        | Unit   |
+| :----------- | :------------------------------ | :----- |
+| `sched_lat`  | `sched_latency_ns`              | ns     |
+| `sched_gran` | `sched_min_granularity_ns`      | ns     |
+| `sched_wake` | `sched_wakeup_granularity_ns`   | ns     |
+| `sched_mig`  | `sched_migration_cost_ns`       | ns     |
+| `sched_walt` | `sched_walt_init_task_load_pct` | %      |
+| `sched_ucl`  | `sched_uclamp_util_min`         | 0–1024 |
 
 For the first four nodes, `pg_sysfs_cache_init()` falls back to
 `/sys/kernel/debug/sched/{latency_ns,min_granularity_ns,wakeup_granularity_ns,migration_cost_ns}`
@@ -521,19 +515,18 @@ continue operating. If all six nodes fail to open, the daemon enters dormant mod
 (performing display upkeep and idle sweeps under `NDK_BUILD`, or setting `next_wake = -1` otherwise).
 
 `pg_sysfs_update()` suppresses redundant writes using `PG_CHK_ABS` (absolute difference),
-`PG_CHK_REL` (per-mille relative difference,
-$\vert{}\text{cur} - \text{tgt}\vert{} \cdot 1000 \ge \text{cur} \cdot \text{tol}$), or
+`PG_CHK_REL` (per-mille relative difference, `|cur - tgt| * 1000 >= cur * tol`), or
 `PG_CHK_STRICT` (any change). Each cache initializes `last` to `UINT64_MAX`
 so the initial write always executes:
 
-| Tunable            | Mode | Limit | Effective Delta             |
-| :----------------- | :--- | :---- | :-------------------------- |
-| Latency            | REL  | 100   | $\ge 10\%$                  |
-| Min granularity    | REL  | 100   | $\ge 10\%$                  |
-| Wakeup granularity | REL  | 150   | $\ge 15\%$                  |
-| Migration cost     | ABS  | 50000 | $\ge 50\text{ }\mu\text{s}$ |
-| WALT init load     | ABS  | 5     | $\ge 5\%$                   |
-| Uclamp min         | ABS  | 32    | $\ge 32$ units              |
+| Tunable            | Mode | Limit | Effective Delta |
+| :----------------- | :--- | :---- | :-------------- |
+| Latency            | REL  | 100   | ≥10%            |
+| Min granularity    | REL  | 100   | ≥10%            |
+| Wakeup granularity | REL  | 150   | ≥15%            |
+| Migration cost     | ABS  | 50000 | ≥50 µs          |
+| WALT init load     | ABS  | 5     | ≥5%             |
+| Uclamp min         | ABS  | 32    | ≥32 units units |
 
 Updates clearing their threshold call `pg_sysfs_write_strm()`, formatting the value with
 `pg_fmt_u64()` and issuing a single `pwrite()` at offset 0 on the cached descriptor. One-shot
@@ -543,17 +536,17 @@ which opens, writes, and closes the file on each call.
 ## Picking the next poll interval
 
 `pg_poll_calc_next()` predicts pressure 0.5 seconds ahead
-($\text{pred} = \text{cur}_{\text{press}} + \text{press}_{\text{vel}} \cdot 0.5$). Predicted pressure
+(`pred = cur_press + press_vel * 0.5`). Predicted pressure
 over 5 or velocity over 2 snaps the interval immediately to `PG_MIN_POLL_MS` (100 ms);
 predicted pressure over 1.5 halves the current interval; if the 300-second baseline is
 under 2 and neither faster condition applies, the interval grows by 200 ms. The output
-is clamped to $[100\text{ ms}, 10000\text{ ms}]$.
+is clamped to [100, 10000] ms.
 
 Downscaling takes effect immediately on workload surges, whereas interval relaxation
 requires a change of at least 200 ms to prevent boundary jitter. If elapsed wall-clock
 time since the previous call exceeds the last requested wait (including jitter) plus a
 200 ms tolerance, the interval resets to `PG_MIN_POLL_MS`. Before returning, the interval
-is rounded to the nearest 50 ms and perturbed by up to $\pm 5\%$ via a seeded PRNG
+is rounded to the nearest 50 ms and perturbed by up to ±5% via a seeded PRNG
 (64-bit LCG with 128-bit multiply-and-shift when available, or xorshift fallback).
 
 ## Display state and idle housekeeping
@@ -602,44 +595,44 @@ PSI `avg10` exceeds 3, or the system clock predates a compile-time epoch.
 
 `pg_tune_limits()` and `pg_tune_configs()` run once after the PSI availability check
 and interpolate `LIM_CPU`, `CFG_CPU`, and `CFG_THERMAL` in place using four hardware
-indices. `cap` drives all `LIM_CPU` fields as a blend of $40\%$ core-count ratio
-(against 8 cores) and $60\%$ max-frequency ratio (against 3500 MHz), without consulting
+indices. `cap` drives all `LIM_CPU` fields as a blend of 40% core-count ratio
+(against 8 cores) and 60% max-frequency ratio (against 3500 MHz), without consulting
 EAS data. `rel` drives `CFG_CPU` and `CFG_THERMAL` using total EAS `cpu_capacity` normalized
 against 8192 when both capacity and max frequency are readable, falling back to the `cap`
 blend otherwise. `rat` measures cluster heterogeneity as the lowest-to-highest cluster
-capacity ratio when EAS data exists, or $0.5$ above 4 cores and $1.0$ at or below 4 cores.
-`therm` evaluates $\text{rel} \cdot (\text{freq}_{\text{max}} / 3500)$, clamped to $[0, 1]$.
+capacity ratio when EAS data exists, or 0.5 above 4 cores and 1.0 at or below 4 cores.
+`therm` evaluates `rel * (max_freq_mhz / 3500)`, clamped to [0, 1].
 
-| Field                   | Base                 | Range                         | Metric                          | Scaling |
-| :---------------------- | :------------------- | :---------------------------- | :------------------------------ | :------ |
-| `LIM_CPU.min_lat`       | $8.0\text{ ms}$      | $4.0\text{--}20.0\text{ ms}$  | `cap`                           | Inverse |
-| `LIM_CPU.max_lat`       | $20.0\text{ ms}$     | $12.0\text{--}25.0\text{ ms}$ | `cap`                           | Inverse |
-| `LIM_CPU.min_gran`      | $2.5\text{ ms}$      | $1.5\text{--}6.5\text{ ms}$   | `cap`                           | Inverse |
-| `LIM_CPU.max_gran`      | $6.5\text{ ms}$      | $4.0\text{--}10.0\text{ ms}$  | `cap`                           | Inverse |
-| `LIM_CPU.min_wake`      | $1.5\text{ ms}$      | $1.0\text{--}3.0\text{ ms}$   | `cap`                           | Inverse |
-| `LIM_CPU.max_wake`      | $6.5\text{ ms}$      | $4.0\text{--}8.0\text{ ms}$   | `cap`                           | Inverse |
-| `LIM_CPU.min_mig`       | $0.2\text{ ms}$      | $0.2\text{--}0.6\text{ ms}$   | `cap`                           | Inverse |
-| `LIM_CPU.max_mig`       | $0.6\text{ ms}$      | $0.6\text{--}1.2\text{ ms}$   | `cap`                           | Inverse |
-| `LIM_CPU.max_ucl`       | $384$                | $384\text{--}1024$            | `cap`                           | Direct  |
-| `CFG_CPU.lat_gran_rat`  | $0.34$               | $0.20\text{--}0.50$           | `rel`                           | Inverse |
-| `CFG_CPU.uclamp_k`      | $0.185$              | $0.12\text{--}0.25$           | `rat`                           | Direct  |
-| `CFG_CPU.sigmoid_k`     | $0.072$              | $0.04\text{--}0.12$           | `rat`                           | Direct  |
-| `CFG_CPU.surge_thresh`  | $17.5$               | $12.0\text{--}25.0$           | `rel`                           | Direct  |
-| `CFG_CPU.trans_rate`    | $0.115$              | $0.08\text{--}0.20$           | `rel`                           | Direct  |
-| `CFG_CPU.trans_diff`    | $0.58$               | $0.40\text{--}0.90$           | `rel`                           | Direct  |
-| `CFG_THERMAL.limit_cpu` | $52.5^\circ\text{C}$ | $45\text{--}90^\circ\text{C}$ | $\text{trip} - 5^\circ\text{C}$ | Direct  |
-| `CFG_THERMAL.limit_bat` | $40.5^\circ\text{C}$ | $38\text{--}42^\circ\text{C}$ | `therm`                         | Inverse |
-| `CFG_THERMAL.ki_base`   | $0.0095$             | $0.005\text{--}0.015$         | `therm`                         | Direct  |
-| `CFG_THERMAL.kp_base`   | $0.61$               | $0.45\text{--}0.90$           | `therm`                         | Direct  |
-| `CFG_THERMAL.kd_base`   | $0.82$               | $0.60\text{--}1.30$           | `therm`                         | Direct  |
+| Field                   | Base    | Range        | Metric                    | Scaling |
+| :---------------------- | :------ | :----------- | :------------------------ | :------ |
+| `LIM_CPU.min_lat`       | 8.0 ms  | 4.0–20.0 ms  | `cap`                     | Inverse |
+| `LIM_CPU.max_lat`       | 20.0 ms | 12.0–25.0 ms | `cap`                     | Inverse |
+| `LIM_CPU.min_gran`      | 2.5 ms  | 1.5–6.5 ms   | `cap`                     | Inverse |
+| `LIM_CPU.max_gran`      | 6.5 ms  | 4.0–10.0 ms  | `cap`                     | Inverse |
+| `LIM_CPU.min_wake`      | 1.5 ms  | 1.0–3.0 ms   | `cap`                     | Inverse |
+| `LIM_CPU.max_wake`      | 6.5 ms  | 4.0–8.0 ms   | `cap`                     | Inverse |
+| `LIM_CPU.min_mig`       | 0.2 ms  | 0.2–0.6 ms   | `cap`                     | Inverse |
+| `LIM_CPU.max_mig`       | 0.6 ms  | 0.6–1.2 ms   | `cap`                     | Inverse |
+| `LIM_CPU.max_ucl`       | 384     | 384–1024     | `cap`                     | Direct  |
+| `CFG_CPU.lat_gran_rat`  | 0.34    | 0.20–0.50    | `rel`                     | Inverse |
+| `CFG_CPU.uclamp_k`      | 0.185   | 0.12–0.25    | `rat`                     | Direct  |
+| `CFG_CPU.sigmoid_k`     | 0.072   | 0.04–0.12    | `rat`                     | Direct  |
+| `CFG_CPU.surge_thresh`  | 17.5    | 12.0–25.0    | `rel`                     | Direct  |
+| `CFG_CPU.trans_rate`    | 0.115   | 0.08–0.20    | `rel`                     | Direct  |
+| `CFG_CPU.trans_diff`    | 0.58    | 0.40–0.90    | `rel`                     | Direct  |
+| `CFG_THERMAL.limit_cpu` | 52.5°C  | 45–90°C      | detected trip point − 5°C | Direct  |
+| `CFG_THERMAL.limit_bat` | 40.5°C  | 38–42°C      | `therm`                   | Inverse |
+| `CFG_THERMAL.ki_base`   | 0.0095  | 0.005–0.015  | `therm`                   | Direct  |
+| `CFG_THERMAL.kp_base`   | 0.61    | 0.45–0.90    | `therm`                   | Direct  |
+| `CFG_THERMAL.kd_base`   | 0.82    | 0.60–1.30    | `therm`                   | Direct  |
 
 For `CFG_THERMAL.limit_cpu`, if no valid thermal trip point is detected, a fallback
-trip temperature of $57.5^\circ\text{C}$ is used (yielding $52.5^\circ\text{C}$).
+trip temperature of 57.5°C is used (yielding 52.5°C).
 `pg_tune_limits()` leaves `LIM_CPU` untouched if either core count or max frequency
 cannot be read, whereas `pg_tune_configs()` substitutes defaults of 8 cores and 2000 MHz
 for missing values. `LIM_CPU.min_walt`, `LIM_CPU.max_walt`, `LIM_CPU.min_ucl`, and
 `CFG_CPU.trans_poll` remain at their static `config.c` baselines
-($10.0$, $40.0$, $0$, and $50\text{ ms}$).
+(10.0, 40.0, 0, and 50 ms).
 
 ## The optional config file
 
