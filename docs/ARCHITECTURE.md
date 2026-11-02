@@ -401,7 +401,7 @@ whenever the raw unsaturated output diverges from the saturated $[0, 100]$ outpu
 increases with saturation duration.
 
 The saturated output is inverted into the thermal scale factor
-$\text{th\_scl} = 1 - u_{\text{sat}} / 100$, clamped to $[0.1, 1.0]$ during normal operation
+$\text{th}_{\text{scl}} = 1 - u_{\text{sat}} / 100$, clamped to $[0.1, 1.0]$ during normal operation
 (where $1.0$ means no restriction). If battery temperature reaches `cfg->limit_bat`, the clamp
 tightens to $[0.1, 0.2]$. `th_scl` modulates load-demand gain, latency shaping, `uclamp` shaping,
 and wakeup granularity.
@@ -444,7 +444,7 @@ runs every `PG_THERM_CHK_SEC` (1 s), with cached values consumed on intermediate
 
 Effectiveness parameters are recomputed each tick from battery capacity, `th_scl`, and
 the 300-second PSI baseline (`avg300`). A composite `health` factor
-($\text{battery\_fraction} \cdot \text{th\_scl}$) scales response gain, surge gain, and
+($\text{battery}_{\text{fraction}} \cdot \text{th}_{\text{scl}}$) scales response gain, surge gain, and
 trend amplification, while `th_scl` alone scales lookahead and decay. Sigmoid midpoints
 for latency and `uclamp` shift upward with `avg300` so sustained load requires higher
 instantaneous pressure to trigger aggressive response. Scaling `avg300` by $0.1$ and
@@ -457,20 +457,20 @@ load-demand model.
 
 The load-demand model (`pg_cpu_calc_load_demand()`) treats running PSI as an overdamped
 second-order system chasing a lookahead target
-($\text{pred} = \text{tgt\_psi} + \text{vel} \cdot \text{lookahead}$). If incoming target
+($\text{pred} = \text{tgt}_{\text{psi}} + \text{vel} \cdot \text{lookahead}$). If incoming target
 PSI is under $1.0$, velocity magnitude is under $0.01$, and tracked `psi_val` and `rate` are
 already below those bounds, both reset to zero and the function returns immediately. Otherwise,
 if the PSI filter's NIS exceeds `nis_thresh`, `psi_val` snaps to the raw target and `rate`
 zeroes before force evaluation. When raw velocity magnitude exceeds `surge_thresh`, `rate`
-receives an immediate additive nudge ($\text{vel} \cdot \text{surge\_gain}$) prior to computing
+receives an immediate additive nudge ($\text{vel} \cdot \text{surge}_{\text{gain}}$) prior to computing
 `pred`. The net force combines a proportional spring term
-$k_{\text{fin}} \cdot (\text{pred} - \text{psi\_val})$ (where $k_{\text{fin}}$ incorporates response
-gain, positive-velocity trend multiplier, and $\text{th\_scl}^2$), a damping dashpot term
+$k_{\text{fin}} \cdot (\text{pred} - \text{psi}_{\text{val}})$ (where $k_{\text{fin}}$ incorporates response
+gain, positive-velocity trend multiplier, and $\text{th}_{\text{scl}}^2$), a damping dashpot term
 $c_{\text{fin}} \cdot \text{rate}$ (where $c_{\text{fin}}$ is the larger of
-$c_{\text{base}} / \sqrt{\text{th\_scl}}$ and a battery-integrator-scaled term capped at
+$c_{\text{base}} / \sqrt{\text{th}_{\text{scl}}}$ and a battery-integrator-scaled term capped at
 $4 \cdot c_{\text{base}}$ and multiplied by $3.1$, with
-$c_{\text{base}} = 2\sqrt{k_{\text{fin}}} \cdot \text{stab\_rat}$), and an integral term
-$\text{integ} \cdot \text{psi\_val}$ capped at $1.5\times$ a reference magnitude derived from
+$c_{\text{base}} = 2\sqrt{k_{\text{fin}}} \cdot \text{stab}_{\text{rat}}$), and an integral term
+$\text{integ} \cdot \text{psi}_{\text{val}}$ capped at $1.5\times$ a reference magnitude derived from
 $k_{\text{fin}}$. Net force is clamped to $\pm 32000$ (Q16), and velocity and position integrate
 over `dt_safe` (`dt_real` clamped to $[2^{-16}\text{ s}, 100\text{ ms}]$). `psi_val` clamps to
 $[0, 500]$, zeroing `rate` whenever that boundary is hit.
@@ -543,7 +543,7 @@ which opens, writes, and closes the file on each call.
 ## Picking the next poll interval
 
 `pg_poll_calc_next()` predicts pressure 0.5 seconds ahead
-($\text{pred} = \text{cur\_press} + \text{press\_vel} \cdot 0.5$). Predicted pressure
+($\text{pred} = \text{cur}_{\text{press}} + \text{press}_{\text{vel}} \cdot 0.5$). Predicted pressure
 over 5 or velocity over 2 snaps the interval immediately to `PG_MIN_POLL_MS` (100 ms);
 predicted pressure over 1.5 halves the current interval; if the 300-second baseline is
 under 2 and neither faster condition applies, the interval grows by 200 ms. The output
@@ -608,7 +608,7 @@ EAS data. `rel` drives `CFG_CPU` and `CFG_THERMAL` using total EAS `cpu_capacity
 against 8192 when both capacity and max frequency are readable, falling back to the `cap`
 blend otherwise. `rat` measures cluster heterogeneity as the lowest-to-highest cluster
 capacity ratio when EAS data exists, or $0.5$ above 4 cores and $1.0$ at or below 4 cores.
-`therm` evaluates $\text{rel} \cdot (\text{max\_freq\_mhz} / 3500)$, clamped to $[0, 1]$.
+`therm` evaluates $\text{rel} \cdot (\text{freq}_{\text{max}} / 3500)$, clamped to $[0, 1]$.
 
 | Field                   | Base                 | Range                         | Metric                          | Scaling |
 | :---------------------- | :------------------- | :---------------------------- | :------------------------------ | :------ |
