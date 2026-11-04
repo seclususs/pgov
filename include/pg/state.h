@@ -28,7 +28,7 @@ enum pg_disp_state {
  * @brief The centralized, cache-aligned state machine container for the daemon.
  *
  * @note MEMORY LAYOUT & ARCHITECTURE:
- *       - Declared with `ALIGNED(64)` to strictly fit into standard CPU L1 cache lines.
+ *       - Declared with `ALIGNED(64)`, so the object starts on 64-byte cache line boundary.
  *         Any addition or rearrangement of struct members MUST be carefully audited to 
  *         prevent cache line bouncing or unnecessary padding inflation.
  *       - Encapsulates all hardware sensors, sysfs file descriptors, and mathematical 
