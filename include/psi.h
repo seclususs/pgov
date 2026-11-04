@@ -52,8 +52,8 @@ void pg_psi_cleanup(struct pg_psi_monitor *mon);
  * @param now  Current monotonic timestamp for dt (delta time) calculations.
  *
  * @note IMPLICIT CONTRACTS & SYSTEM IMPACT:
- *       - Performs zero-allocation string parsing directly on the stack buffer
- *         (`mon->buf`) to minimize hot-path latency.
+ *       - Performs zero-allocation string parsing directly on the monitor's fixed 512-byte
+ *         buffer (`mon->buf`) to minimize hot-path latency.
  *       - Implements a resilient `pread` loop to bypass seeking overhead.
  *       - Deeply mutates `mon->filter` (Kalman state) by injecting the newly parsed metrics.
  *
