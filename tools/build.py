@@ -7,7 +7,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
-from typing import NoReturn
+from typing import NoReturn, Optional
 
 ROOT: Path = Path(__file__).resolve().parent.parent
 ABI_MAP: dict[str, str] = {"arm64": "arm64-v8a", "arm32": "armeabi-v7a"}
@@ -36,8 +36,8 @@ def set_ndk() -> None:
         sdk_root = home / "Android" / "Sdk"
 
     ndk_root = sdk_root / "ndk"
-    if ndk_root.exists() and ndk_root.is_dir():
-        versions = sorted([d for d in ndk_root.iterdir() if d.is_dir()], reverse=True)
+    if ndk_root.is_dir():
+        versions = sorted((d for d in ndk_root.iterdir() if d.is_dir()), reverse=True)
         if versions:
             latest = str(versions[0].resolve())
             os.environ["ANDROID_NDK_HOME"] = latest
@@ -56,7 +56,7 @@ def verify_deps() -> None:
 def parse_stream(line: str) -> str:
     text = line.strip()
     if text.startswith("[") and "]" in text:
-        idx = text.split("]")[0] + "]"
+        idx = text.split("]", 1)[0] + "]"
         if "Building" in text:
             name = Path(text.split()[-1]).name.replace(".o", "")
             return f"{idx} {name}"
@@ -68,28 +68,28 @@ def parse_stream(line: str) -> str:
 
 def exec_cmd(command: list[str], step_name: str) -> None:
     try:
-        proc = subprocess.Popen(
+        with subprocess.Popen(
             command,
             cwd=ROOT,
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             text=True,
             bufsize=1,
-            universal_newlines=True,
-        )
-        if proc.stdout:
-            for line in proc.stdout:
-                message = parse_stream(line)
-                if message:
-                    log_step(step_name, message)
-        proc.wait()
-        if proc.returncode != 0:
-            abort("build step failed check system logs")
+        ) as proc:
+            if proc.stdout:
+                for line in proc.stdout:
+                    message = parse_stream(line)
+                    if message:
+                        log_step(step_name, message)
+
+            return_code = proc.wait()
+            if return_code != 0:
+                abort("build step failed check system logs")
     except FileNotFoundError:
         abort("executable missing during build step")
 
 
-def rm_workspace(abi: str | None = None, variant: str | None = None) -> None:
+def rm_workspace(abi: Optional[str] = None, variant: Optional[str] = None) -> None:
     if abi and variant:
         target = ROOT / "build" / ABI_MAP[abi] / variant
     else:

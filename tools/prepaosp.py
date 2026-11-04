@@ -9,16 +9,16 @@ def mv_files(root: Path, files: list[str]) -> None:
         src: Path = root / f
         dst: Path = root / src.name
         if src.exists():
-            shutil.move(str(src), str(dst))
+            shutil.move(src, dst)
 
 
 def rm_paths(root: Path, paths: list[str]) -> None:
     for p in paths:
         tgt: Path = root / p
-        if tgt.is_file():
+        if tgt.is_symlink() or tgt.is_file():
             tgt.unlink()
         elif tgt.is_dir():
-            shutil.rmtree(str(tgt))
+            shutil.rmtree(tgt)
 
 
 def main() -> None:
@@ -43,6 +43,7 @@ def main() -> None:
         ".editorconfig",
         ".gitattributes",
         ".gitignore",
+        ".shellcheckrc",
     ]
 
     mv_files(root, mv_list)

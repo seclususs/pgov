@@ -23,8 +23,9 @@ def read_version(prop_path: Path) -> str:
 
     with open(prop_path, "r", encoding="utf-8") as file:
         for line in file:
-            if line.strip().startswith("version="):
-                return line.strip().split("=", 1)[1].strip()
+            stripped = line.strip()
+            if stripped.startswith("version="):
+                return stripped.split("=", 1)[1].strip()
 
     log.error("-  ERR      version= undefined in module.prop")
     sys.exit(1)
@@ -40,14 +41,14 @@ def stage_binaries(targets: dict[Path, Path]) -> None:
     for src, dst in targets.items():
         dst.parent.mkdir(parents=True, exist_ok=True)
         shutil.copy2(src, dst)
-        log.info(f"-  STAGE     {dst.parent.name}/{dst.name}")
+        log.info(f"-  STAGE    {dst.parent.name}/{dst.name}")
 
 
 def clean_staged_binaries(staged_files: list[Path]) -> None:
     for path in staged_files:
         if path.exists():
             path.unlink()
-            log.info(f"-  CLEAN     {path.parent.name}/{path.name}")
+            log.info(f"-  CLEAN    {path.parent.name}/{path.name}")
 
 
 def create_archive(source_dir: Path, output_zip: Path) -> None:
@@ -80,7 +81,7 @@ def main() -> None:
     arm64_dst = modules_dir / "system" / "bin" / "arm64-v8a" / "pgovd"
     arm32_dst = modules_dir / "system" / "bin" / "armeabi-v7a" / "pgovd"
 
-    staging_map = {
+    staging_map: dict[Path, Path] = {
         arm64_src: arm64_dst,
         arm32_src: arm32_dst,
     }
@@ -93,9 +94,9 @@ def main() -> None:
         if output_zip.exists():
             output_zip.unlink()
 
-        log.info(f"-  ZIP       {output_zip.name}")
+        log.info(f"-  ZIP      {output_zip.name}")
         create_archive(modules_dir, output_zip)
-        log.info(f"-  DONE      {output_zip}")
+        log.info(f"-  DONE     {output_zip}")
     finally:
         clean_staged_binaries(list(active_map.values()))
 
