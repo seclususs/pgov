@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#ifndef PG_CPU_H
-#define PG_CPU_H
+#ifndef PGOV_CPU_H
+#define PGOV_CPU_H
 
-#include "compiler.h"
-#include "pg/math.h"
+#include "pgov/compiler.h"
+#include "pgov/math.h"
 #include <stdbool.h>
 
 struct pg_cpu_lim {
@@ -107,4 +107,4 @@ PURE q16_t pg_cpu_calc_uclamp(q16_t press, q16_t th_scl,
 			      const struct pg_cpu_eff *eff,
 			      const struct pg_cpu_lim *lim);
 
-#endif // PG_CPU_H
+#endif // PGOV_CPU_H

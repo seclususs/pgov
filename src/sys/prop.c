@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "prop.h"
-#include "pg/config.h"
-#include "pg/log.h"
+#include "pgov/prop.h"
+#include "pgov/config.h"
+#include "pgov/log.h"
 #include <errno.h> // IWYU pragma: keep
 #include <string.h>
 #include <unistd.h>

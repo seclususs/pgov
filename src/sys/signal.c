@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "pg/signal.h"
-#include "pg/log.h"
-#include "compiler.h"
+#include "pgov/signal.h"
+#include "pgov/log.h"
+#include "pgov/compiler.h"
 #include <errno.h>
 #include <signal.h>
 #include <sys/signalfd.h>

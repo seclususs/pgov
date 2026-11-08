@@ -1,21 +1,21 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "pg/gov.h"
-#include "pg/config.h"
-#include "pg/log.h"
-#include "epoll.h"
-#include "paths.h"
-#include "compiler.h"
-#include "pg/cpu.h"
-#include "pg/math.h"
-#include "pg/poll.h"
-#include "psi.h"
-#include "sensor.h"
-#include "node.h"
-#include "pg/sweep.h"
-#include "pg/thermal.h"
-#include "pg/time.h"
+#include "pgov/gov.h"
+#include "pgov/config.h"
+#include "pgov/log.h"
+#include "pgov/epoll.h"
+#include "pgov/paths.h"
+#include "pgov/compiler.h"
+#include "pgov/cpu.h"
+#include "pgov/math.h"
+#include "pgov/poll.h"
+#include "pgov/psi.h"
+#include "pgov/sensor.h"
+#include "pgov/node.h"
+#include "pgov/sweep.h"
+#include "pgov/thermal.h"
+#include "pgov/time.h"
 #include <unistd.h>
 
 static const struct pg_node_chk CHK_LAT = { PG_CHK_REL, PG_CHK_LAT };

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "pg/log.h"
-#include "compiler.h"
+#include "pgov/log.h"
+#include "pgov/compiler.h"
 #include <stdint.h>
 #include <stdio.h>
 #include <stdarg.h>

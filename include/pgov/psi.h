@@ -4,8 +4,8 @@
 #ifndef PGOV_PSI_H
 #define PGOV_PSI_H
 
-#include "pg/kalman.h"
-#include "pg/math.h"
+#include "pgov/kalman.h"
+#include "pgov/math.h"
 #include <stdbool.h>
 #include <stdint.h>
 #include <time.h>

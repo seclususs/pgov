@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#ifndef PG_MATH_H
-#define PG_MATH_H
+#ifndef PGOV_MATH_H
+#define PGOV_MATH_H
 
-#include "compiler.h"
+#include "pgov/compiler.h"
 #include <stdint.h>
 
 typedef int32_t q16_t;
@@ -193,4 +193,4 @@ static ALWAYS_INLINE CONST q16_t pg_math_lerp(q16_t min, q16_t max, q16_t v)
 	return min + q16_mul(rng, v);
 }
 
-#endif // PG_MATH_H
+#endif // PGOV_MATH_H

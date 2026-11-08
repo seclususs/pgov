@@ -4,7 +4,7 @@
 #ifndef PGOV_STR_H
 #define PGOV_STR_H
 
-#include "compiler.h"
+#include "pgov/compiler.h"
 #include <stdbool.h>
 #include <stddef.h>
 

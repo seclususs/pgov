@@ -4,7 +4,7 @@
 #ifndef PGOV_NODE_H
 #define PGOV_NODE_H
 
-#include "compiler.h"
+#include "pgov/compiler.h"
 #include <stdbool.h>
 #include <stdint.h>
 

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "pg/cpu.h"
+#include "pgov/cpu.h"
 
 PURE bool pg_cpu_trans(const struct pg_load_state *state,
 		       const struct pg_cpu_cfg *cfg)

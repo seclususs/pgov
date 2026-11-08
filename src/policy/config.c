@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "pg/config.h"
-#include "pg/math.h"
+#include "pgov/config.h"
+#include "pgov/math.h"
 
 struct pg_cpu_lim LIM_CPU = {
 	.min_lat = FLOAT_TO_Q16(8.0F),

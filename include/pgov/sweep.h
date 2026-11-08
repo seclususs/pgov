@@ -3,13 +3,13 @@
 
 #if defined(NDK_BUILD)
 
-#ifndef PG_SWEEP_H
-#define PG_SWEEP_H
+#ifndef PGOV_SWEEP_H
+#define PGOV_SWEEP_H
 
-#include "pg/state.h"
+#include "pgov/state.h"
 
 void pg_sweep_run(struct pg_context *ctx);
 
-#endif // PG_SWEEP_H
+#endif // PGOV_SWEEP_H
 
 #endif // NDK_BUILD

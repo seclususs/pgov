@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "pg/tune.h"
-#include "pg/config.h"
-#include "topo.h"
-#include "sensor.h"
+#include "pgov/tune.h"
+#include "pgov/config.h"
+#include "pgov/topo.h"
+#include "pgov/sensor.h"
 
 static inline q16_t calc_heuristic_cap(int32_t core, int32_t mhz)
 {

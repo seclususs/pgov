@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#ifndef PG_CONFIG_H
-#define PG_CONFIG_H
+#ifndef PGOV_CONFIG_H
+#define PGOV_CONFIG_H
 
-#include "pg/cpu.h"
-#include "pg/thermal.h"
+#include "pgov/cpu.h"
+#include "pgov/thermal.h"
 
 #define PG_MIN_POLL_MS 100
 #define PG_MAX_POLL_MS 10000
@@ -45,4 +45,4 @@ extern struct pg_cpu_lim LIM_CPU;
 extern struct pg_cpu_cfg CFG_CPU;
 extern struct pg_thermal_cfg CFG_THERMAL;
 
-#endif // PG_CONFIG_H
+#endif // PGOV_CONFIG_H

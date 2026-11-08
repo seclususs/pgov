@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "detect.h"
-#include "pg/log.h"
-#include "paths.h"
+#include "pgov/detect.h"
+#include "pgov/log.h"
+#include "pgov/paths.h"
 #include <errno.h> // IWYU pragma: keep
 #include <unistd.h>
 

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#ifndef PG_THERMAL_H
-#define PG_THERMAL_H
+#ifndef PGOV_THERMAL_H
+#define PGOV_THERMAL_H
 
-#include "pg/math.h"
-#include "pg/kalman.h"
+#include "pgov/math.h"
+#include "pgov/kalman.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <time.h>
@@ -32,4 +32,4 @@ q16_t pg_thermal_update(struct pg_thermal_state *state, q16_t cpu_temp,
 			q16_t bat_temp, const struct pg_thermal_cfg *cfg,
 			const struct timespec *now);
 
-#endif // PG_THERMAL_H
+#endif // PGOV_THERMAL_H

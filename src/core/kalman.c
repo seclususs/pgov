@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "pg/kalman.h"
+#include "pgov/kalman.h"
 
 void pg_kalman_init(struct pg_kalman_state *state)
 {

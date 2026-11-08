@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#ifndef PG_TIME_H
-#define PG_TIME_H
+#ifndef PGOV_TIME_H
+#define PGOV_TIME_H
 
-#include "compiler.h"
-#include "pg/math.h"
+#include "pgov/compiler.h"
+#include "pgov/math.h"
 #include <time.h>
 
 static ALWAYS_INLINE q16_t pg_dt_sec(const struct timespec *prev,
@@ -24,4 +24,4 @@ static ALWAYS_INLINE q16_t pg_dt_sec(const struct timespec *prev,
 	return (q16_t)(sec * Q16_ONE) + nsec_q16;
 }
 
-#endif // PG_TIME_H
+#endif // PGOV_TIME_H

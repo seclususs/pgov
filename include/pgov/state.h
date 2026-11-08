@@ -1,16 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#ifndef PG_STATE_H
-#define PG_STATE_H
+#ifndef PGOV_STATE_H
+#define PGOV_STATE_H
 
-#include "pg/cpu.h"
-#include "pg/poll.h"
-#include "psi.h"
-#include "sensor.h"
-#include "node.h"
-#include "pg/thermal.h"
-#include "pg/math.h"
+#include "pgov/cpu.h"
+#include "pgov/poll.h"
+#include "pgov/psi.h"
+#include "pgov/sensor.h"
+#include "pgov/node.h"
+#include "pgov/thermal.h"
+#include "pgov/math.h"
 #include <stdbool.h>
 #include <time.h>
 
@@ -85,4 +85,4 @@ struct ALIGNED(64) pg_context {
 	pg_event_cb on_timeout;
 };
 
-#endif // PG_STATE_H
+#endif // PGOV_STATE_H

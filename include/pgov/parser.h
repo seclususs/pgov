@@ -4,8 +4,8 @@
 #ifndef PGOV_PARSER_H
 #define PGOV_PARSER_H
 
-#include "compiler.h"
-#include "pg/math.h"
+#include "pgov/compiler.h"
+#include "pgov/math.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>

@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#ifndef PG_SIGNAL_H
-#define PG_SIGNAL_H
+#ifndef PGOV_SIGNAL_H
+#define PGOV_SIGNAL_H
 
 /**
  * @brief Hijacks POSIX signals and converts them into a synchronous file descriptor.
@@ -21,4 +21,4 @@ int pg_signal_init(void);
 void pg_signal_catch_crash(void (*hook)(void));
 void pg_signal_close(int fd);
 
-#endif // PG_SIGNAL_H
+#endif // PGOV_SIGNAL_H

@@ -4,7 +4,7 @@
 #ifndef PGOV_EPOLL_H
 #define PGOV_EPOLL_H
 
-#include "pg/state.h"
+#include "pgov/state.h"
 
 int pg_epoll_add_trg(struct pg_context *ctx);
 void pg_epoll_rm_trg(struct pg_context *ctx);

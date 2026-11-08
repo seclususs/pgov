@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "pg/thermal.h"
-#include "pg/config.h"
-#include "pg/time.h"
+#include "pgov/thermal.h"
+#include "pgov/config.h"
+#include "pgov/time.h"
 
 static void thermal_filter_reset(struct pg_thermal_state *state)
 {

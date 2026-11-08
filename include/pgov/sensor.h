@@ -4,8 +4,8 @@
 #ifndef PGOV_SENSOR_H
 #define PGOV_SENSOR_H
 
-#include "pg/config.h"
-#include "pg/math.h"
+#include "pgov/config.h"
+#include "pgov/math.h"
 #include <stdint.h>
 
 struct pg_temp_sensor {

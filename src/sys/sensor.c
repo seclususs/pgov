@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "sensor.h"
-#include "scan.h"
-#include "node.h"
-#include "pg/log.h"
-#include "parser.h"
+#include "pgov/sensor.h"
+#include "pgov/scan.h"
+#include "pgov/node.h"
+#include "pgov/log.h"
+#include "pgov/parser.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>

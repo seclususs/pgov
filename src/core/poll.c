@@ -1,9 +1,9 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "pg/poll.h"
-#include "pg/config.h"
-#include "pg/time.h"
+#include "pgov/poll.h"
+#include "pgov/config.h"
+#include "pgov/time.h"
 
 void pg_poll_init(struct pg_poll_state *state)
 {

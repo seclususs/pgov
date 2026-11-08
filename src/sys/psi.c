@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "psi.h"
-#include "pg/log.h"
-#include "parser.h"
-#include "pg/time.h"
+#include "pgov/psi.h"
+#include "pgov/log.h"
+#include "pgov/parser.h"
+#include "pgov/time.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <unistd.h>

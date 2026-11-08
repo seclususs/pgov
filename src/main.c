@@ -1,5 +1,5 @@
-#include "daemon.h"
-#include "compiler.h"
+#include "pgov/daemon.h"
+#include "pgov/compiler.h"
 
 PGOV_AUTHOR("seclususs");
 PGOV_LICENSE("GPL-3.0-only");

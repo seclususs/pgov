@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#ifndef PG_KALMAN_H
-#define PG_KALMAN_H
+#ifndef PGOV_KALMAN_H
+#define PGOV_KALMAN_H
 
-#include "pg/math.h"
+#include "pgov/math.h"
 #include <stdbool.h>
 
 /**
@@ -55,4 +55,4 @@ void pg_kalman_reset(struct pg_kalman_state *state);
 q16_t pg_kalman_update(struct pg_kalman_state *state, q16_t z_meas,
 		       q16_t dt_sec);
 
-#endif // PG_KALMAN_H
+#endif // PGOV_KALMAN_H

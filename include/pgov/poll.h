@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#ifndef PG_POLL_H
-#define PG_POLL_H
+#ifndef PGOV_POLL_H
+#define PGOV_POLL_H
 
-#include "pg/math.h"
+#include "pgov/math.h"
 #include <stdint.h>
 #include <time.h>
 
@@ -20,4 +20,4 @@ void pg_poll_init(struct pg_poll_state *state);
 uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
 			   q16_t avg300, q16_t press_vel);
 
-#endif // PG_POLL_H
+#endif // PGOV_POLL_H

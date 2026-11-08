@@ -2,11 +2,11 @@
 // Copyright (C) 2026 seclususs
 
 #define _GNU_SOURCE
-#include "topo.h"
-#include "pg/log.h"
-#include "compiler.h"
-#include "parser.h"
-#include "node.h"
+#include "pgov/topo.h"
+#include "pgov/log.h"
+#include "pgov/compiler.h"
+#include "pgov/parser.h"
+#include "pgov/node.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <sched.h>

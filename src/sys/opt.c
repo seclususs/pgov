@@ -3,14 +3,14 @@
 
 #if defined(NDK_BUILD)
 
-#include "opt.h"
-#include "compiler.h"
-#include "conf.h"
-#include "paths.h"
-#include "node.h"
-#include "prop.h"
-#include "str.h"
-#include "pg/log.h"
+#include "pgov/opt.h"
+#include "pgov/compiler.h"
+#include "pgov/conf.h"
+#include "pgov/paths.h"
+#include "pgov/node.h"
+#include "pgov/prop.h"
+#include "pgov/str.h"
+#include "pgov/log.h"
 #include <errno.h> // IWYU pragma: keep
 
 #define MAX_PROPS 64

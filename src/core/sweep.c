@@ -4,15 +4,15 @@
 #if defined(NDK_BUILD)
 
 #define _GNU_SOURCE
-#include "pg/sweep.h"
-#include "fs.h"
-#include "pg/config.h"
-#include "pg/log.h"
-#include "task.h"
-#include "sensor.h"
-#include "paths.h"
-#include "compiler.h"
-#include "psi.h"
+#include "pgov/sweep.h"
+#include "pgov/fs.h"
+#include "pgov/config.h"
+#include "pgov/log.h"
+#include "pgov/task.h"
+#include "pgov/sensor.h"
+#include "pgov/paths.h"
+#include "pgov/compiler.h"
+#include "pgov/psi.h"
 #include <dirent.h>
 #include <fcntl.h>
 #include <sys/stat.h>

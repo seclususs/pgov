@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "node.h"
-#include "parser.h"
-#include "pg/log.h"
-#include "pg/config.h"
+#include "pgov/node.h"
+#include "pgov/parser.h"
+#include "pgov/log.h"
+#include "pgov/config.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>

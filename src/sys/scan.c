@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "scan.h"
-#include "compiler.h"
-#include "str.h"
-#include "paths.h"
+#include "pgov/scan.h"
+#include "pgov/compiler.h"
+#include "pgov/str.h"
+#include "pgov/paths.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>

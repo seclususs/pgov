@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#ifndef PG_LOG_H
-#define PG_LOG_H
+#ifndef PGOV_LOG_H
+#define PGOV_LOG_H
 
 #include <android/log.h>
 
@@ -28,4 +28,4 @@ void pg_log_err(const char *tag, const char *fmt, ...)
 	} while (0)
 #endif
 
-#endif // PG_LOG_H
+#endif // PGOV_LOG_H

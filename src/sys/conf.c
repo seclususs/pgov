@@ -3,8 +3,8 @@
 
 #if defined(NDK_BUILD)
 
-#include "conf.h"
-#include "compiler.h"
+#include "pgov/conf.h"
+#include "pgov/compiler.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
