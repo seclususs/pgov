@@ -117,7 +117,7 @@ int pg_task_set_timer_slack(unsigned long slack_ns)
 		return -err;
 	}
 
-	LOGD("task: timer coalescing active slack=%lu ns", slack_ns);
+	LOGD("task: timer slack configured slack=%lu ns", slack_ns);
 	return 0;
 }
 
