@@ -92,7 +92,7 @@ void pg_sensor_init_bl(struct pg_bl_sensor *sensor, const char *path)
 	if (UNLIKELY(!sensor || !path || path[0] == '\0'))
 		return;
 
-	if (sensor->n >= PG_BL_MAX)
+	if (sensor->n >= CFG_BL_MAX)
 		return;
 
 	int fd = open(path, O_RDONLY | O_CLOEXEC);

@@ -35,7 +35,7 @@ q16_t pg_thermal_update(struct pg_thermal_state *state, q16_t cpu_temp,
 	q16_t c_marg = (b_marg < INT_TO_Q16(5)) ? (INT_TO_Q16(5) - b_marg) : 0;
 	q16_t sp = cfg->limit_cpu - c_marg;
 
-	if (UNLIKELY(dt > INT_TO_Q16(PG_THERM_STALE_SEC))) {
+	if (UNLIKELY(dt > INT_TO_Q16(CFG_THERM_STALE_SEC))) {
 		thermal_filter_reset(state);
 
 		state->prev_sat = 0;

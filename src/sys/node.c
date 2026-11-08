@@ -276,7 +276,7 @@ void pg_node_update(struct pg_node_cache *cache, uint64_t value, bool force,
 		return;
 	}
 
-	if (cache->fails < PG_NODE_FAIL_MAX)
+	if (cache->fails < CFG_NODE_FAIL_MAX)
 		cache->fails++;
 
 	uint32_t delay = NODE_BACKOFF_BASE_MS << (cache->fails - 1);

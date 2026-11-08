@@ -5,7 +5,7 @@
 #include "pgov/config.h"
 #include "pgov/log.h"
 #include "pgov/epoll.h"
-#include "pgov/paths.h"
+#include "pgov/path.h"
 #include "pgov/compiler.h"
 #include "pgov/cpu.h"
 #include "pgov/math.h"
@@ -18,12 +18,12 @@
 #include "pgov/time.h"
 #include <unistd.h>
 
-static const struct pg_node_chk CHK_LAT = { PG_CHK_REL, PG_CHK_LAT };
-static const struct pg_node_chk CHK_GRAN = { PG_CHK_REL, PG_CHK_GRAN };
-static const struct pg_node_chk CHK_WAKE = { PG_CHK_REL, PG_CHK_WAKE };
-static const struct pg_node_chk CHK_MIG = { PG_CHK_ABS, PG_CHK_MIG };
-static const struct pg_node_chk CHK_WALT = { PG_CHK_ABS, PG_CHK_WALT };
-static const struct pg_node_chk CHK_UCL = { PG_CHK_ABS, PG_CHK_UCL };
+static const struct pg_node_chk CHK_LAT = { PG_CHK_REL, CFG_CHK_LAT };
+static const struct pg_node_chk CHK_GRAN = { PG_CHK_REL, CFG_CHK_GRAN };
+static const struct pg_node_chk CHK_WAKE = { PG_CHK_REL, CFG_CHK_WAKE };
+static const struct pg_node_chk CHK_MIG = { PG_CHK_ABS, CFG_CHK_MIG };
+static const struct pg_node_chk CHK_WALT = { PG_CHK_ABS, CFG_CHK_WALT };
+static const struct pg_node_chk CHK_UCL = { PG_CHK_ABS, CFG_CHK_UCL };
 
 int pg_gov_init(struct pg_context *ctx)
 {
@@ -38,7 +38,7 @@ static inline bool update_disp(struct pg_context *ctx,
 			       const struct timespec *now)
 {
 	if (LIKELY(ctx->disp_state == PG_DISP_ON) &&
-	    pg_dt_sec(&ctx->last_disp, now) < INT_TO_Q16(PG_DISP_CHK_SEC))
+	    pg_dt_sec(&ctx->last_disp, now) < INT_TO_Q16(CFG_DISP_CHK_SEC))
 		return false;
 
 	ctx->last_disp = *now;
@@ -67,7 +67,7 @@ static inline bool update_disp(struct pg_context *ctx,
 
 #ifdef NDK_BUILD
 		q16_t sweep_elaps = pg_dt_sec(&ctx->last_sweep, now);
-		if (sweep_elaps > INT_TO_Q16(PG_SWEEP_IVL_SEC)) {
+		if (sweep_elaps > INT_TO_Q16(CFG_SWEEP_IVL_SEC)) {
 			pg_sweep_run(ctx);
 			clock_gettime(CLOCK_MONOTONIC, &ctx->last_sweep);
 		}
@@ -81,8 +81,8 @@ static inline bool update_disp(struct pg_context *ctx,
 
 static void arm_trigger(struct pg_context *ctx)
 {
-	int fd = pg_psi_open_trg(PG_PATH_PSI_CPU, PG_PSI_THRESHOLD_US,
-				 PG_PSI_WINDOW_US);
+	int fd = pg_psi_open_trg(PATH_PSI_CPU, CFG_PSI_THRESHOLD_US,
+				 CFG_PSI_WINDOW_US);
 	if (fd < 0)
 		return;
 
@@ -106,7 +106,7 @@ static inline bool read_psi(struct pg_context *ctx, const struct timespec *now,
 		return true;
 	}
 
-	if (ctx->psi_fails < PG_PSI_FAIL_MAX) {
+	if (ctx->psi_fails < CFG_PSI_FAIL_MAX) {
 		ctx->psi_fails++;
 		LOGW("gov: psi read failed status=%d, init recov", status);
 	}
@@ -121,7 +121,7 @@ static inline bool read_psi(struct pg_context *ctx, const struct timespec *now,
 		ctx->trg_fd = -1;
 	}
 
-	pg_psi_recov(&ctx->psi, PG_PATH_PSI_CPU);
+	pg_psi_recov(&ctx->psi, PATH_PSI_CPU);
 
 	arm_trigger(ctx);
 
@@ -132,7 +132,7 @@ static inline void poll_battery_metrics(struct pg_context *ctx,
 					const struct timespec *now)
 {
 	q16_t elaps_bat = pg_dt_sec(&ctx->last_bat, now);
-	if (elaps_bat < INT_TO_Q16(PG_BAT_CHK_SEC))
+	if (elaps_bat < INT_TO_Q16(CFG_BAT_CHK_SEC))
 		return;
 
 	pg_sensor_read_bat_cap(&ctx->bat_cap_sensor, &ctx->bat_lvl);
@@ -147,7 +147,7 @@ static inline void poll_thermal_metrics(struct pg_context *ctx,
 					const struct timespec *now)
 {
 	q16_t elaps_therm = pg_dt_sec(&ctx->last_therm, now);
-	if (elaps_therm < INT_TO_Q16(PG_THERM_CHK_SEC))
+	if (elaps_therm < INT_TO_Q16(CFG_THERM_CHK_SEC))
 		return;
 
 	q16_t cpu_temp = 0;
@@ -157,7 +157,7 @@ static inline void poll_thermal_metrics(struct pg_context *ctx,
 		if (pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor, &cpu_temp) ==
 		    0) {
 			ctx->temp_fails = 0;
-		} else if (ctx->temp_fails < PG_TEMP_FAIL_MAX) {
+		} else if (ctx->temp_fails < CFG_TEMP_FAIL_MAX) {
 			ctx->temp_fails++;
 			hold = true;
 		} else {
@@ -245,7 +245,7 @@ static inline void apply_mapping(struct pg_context *ctx,
 {
 	const struct pg_cpu_cfg *c = &CFG_CPU;
 	const struct pg_cpu_lim *l = &LIM_CPU;
-	const uint64_t q_ns = PG_QUANT_NS;
+	const uint64_t q_ns = CFG_QUANT_NS;
 	struct pg_cpu_eff *eff = &ctx->load_state.eff;
 
 	uint64_t v_lat = 0;
@@ -334,7 +334,7 @@ static void dormant_tick(struct pg_context *ctx)
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	if (!update_disp(ctx, &now))
-		ctx->next_wake = PG_MAX_POLL_MS;
+		ctx->next_wake = CFG_MAX_POLL_MS;
 #else
 	ctx->next_wake = -1;
 #endif // NDK_BUILD

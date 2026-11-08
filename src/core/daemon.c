@@ -12,7 +12,7 @@
 #include "pgov/log.h"
 #include "pgov/memory.h"
 #include "pgov/parser.h"
-#include "pgov/paths.h"
+#include "pgov/path.h"
 #include "pgov/prop.h"
 #include "pgov/rlimit.h"
 #include "pgov/scan.h"
@@ -33,37 +33,37 @@
 static struct pg_context context;
 
 static const char *const CAND_LAT[] = {
-	PG_PATH_SCHED_LAT,
-	PG_PATH_SCHED_LAT_DBG,
+	PATH_SCHED_LAT,
+	PATH_SCHED_LAT_DBG,
 	NULL,
 };
 
 static const char *const CAND_GRAN[] = {
-	PG_PATH_SCHED_GRAN,
-	PG_PATH_SCHED_GRAN_DBG,
+	PATH_SCHED_GRAN,
+	PATH_SCHED_GRAN_DBG,
 	NULL,
 };
 
 static const char *const CAND_WAKE[] = {
-	PG_PATH_SCHED_WAKEUP,
-	PG_PATH_SCHED_WAKEUP_DBG,
+	PATH_SCHED_WAKEUP,
+	PATH_SCHED_WAKEUP_DBG,
 	NULL,
 };
 
 static const char *const CAND_MIG[] = {
-	PG_PATH_SCHED_MIG,
-	PG_PATH_SCHED_MIG_DBG,
+	PATH_SCHED_MIG,
+	PATH_SCHED_MIG_DBG,
 	NULL,
 };
 
 static const char *const CAND_WALT[] = {
-	PG_PATH_SCHED_WALT,
+	PATH_SCHED_WALT,
 	NULL,
 };
 
 static const char *const CAND_UCL[] = {
-	PG_PATH_SCHED_UCLAMP_UTIL,
-	PG_PATH_SCHED_UTIL_CLAMP,
+	PATH_SCHED_UCLAMP_UTIL,
+	PATH_SCHED_UTIL_CLAMP,
 	NULL,
 };
 
@@ -117,8 +117,9 @@ static void restore_all(struct pg_context *ctx)
 
 static void init_os_environment(void)
 {
-	int log_fd = open(PG_PATH_LOG,
-			  O_CREAT | O_WRONLY | O_APPEND | O_CLOEXEC, 0644);
+	int log_fd =
+		open(PATH_LOG, O_CREAT | O_WRONLY | O_APPEND | O_CLOEXEC, 0644);
+
 	if (log_fd >= 0) {
 		dup2(log_fd, STDERR_FILENO);
 		close(log_fd);
@@ -128,18 +129,18 @@ static void init_os_environment(void)
 	pg_memory_shield();
 	pg_memory_lock();
 	pg_rlimit_set_max_fd();
-	pg_rlimit_set_stack(PG_STACK_SIZE);
+	pg_rlimit_set_stack(CFG_STACK_SIZE);
 	pg_task_set_core_efficiency();
-	pg_task_set_rt_prio(PG_RT_PRIORITY);
-	pg_task_set_timer_slack(PG_TIMER_SLACK_NS);
-	pg_task_set_uclamp(PG_UCLAMP_MAX);
-	pg_task_set_io_prio(PG_IOPRIO_CLASS, PG_IOPRIO_DATA);
+	pg_task_set_rt_prio(CFG_RT_PRIORITY);
+	pg_task_set_timer_slack(CFG_TIMER_SLACK_NS);
+	pg_task_set_uclamp(CFG_UCLAMP_MAX);
+	pg_task_set_io_prio(CFG_IOPRIO_CLASS, CFG_IOPRIO_DATA);
 }
 
 static inline void init_context_defaults(struct pg_context *ctx)
 {
 	ctx->shutdown_req = false;
-	ctx->next_wake = PG_MIN_POLL_MS;
+	ctx->next_wake = CFG_MIN_POLL_MS;
 	ctx->disp_state = PG_DISP_UNKNOWN;
 	ctx->cached_th_scl = Q16_ONE;
 	ctx->load_state.first_run = true;
@@ -156,7 +157,7 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->bat_cap_sensor.fd = -1;
 
 	ctx->bl_sensor.n = 0;
-	for (size_t i = 0; i < PG_BL_MAX; i++)
+	for (size_t i = 0; i < CFG_BL_MAX; i++)
 		ctx->bl_sensor.fd[i] = -1;
 
 	ctx->sched_lat.fd = -1;
@@ -190,12 +191,12 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	LOGD("daemon: cpu thermal sensor mapped to %s", t_path);
 	pg_sensor_init_cpu_temp(&ctx->cpu_temp_sensor, t_path);
 
-	pg_sensor_init_bat_temp(&ctx->bat_temp_sensor, PG_PATH_BATTERY_TEMP);
-	pg_sensor_init_bat_cap(&ctx->bat_cap_sensor, PG_PATH_BATTERY_CAP);
+	pg_sensor_init_bat_temp(&ctx->bat_temp_sensor, PATH_BATTERY_TEMP);
+	pg_sensor_init_bat_cap(&ctx->bat_cap_sensor, PATH_BATTERY_CAP);
 
 	if (!ctx->dormant) {
 		ctx->trg_fd = pg_psi_open_trg(
-			PG_PATH_PSI_CPU, PG_PSI_THRESHOLD_US, PG_PSI_WINDOW_US);
+			PATH_PSI_CPU, CFG_PSI_THRESHOLD_US, CFG_PSI_WINDOW_US);
 
 		if (ctx->trg_fd < 0) {
 			LOGE("daemon: failed inject err=%d", ctx->trg_fd);
@@ -203,7 +204,7 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 		}
 	}
 
-	pg_psi_init(&ctx->psi, PG_PATH_PSI_CPU);
+	pg_psi_init(&ctx->psi, PATH_PSI_CPU);
 
 	ctx->sig_fd = pg_signal_init();
 	if (ctx->sig_fd < 0)
@@ -212,8 +213,8 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	pg_thermal_init(&ctx->thermal_state);
 	pg_poll_init(&ctx->poll_state);
 
-	char b_path[PG_BL_MAX][PG_BL_PATH_LEN];
-	int n_bl = pg_scan_backlight(b_path, PG_BL_MAX);
+	char b_path[CFG_BL_MAX][PG_BL_PATH_LEN];
+	int n_bl = pg_scan_backlight(b_path, CFG_BL_MAX);
 	for (int i = 0; i < n_bl; i++)
 		pg_sensor_init_bl(&ctx->bl_sensor, b_path[i]);
 
@@ -259,7 +260,7 @@ int pg_daemon_init(void)
 	if (ret != 0)
 		goto cleanup;
 
-	context.lock_fd = pg_lockfile_init(PG_PATH_LOCK);
+	context.lock_fd = pg_lockfile_init(PATH_LOCK);
 	if (context.lock_fd < 0) {
 		ret = context.lock_fd;
 		goto cleanup;

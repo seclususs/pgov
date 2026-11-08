@@ -135,13 +135,13 @@ int pg_epoll_run(struct pg_context *ctx)
 	if (ret < 0)
 		return ret;
 
-	struct epoll_event events[PG_MAX_EVENTS];
+	struct epoll_event events[CFG_MAX_EVENTS];
 
 	while (LIKELY(!ctx->shutdown_req)) {
 		struct timespec wait_start;
 		clock_gettime(CLOCK_MONOTONIC, &wait_start);
 
-		int nfds = epoll_wait(ctx->epoll_fd, events, PG_MAX_EVENTS,
+		int nfds = epoll_wait(ctx->epoll_fd, events, CFG_MAX_EVENTS,
 				      ctx->next_wake);
 
 		if (UNLIKELY(nfds < 0)) {

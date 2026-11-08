@@ -20,7 +20,7 @@ struct pg_bat_sensor {
 };
 
 struct pg_bl_sensor {
-	int fd[PG_BL_MAX];
+	int fd[CFG_BL_MAX];
 	uint8_t n;
 	uint8_t buf[16];
 };

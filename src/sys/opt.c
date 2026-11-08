@@ -6,7 +6,7 @@
 #include "pgov/opt.h"
 #include "pgov/compiler.h"
 #include "pgov/conf.h"
-#include "pgov/paths.h"
+#include "pgov/path.h"
 #include "pgov/node.h"
 #include "pgov/prop.h"
 #include "pgov/str.h"
@@ -61,7 +61,7 @@ static int parse_cb(const char *key, const char *val)
 
 int pg_opt_init(void)
 {
-	int ret = pg_conf_parse(CONF_PATH, parse_cb);
+	int ret = pg_conf_parse(PATH_CONF, parse_cb);
 	if (ret < 0 && ret != -ENOENT) {
 		LOGW("opt: failed to parse conf err=%d", ret);
 		return ret;
