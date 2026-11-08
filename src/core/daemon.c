@@ -63,7 +63,8 @@ static const char *const CAND_WALT[] = {
 };
 
 static const char *const CAND_UCL[] = {
-	PG_PATH_SCHED_UCLAMP,
+	PG_PATH_SCHED_UCLAMP_UTIL,
+	PG_PATH_SCHED_UTIL_CLAMP,
 	NULL,
 };
 
