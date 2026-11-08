@@ -4,7 +4,6 @@
 #ifndef PGOV_SENSOR_H
 #define PGOV_SENSOR_H
 
-#include "compiler.h"
 #include "pg/config.h"
 #include "pg/math.h"
 #include <stdint.h>
@@ -26,35 +25,27 @@ struct pg_bl_sensor {
 	uint8_t buf[16];
 };
 
-void pg_sensor_init_cpu_temp(struct pg_temp_sensor *RESTRICT sensor,
-			     const char *RESTRICT path);
+void pg_sensor_init_cpu_temp(struct pg_temp_sensor *sensor, const char *path);
 
-void pg_sensor_init_bat_temp(struct pg_temp_sensor *RESTRICT sensor,
-			     const char *RESTRICT path);
+void pg_sensor_init_bat_temp(struct pg_temp_sensor *sensor, const char *path);
 
 void pg_sensor_temp_close(struct pg_temp_sensor *sensor);
 
-void pg_sensor_init_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
-			    const char *RESTRICT path);
+void pg_sensor_init_bat_cap(struct pg_bat_sensor *sensor, const char *path);
 
 void pg_sensor_bat_close(struct pg_bat_sensor *sensor);
 
-void pg_sensor_init_bl(struct pg_bl_sensor *RESTRICT sensor,
-		       const char *RESTRICT path);
+void pg_sensor_init_bl(struct pg_bl_sensor *sensor, const char *path);
 
 void pg_sensor_bl_close(struct pg_bl_sensor *sensor);
 
-int pg_sensor_read_cpu_temp(struct pg_temp_sensor *RESTRICT sensor,
-			    q16_t *RESTRICT temp);
+int pg_sensor_read_cpu_temp(struct pg_temp_sensor *sensor, q16_t *temp);
 
-int pg_sensor_read_bat_temp(struct pg_temp_sensor *RESTRICT sensor,
-			    q16_t *RESTRICT temp);
+int pg_sensor_read_bat_temp(struct pg_temp_sensor *sensor, q16_t *temp);
 
-int pg_sensor_read_bat_cap(struct pg_bat_sensor *RESTRICT sensor,
-			   q16_t *RESTRICT cap);
+int pg_sensor_read_bat_cap(struct pg_bat_sensor *sensor, q16_t *cap);
 
-int pg_sensor_read_bl(struct pg_bl_sensor *RESTRICT sensor,
-		      int32_t *RESTRICT brightness);
+int pg_sensor_read_bl(struct pg_bl_sensor *sensor, int32_t *brightness);
 
 q16_t pg_sensor_get_trip_temp(q16_t fallback);
 

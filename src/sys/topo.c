@@ -47,8 +47,7 @@ static void format_path(char *RESTRICT buf, size_t buf_len,
 	buf[pos] = '\0';
 }
 
-static bool build_cpuset(long num_cores, const char *RESTRICT fmt,
-			 cpu_set_t *RESTRICT cpuset)
+static bool build_cpuset(long num_cores, const char *fmt, cpu_set_t *cpuset)
 {
 	long min_val = INT32_MAX;
 	bool found = false;

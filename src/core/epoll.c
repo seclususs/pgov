@@ -14,8 +14,8 @@
 #include <time.h>
 #include <unistd.h>
 
-static inline void epoll_error(struct pg_context *RESTRICT ctx,
-			       const struct timespec *RESTRICT wait_start)
+static inline void epoll_error(struct pg_context *ctx,
+			       const struct timespec *wait_start)
 {
 	if (errno == EINTR) {
 		if (ctx->next_wake < 0)
@@ -55,8 +55,8 @@ static inline void handle_trigger_event(struct pg_context *ctx)
 		ctx->on_trigger(ctx);
 }
 
-static inline void epoll_events(struct pg_context *RESTRICT ctx,
-				struct epoll_event *RESTRICT events, int nfds)
+static inline void epoll_events(struct pg_context *ctx,
+				struct epoll_event *events, int nfds)
 {
 	for (int i = 0; i < nfds; ++i) {
 		int ev_fd = events[i].data.fd;

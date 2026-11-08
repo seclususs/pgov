@@ -8,8 +8,8 @@
 #include "pg/math.h"
 #include <time.h>
 
-static ALWAYS_INLINE q16_t pg_dt_sec(const struct timespec *RESTRICT prev,
-				     const struct timespec *RESTRICT now)
+static ALWAYS_INLINE q16_t pg_dt_sec(const struct timespec *prev,
+				     const struct timespec *now)
 {
 	int64_t sec = (int64_t)(now->tv_sec - prev->tv_sec);
 	int64_t nsec = (int64_t)(now->tv_nsec - prev->tv_nsec);

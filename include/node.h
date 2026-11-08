@@ -70,9 +70,9 @@ int pg_node_read_i32(const char *path, int32_t *out_val);
  */
 int pg_node_write_strm(int fd, uint64_t value);
 
-int pg_node_write(const char *RESTRICT path, const char *RESTRICT val);
+int pg_node_write(const char *path, const char *val);
 
-void pg_node_update(struct pg_node_cache *RESTRICT cache, uint64_t value,
-		    bool force, const struct pg_node_chk *RESTRICT strat);
+void pg_node_update(struct pg_node_cache *cache, uint64_t value, bool force,
+		    const struct pg_node_chk *strat);
 
 #endif // PGOV_NODE_H

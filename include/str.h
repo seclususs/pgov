@@ -8,8 +8,7 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-static inline bool pg_str_has_prefix(const char *RESTRICT str,
-				     const char *RESTRICT prefix)
+static inline bool pg_str_has_prefix(const char *str, const char *prefix)
 {
 	while (*prefix)
 		if (*prefix++ != *str++)
@@ -18,8 +17,7 @@ static inline bool pg_str_has_prefix(const char *RESTRICT str,
 	return true;
 }
 
-static inline bool pg_str_contains(const char *RESTRICT str,
-				   const char *RESTRICT substr)
+static inline bool pg_str_contains(const char *str, const char *substr)
 {
 	if (!*substr)
 		return true;

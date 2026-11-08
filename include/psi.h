@@ -4,7 +4,6 @@
 #ifndef PGOV_PSI_H
 #define PGOV_PSI_H
 
-#include "compiler.h"
 #include "pg/kalman.h"
 #include "pg/math.h"
 #include <stdbool.h>
@@ -36,11 +35,9 @@ int pg_psi_open_trg(const char *path, int32_t threshold_us, int32_t window_us);
 
 void pg_psi_close_trg(int fd);
 
-int pg_psi_recov(struct pg_psi_monitor *RESTRICT mon,
-		 const char *RESTRICT path);
+int pg_psi_recov(struct pg_psi_monitor *mon, const char *path);
 
-void pg_psi_init(struct pg_psi_monitor *RESTRICT mon,
-		 const char *RESTRICT path);
+void pg_psi_init(struct pg_psi_monitor *mon, const char *path);
 
 void pg_psi_cleanup(struct pg_psi_monitor *mon);
 
@@ -59,10 +56,9 @@ void pg_psi_cleanup(struct pg_psi_monitor *mon);
  *
  * @return 0 on successful parse and filter update, or a negative POSIX error code.
  */
-int pg_psi_read(struct pg_psi_monitor *RESTRICT mon,
-		struct pg_psi_data *RESTRICT data,
-		const struct timespec *RESTRICT now);
+int pg_psi_read(struct pg_psi_monitor *mon, struct pg_psi_data *data,
+		const struct timespec *now);
 
-int pg_psi_read_raw(const char *RESTRICT path, q16_t *RESTRICT avg10);
+int pg_psi_read_raw(const char *path, q16_t *avg10);
 
 #endif // PGOV_PSI_H

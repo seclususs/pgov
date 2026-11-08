@@ -4,7 +4,6 @@
 #ifndef PG_THERMAL_H
 #define PG_THERMAL_H
 
-#include "compiler.h"
 #include "pg/math.h"
 #include "pg/kalman.h"
 #include <stdbool.h>
@@ -29,9 +28,8 @@ struct pg_thermal_state {
 
 void pg_thermal_init(struct pg_thermal_state *state);
 
-q16_t pg_thermal_update(struct pg_thermal_state *RESTRICT state, q16_t cpu_temp,
-			q16_t bat_temp,
-			const struct pg_thermal_cfg *RESTRICT cfg,
-			const struct timespec *RESTRICT now);
+q16_t pg_thermal_update(struct pg_thermal_state *state, q16_t cpu_temp,
+			q16_t bat_temp, const struct pg_thermal_cfg *cfg,
+			const struct timespec *now);
 
 #endif // PG_THERMAL_H

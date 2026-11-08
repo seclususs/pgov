@@ -3,6 +3,7 @@
 
 #define _GNU_SOURCE
 #include "fs.h"
+#include "compiler.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -110,8 +111,7 @@ int pg_fs_walk_fd(int dfd, pg_fs_cb cb, void *ctx, int max_depth)
 	return walk(dfd, cb, ctx, max_depth, 0);
 }
 
-int pg_fs_walk(const char *RESTRICT path, pg_fs_cb cb, void *RESTRICT ctx,
-	       int max_depth)
+int pg_fs_walk(const char *path, pg_fs_cb cb, void *ctx, int max_depth)
 {
 	if (UNLIKELY(!path || !cb || max_depth < 0))
 		return -EINVAL;

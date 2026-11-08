@@ -3,8 +3,8 @@
 
 #include "pg/cpu.h"
 
-PURE bool pg_cpu_trans(const struct pg_load_state *RESTRICT state,
-		       const struct pg_cpu_cfg *RESTRICT cfg)
+PURE bool pg_cpu_trans(const struct pg_load_state *state,
+		       const struct pg_cpu_cfg *cfg)
 {
 	if (UNLIKELY(!state || !cfg))
 		return false;
@@ -89,8 +89,8 @@ static inline q16_t calc_c_final(q16_t k_fin, q16_t vel, q16_t i_dt,
 	return (c_th > c_stb) ? c_th : c_stb;
 }
 
-void pg_cpu_upd_eff(struct pg_cpu_eff *RESTRICT eff, q16_t bat_lvl,
-		    q16_t th_scl, q16_t avg300)
+void pg_cpu_upd_eff(struct pg_cpu_eff *eff, q16_t bat_lvl, q16_t th_scl,
+		    q16_t avg300)
 {
 	if (UNLIKELY(!eff))
 		return;
@@ -118,9 +118,9 @@ void pg_cpu_upd_eff(struct pg_cpu_eff *RESTRICT eff, q16_t bat_lvl,
 		pg_math_lerp(FLOAT_TO_Q16(0.99F), FLOAT_TO_Q16(0.85F), noise);
 }
 
-q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
-			      const struct pg_demand_input *RESTRICT input,
-			      const struct pg_cpu_cfg *RESTRICT cfg)
+q16_t pg_cpu_calc_load_demand(struct pg_load_state *state,
+			      const struct pg_demand_input *input,
+			      const struct pg_cpu_cfg *cfg)
 {
 	if (UNLIKELY(!state || !input || !cfg))
 		return 0;
@@ -214,9 +214,9 @@ PURE q16_t pg_cpu_calc_therm_lat(q16_t th_scl, const struct pg_cpu_lim *lim)
 }
 
 PURE q16_t pg_cpu_calc_lat(q16_t p_eff, q16_t l_dem, q16_t th_lat,
-			   const struct pg_cpu_cfg *RESTRICT cfg,
-			   const struct pg_cpu_eff *RESTRICT eff,
-			   const struct pg_cpu_lim *RESTRICT lim)
+			   const struct pg_cpu_cfg *cfg,
+			   const struct pg_cpu_eff *eff,
+			   const struct pg_cpu_lim *lim)
 {
 	if (UNLIKELY(!cfg || !eff || !lim))
 		return 0;
@@ -235,8 +235,8 @@ PURE q16_t pg_cpu_calc_lat(q16_t p_eff, q16_t l_dem, q16_t th_lat,
 	return pg_math_clamp(f_lat, lim->min_lat, lim->max_lat);
 }
 
-PURE q16_t pg_cpu_calc_gran(q16_t lat, const struct pg_cpu_cfg *RESTRICT cfg,
-			    const struct pg_cpu_lim *RESTRICT lim)
+PURE q16_t pg_cpu_calc_gran(q16_t lat, const struct pg_cpu_cfg *cfg,
+			    const struct pg_cpu_lim *lim)
 {
 	if (UNLIKELY(!cfg || !lim))
 		return lat;
@@ -247,9 +247,8 @@ PURE q16_t pg_cpu_calc_gran(q16_t lat, const struct pg_cpu_cfg *RESTRICT cfg,
 	return (a_grn < lat) ? a_grn : lat;
 }
 
-PURE q16_t pg_cpu_calc_wakeup(q16_t p_eff,
-			      const struct pg_cpu_eff *RESTRICT eff,
-			      const struct pg_cpu_lim *RESTRICT lim)
+PURE q16_t pg_cpu_calc_wakeup(q16_t p_eff, const struct pg_cpu_eff *eff,
+			      const struct pg_cpu_lim *lim)
 {
 	if (UNLIKELY(!eff || !lim))
 		return 0;
@@ -292,9 +291,9 @@ PURE q16_t pg_cpu_calc_walt(q16_t press, const struct pg_cpu_lim *lim)
 }
 
 PURE q16_t pg_cpu_calc_uclamp(q16_t press, q16_t th_scl,
-			      const struct pg_cpu_cfg *RESTRICT cfg,
-			      const struct pg_cpu_eff *RESTRICT eff,
-			      const struct pg_cpu_lim *RESTRICT lim)
+			      const struct pg_cpu_cfg *cfg,
+			      const struct pg_cpu_eff *eff,
+			      const struct pg_cpu_lim *lim)
 {
 	if (UNLIKELY(!cfg || !eff || !lim))
 		return 0;

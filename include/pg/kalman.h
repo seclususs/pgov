@@ -4,7 +4,6 @@
 #ifndef PG_KALMAN_H
 #define PG_KALMAN_H
 
-#include "compiler.h"
 #include "pg/math.h"
 #include <stdbool.h>
 
@@ -38,7 +37,7 @@ struct pg_kalman_state {
 	bool first_run;
 };
 
-void pg_kalman_init(struct pg_kalman_state *RESTRICT state);
+void pg_kalman_init(struct pg_kalman_state *state);
 
 void pg_kalman_reset(struct pg_kalman_state *state);
 

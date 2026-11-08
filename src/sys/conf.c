@@ -4,6 +4,7 @@
 #if defined(NDK_BUILD)
 
 #include "conf.h"
+#include "compiler.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
@@ -30,7 +31,7 @@ static inline void trim_trailing(char *str)
 	}
 }
 
-static int parse_line(char *RESTRICT line, pg_conf_cb cb)
+static int parse_line(char *line, pg_conf_cb cb)
 {
 	char *key = line;
 	char *val;
@@ -87,7 +88,7 @@ static inline int dispatch_line(char *line, size_t len, pg_conf_cb cb)
 	return parse_line(line, cb);
 }
 
-int pg_conf_parse(const char *RESTRICT path, pg_conf_cb cb)
+int pg_conf_parse(const char *path, pg_conf_cb cb)
 {
 	char buf[CONF_BUF_SZ];
 	char line[CONF_LINE_SZ];

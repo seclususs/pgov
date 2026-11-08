@@ -21,9 +21,9 @@ void pg_prop_state_init(struct pg_prop_state *RESTRICT state,
 
 int pg_prop_set(struct pg_prop_state *RESTRICT state, const char *RESTRICT val);
 
-int pg_prop_reset(struct pg_prop_state *RESTRICT state);
+int pg_prop_reset(struct pg_prop_state *state);
 
-void pg_prop_cleanup(struct pg_prop_state *RESTRICT state);
+void pg_prop_cleanup(struct pg_prop_state *state);
 
 #endif // NDK_BUILD
 

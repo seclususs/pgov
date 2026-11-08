@@ -83,7 +83,7 @@ void pg_node_cache_cleanup(struct pg_node_cache *cache)
 	cache->active = false;
 }
 
-int pg_node_read_i32(const char *RESTRICT path, int32_t *RESTRICT out_val)
+int pg_node_read_i32(const char *path, int32_t *out_val)
 {
 	int ret = 0;
 
@@ -152,7 +152,7 @@ int pg_node_write_strm(int fd, uint64_t value)
 	return 0;
 }
 
-int pg_node_write(const char *RESTRICT path, const char *RESTRICT val)
+int pg_node_write(const char *path, const char *val)
 {
 	ssize_t res;
 	int ret = 0;
@@ -231,8 +231,8 @@ static inline bool relative(uint64_t cur, uint64_t tgt, uint64_t tol)
 	return (diff * (uint64_t)1000) >= (cur * tol);
 }
 
-void pg_node_update(struct pg_node_cache *RESTRICT cache, uint64_t value,
-		    bool force, const struct pg_node_chk *RESTRICT strat)
+void pg_node_update(struct pg_node_cache *cache, uint64_t value, bool force,
+		    const struct pg_node_chk *strat)
 {
 	if (UNLIKELY(!cache))
 		return;

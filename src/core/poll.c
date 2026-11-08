@@ -5,7 +5,7 @@
 #include "pg/config.h"
 #include "pg/time.h"
 
-void pg_poll_init(struct pg_poll_state *RESTRICT state)
+void pg_poll_init(struct pg_poll_state *state)
 {
 	if (UNLIKELY(!state))
 		return;

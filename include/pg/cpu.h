@@ -66,37 +66,36 @@ struct pg_load_state {
 	struct pg_cpu_eff eff;
 };
 
-PURE bool pg_cpu_trans(const struct pg_load_state *RESTRICT state,
-		       const struct pg_cpu_cfg *RESTRICT cfg);
+PURE bool pg_cpu_trans(const struct pg_load_state *state,
+		       const struct pg_cpu_cfg *cfg);
 
 void pg_cpu_upd_intg(struct pg_load_state *RESTRICT state, q16_t bat_lvl,
 		     q16_t dt_real, q16_t *RESTRICT i, q16_t *RESTRICT i_dt);
 
-void pg_cpu_upd_eff(struct pg_cpu_eff *RESTRICT eff, q16_t bat_lvl,
-		    q16_t th_scl, q16_t avg300);
+void pg_cpu_upd_eff(struct pg_cpu_eff *eff, q16_t bat_lvl, q16_t th_scl,
+		    q16_t avg300);
 
-q16_t pg_cpu_calc_load_demand(struct pg_load_state *RESTRICT state,
-			      const struct pg_demand_input *RESTRICT input,
-			      const struct pg_cpu_cfg *RESTRICT cfg);
+q16_t pg_cpu_calc_load_demand(struct pg_load_state *state,
+			      const struct pg_demand_input *input,
+			      const struct pg_cpu_cfg *cfg);
 
 PURE q16_t pg_cpu_calc_trend_gain(q16_t vel);
 
 PURE q16_t pg_cpu_calc_eff_press(q16_t l_dem, q16_t t_fact,
-				 const struct pg_cpu_eff *RESTRICT eff);
+				 const struct pg_cpu_eff *eff);
 
 PURE q16_t pg_cpu_calc_therm_lat(q16_t th_scl, const struct pg_cpu_lim *lim);
 
 PURE q16_t pg_cpu_calc_lat(q16_t p_eff, q16_t l_dem, q16_t th_lat,
-			   const struct pg_cpu_cfg *RESTRICT cfg,
-			   const struct pg_cpu_eff *RESTRICT eff,
-			   const struct pg_cpu_lim *RESTRICT lim);
+			   const struct pg_cpu_cfg *cfg,
+			   const struct pg_cpu_eff *eff,
+			   const struct pg_cpu_lim *lim);
 
-PURE q16_t pg_cpu_calc_gran(q16_t lat, const struct pg_cpu_cfg *RESTRICT cfg,
-			    const struct pg_cpu_lim *RESTRICT lim);
+PURE q16_t pg_cpu_calc_gran(q16_t lat, const struct pg_cpu_cfg *cfg,
+			    const struct pg_cpu_lim *lim);
 
-PURE q16_t pg_cpu_calc_wakeup(q16_t p_eff,
-			      const struct pg_cpu_eff *RESTRICT eff,
-			      const struct pg_cpu_lim *RESTRICT lim);
+PURE q16_t pg_cpu_calc_wakeup(q16_t p_eff, const struct pg_cpu_eff *eff,
+			      const struct pg_cpu_lim *lim);
 
 PURE q16_t pg_cpu_calc_migration(q16_t vel, q16_t p_eff,
 				 const struct pg_cpu_lim *lim);
@@ -104,8 +103,8 @@ PURE q16_t pg_cpu_calc_migration(q16_t vel, q16_t p_eff,
 PURE q16_t pg_cpu_calc_walt(q16_t press, const struct pg_cpu_lim *lim);
 
 PURE q16_t pg_cpu_calc_uclamp(q16_t press, q16_t th_scl,
-			      const struct pg_cpu_cfg *RESTRICT cfg,
-			      const struct pg_cpu_eff *RESTRICT eff,
-			      const struct pg_cpu_lim *RESTRICT lim);
+			      const struct pg_cpu_cfg *cfg,
+			      const struct pg_cpu_eff *eff,
+			      const struct pg_cpu_lim *lim);
 
 #endif // PG_CPU_H

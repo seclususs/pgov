@@ -3,7 +3,7 @@
 
 #include "pg/kalman.h"
 
-void pg_kalman_init(struct pg_kalman_state *RESTRICT state)
+void pg_kalman_init(struct pg_kalman_state *state)
 {
 	pg_kalman_reset(state);
 }

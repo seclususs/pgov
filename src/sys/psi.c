@@ -62,7 +62,7 @@ void pg_psi_close_trg(int fd)
 		close(fd);
 }
 
-int pg_psi_recov(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path)
+int pg_psi_recov(struct pg_psi_monitor *mon, const char *path)
 {
 	if (UNLIKELY(!mon || !path))
 		return -EINVAL;
@@ -81,7 +81,7 @@ int pg_psi_recov(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path)
 	return 0;
 }
 
-void pg_psi_init(struct pg_psi_monitor *RESTRICT mon, const char *RESTRICT path)
+void pg_psi_init(struct pg_psi_monitor *mon, const char *path)
 {
 	if (UNLIKELY(!mon || !path))
 		return;
@@ -107,8 +107,7 @@ void pg_psi_cleanup(struct pg_psi_monitor *mon)
 	}
 }
 
-static inline int buffer_cmp(const uint8_t *RESTRICT buf,
-			     const char *RESTRICT str, size_t len)
+static inline int buffer_cmp(const uint8_t *buf, const char *str, size_t len)
 {
 	for (size_t i = 0; i < len; ++i)
 		if (buf[i] != (uint8_t)str[i])
@@ -173,9 +172,9 @@ static inline size_t parse(const uint8_t *RESTRICT buf, size_t len, size_t pos,
 	return pos;
 }
 
-static inline void calc_kalman(struct pg_psi_monitor *RESTRICT mon,
-			       struct pg_psi_trend *RESTRICT trend,
-			       uint64_t cur_tot, q16_t dt_sec)
+static inline void calc_kalman(struct pg_psi_monitor *mon,
+			       struct pg_psi_trend *trend, uint64_t cur_tot,
+			       q16_t dt_sec)
 {
 	if (mon->first_run) {
 		trend->cur = trend->avg10;
@@ -206,9 +205,8 @@ static inline void calc_kalman(struct pg_psi_monitor *RESTRICT mon,
 	}
 }
 
-int pg_psi_read(struct pg_psi_monitor *RESTRICT mon,
-		struct pg_psi_data *RESTRICT data,
-		const struct timespec *RESTRICT now)
+int pg_psi_read(struct pg_psi_monitor *mon, struct pg_psi_data *data,
+		const struct timespec *now)
 {
 	if (UNLIKELY(!mon || !data || !now))
 		return -EINVAL;
@@ -272,7 +270,7 @@ int pg_psi_read(struct pg_psi_monitor *RESTRICT mon,
 	return 0;
 }
 
-int pg_psi_read_raw(const char *RESTRICT path, q16_t *RESTRICT avg10)
+int pg_psi_read_raw(const char *path, q16_t *avg10)
 {
 	if (UNLIKELY(!path || !avg10))
 		return -EINVAL;

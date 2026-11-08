@@ -71,8 +71,8 @@ static bool sweep_chk_intr(struct sweep_ctx *sctx)
 	return false;
 }
 
-static enum pg_fs_act sweep_cb(int dfd, const char *RESTRICT name, uint8_t type,
-			       int depth, void *RESTRICT user)
+static enum pg_fs_act sweep_cb(int dfd, const char *name, uint8_t type,
+			       int depth, void *user)
 {
 	UNUSED(depth);
 	struct sweep_ctx *sctx = user;
@@ -98,8 +98,8 @@ static enum pg_fs_act sweep_cb(int dfd, const char *RESTRICT name, uint8_t type,
 	return FS_KEEP;
 }
 
-static void sweep_package(int root_fd, const char *RESTRICT pkg_name,
-			  struct sweep_ctx *RESTRICT sctx)
+static void sweep_package(int root_fd, const char *pkg_name,
+			  struct sweep_ctx *sctx)
 {
 	int pkg_fd = openat(root_fd, pkg_name, DIR_FLAGS);
 	if (pkg_fd < 0)

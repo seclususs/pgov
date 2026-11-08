@@ -34,8 +34,8 @@ int pg_gov_init(struct pg_context *ctx)
 	return 0;
 }
 
-static inline bool update_disp(struct pg_context *RESTRICT ctx,
-			       const struct timespec *RESTRICT now)
+static inline bool update_disp(struct pg_context *ctx,
+			       const struct timespec *now)
 {
 	if (LIKELY(ctx->disp_state == PG_DISP_ON) &&
 	    pg_dt_sec(&ctx->last_disp, now) < INT_TO_Q16(PG_DISP_CHK_SEC))
@@ -93,9 +93,8 @@ static void arm_trigger(struct pg_context *ctx)
 	}
 }
 
-static inline bool read_psi(struct pg_context *RESTRICT ctx,
-			    const struct timespec *RESTRICT now,
-			    struct pg_psi_data *RESTRICT psi)
+static inline bool read_psi(struct pg_context *ctx, const struct timespec *now,
+			    struct pg_psi_data *psi)
 {
 	int status = pg_psi_read(&ctx->psi, psi, now);
 
@@ -129,8 +128,8 @@ static inline bool read_psi(struct pg_context *RESTRICT ctx,
 	return false;
 }
 
-static inline void poll_battery_metrics(struct pg_context *RESTRICT ctx,
-					const struct timespec *RESTRICT now)
+static inline void poll_battery_metrics(struct pg_context *ctx,
+					const struct timespec *now)
 {
 	q16_t elaps_bat = pg_dt_sec(&ctx->last_bat, now);
 	if (elaps_bat < INT_TO_Q16(PG_BAT_CHK_SEC))
@@ -144,8 +143,8 @@ static inline void poll_battery_metrics(struct pg_context *RESTRICT ctx,
 		arm_trigger(ctx);
 }
 
-static inline void poll_thermal_metrics(struct pg_context *RESTRICT ctx,
-					const struct timespec *RESTRICT now)
+static inline void poll_thermal_metrics(struct pg_context *ctx,
+					const struct timespec *now)
 {
 	q16_t elaps_therm = pg_dt_sec(&ctx->last_therm, now);
 	if (elaps_therm < INT_TO_Q16(PG_THERM_CHK_SEC))
@@ -175,9 +174,9 @@ static inline void poll_thermal_metrics(struct pg_context *RESTRICT ctx,
 	ctx->remap_due = true;
 }
 
-static inline void calc_demand(struct pg_context *RESTRICT ctx,
-			       const struct timespec *RESTRICT now,
-			       const struct pg_psi_data *RESTRICT psi,
+static inline void calc_demand(struct pg_context *ctx,
+			       const struct timespec *now,
+			       const struct pg_psi_data *psi,
 			       q16_t *RESTRICT th_scl, q16_t *RESTRICT l_dem,
 			       q16_t *RESTRICT p_eff)
 {
@@ -214,8 +213,8 @@ static inline void calc_demand(struct pg_context *RESTRICT ctx,
 	*p_eff = pg_cpu_calc_eff_press(*l_dem, t_fact, eff);
 }
 
-static inline bool gov_gate(struct pg_context *RESTRICT ctx,
-			    const struct pg_psi_data *RESTRICT psi, q16_t p_eff)
+static inline bool gov_gate(struct pg_context *ctx,
+			    const struct pg_psi_data *psi, q16_t p_eff)
 {
 	const struct pg_cpu_cfg *c = &CFG_CPU;
 	int32_t n_poll;
@@ -240,9 +239,9 @@ static inline bool gov_gate(struct pg_context *RESTRICT ctx,
 	return true;
 }
 
-static inline void apply_mapping(struct pg_context *RESTRICT ctx,
-				 const struct pg_psi_data *RESTRICT psi,
-				 q16_t th_scl, q16_t l_dem, q16_t p_eff)
+static inline void apply_mapping(struct pg_context *ctx,
+				 const struct pg_psi_data *psi, q16_t th_scl,
+				 q16_t l_dem, q16_t p_eff)
 {
 	const struct pg_cpu_cfg *c = &CFG_CPU;
 	const struct pg_cpu_lim *l = &LIM_CPU;
@@ -311,8 +310,8 @@ static inline void apply_mapping(struct pg_context *RESTRICT ctx,
 	pg_node_update(&ctx->sched_ucl, v_ucl, false, &CHK_UCL);
 }
 
-static inline void exec_gov_logic(struct pg_context *RESTRICT ctx,
-				  const struct timespec *RESTRICT now)
+static inline void exec_gov_logic(struct pg_context *ctx,
+				  const struct timespec *now)
 {
 	if (update_disp(ctx, now))
 		return;

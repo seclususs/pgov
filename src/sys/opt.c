@@ -18,7 +18,7 @@
 static struct pg_prop_state props[MAX_PROPS];
 static size_t prop_count = 0;
 
-static int add_prop(const char *RESTRICT name, const char *RESTRICT val)
+static int add_prop(const char *name, const char *val)
 {
 	if (UNLIKELY(prop_count >= MAX_PROPS)) {
 		LOGW("opt: limit %d props, ignoring %s", MAX_PROPS, name);
@@ -36,7 +36,7 @@ static int add_prop(const char *RESTRICT name, const char *RESTRICT val)
 	return 0;
 }
 
-static int parse_cb(const char *RESTRICT key, const char *RESTRICT val)
+static int parse_cb(const char *key, const char *val)
 {
 	const char *path;
 	const char *name;

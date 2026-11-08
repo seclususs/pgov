@@ -20,10 +20,9 @@ void pg_thermal_init(struct pg_thermal_state *state)
 	thermal_filter_reset(state);
 }
 
-q16_t pg_thermal_update(struct pg_thermal_state *RESTRICT state, q16_t cpu_temp,
-			q16_t bat_temp,
-			const struct pg_thermal_cfg *RESTRICT cfg,
-			const struct timespec *RESTRICT now)
+q16_t pg_thermal_update(struct pg_thermal_state *state, q16_t cpu_temp,
+			q16_t bat_temp, const struct pg_thermal_cfg *cfg,
+			const struct timespec *now)
 {
 	q16_t dt = pg_dt_sec(&state->last_tick, now);
 	q16_t dt_s = pg_math_clamp(dt, FLOAT_TO_Q16(0.01F), Q16_ONE);
