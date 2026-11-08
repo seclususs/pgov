@@ -2,7 +2,6 @@ type pgovd, domain;
 type pgovd_exec, exec_type, vendor_file_type, file_type;
 type pgovd_vendor_data_file, file_type, data_file_type;
 init_daemon_domain(pgovd)
-log_domain(pgovd)
 get_prop(pgovd, boot_status_prop)
 allow pgovd self:capability { sys_nice sys_resource ipc_lock };
 allow pgovd self:process { setsched setrlimit };
@@ -13,9 +12,6 @@ r_dir_file(pgovd, sysfs_thermal)
 r_dir_file(pgovd, sysfs_batteryinfo)
 r_dir_file(pgovd, sysfs_devices_system_cpu)
 r_dir_file(pgovd, sysfs_leds)
-r_dir_file(pgovd, sysfs_backlight)
 allow pgovd proc_sched:dir search;
 allow pgovd proc_sched:file rw_file_perms;
-allow pgovd proc_pressure:dir search;
-allow pgovd proc_pressure:file rw_file_perms;
-allow pgovd proc_oom_score_adj:file w_file_perms;
+allow pgovd proc_pressure_cpu:file rw_file_perms;

@@ -24,10 +24,15 @@ cc_library_static {
         "src/sys/conf.c",
         "src/sys/fs.c",
         "src/sys/opt.c",
-        "src/sys/block.c",
     ],
     local_include_dirs: ["include"],
     export_include_dirs: ["include"],
+    shared_libs: [
+        "liblog",
+    ],
+    export_shared_lib_headers: [
+        "liblog",
+    ],
     c_std: "c11",
     cflags: [
         "-Wall",
@@ -56,6 +61,12 @@ cc_binary {
     ],
     shared_libs: [
         "liblog",
+    ],
+    cflags: [
+        "-Wall",
+        "-Wextra",
+        "-Werror",
+        "-O2",
     ],
     init_rc: ["pgovd.rc"],
     ldflags: [
