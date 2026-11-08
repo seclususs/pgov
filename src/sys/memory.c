@@ -29,7 +29,7 @@ void pg_memory_lock(void)
 		return;
 	}
 
-	LOGE("memory: failed to lock memory err=%d, gc latency risk", errno);
+	LOGE("memory: failed to lock mem err=%d", errno);
 }
 
 void pg_memory_shield(void)
