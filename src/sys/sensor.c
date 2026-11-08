@@ -3,7 +3,7 @@
 
 #include "sensor.h"
 #include "scan.h"
-#include "sysfs.h"
+#include "node.h"
 #include "pg/log.h"
 #include "parser.h"
 #include <errno.h>
@@ -262,7 +262,7 @@ q16_t pg_sensor_get_trip_temp(q16_t fallback)
 	if (pg_scan_trip_point(path, sizeof(path)) != 0)
 		return fallback;
 
-	if (pg_sysfs_read_i32(path, &val) != 0)
+	if (pg_node_read_i32(path, &val) != 0)
 		return fallback;
 
 	temp = (q16_t)(((q32_t)val * Q16_ONE) / 1000);

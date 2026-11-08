@@ -25,7 +25,7 @@
 #include "pg/poll.h"
 #include "psi.h"
 #include "sensor.h"
-#include "sysfs.h"
+#include "node.h"
 #include "pg/thermal.h"
 #include <errno.h> // IWYU pragma: keep
 #include <fcntl.h>
@@ -78,7 +78,7 @@ static size_t rs_cnt;
 
 static void restore_snapshot(const struct pg_context *ctx)
 {
-	const struct pg_sysfs_cache *const c[NR_SINKS] = {
+	const struct pg_node_cache *const c[NR_SINKS] = {
 		&ctx->sched_lat, &ctx->sched_gran, &ctx->sched_wake,
 		&ctx->sched_mig, &ctx->sched_walt, &ctx->sched_ucl,
 	};
@@ -106,12 +106,12 @@ static void crash_restore(void)
 
 static void restore_all(struct pg_context *ctx)
 {
-	pg_sysfs_restore(&ctx->sched_lat);
-	pg_sysfs_restore(&ctx->sched_gran);
-	pg_sysfs_restore(&ctx->sched_wake);
-	pg_sysfs_restore(&ctx->sched_mig);
-	pg_sysfs_restore(&ctx->sched_walt);
-	pg_sysfs_restore(&ctx->sched_ucl);
+	pg_node_restore(&ctx->sched_lat);
+	pg_node_restore(&ctx->sched_gran);
+	pg_node_restore(&ctx->sched_wake);
+	pg_node_restore(&ctx->sched_mig);
+	pg_node_restore(&ctx->sched_walt);
+	pg_node_restore(&ctx->sched_ucl);
 	rs_cnt = 0;
 }
 
@@ -169,16 +169,16 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->on_timeout = NULL;
 }
 
-static int init_sysfs_caches(struct pg_context *ctx)
+static int init_node_caches(struct pg_context *ctx)
 {
 	int n = 0;
 
-	n += pg_sysfs_cache_init(&ctx->sched_lat, CAND_LAT);
-	n += pg_sysfs_cache_init(&ctx->sched_gran, CAND_GRAN);
-	n += pg_sysfs_cache_init(&ctx->sched_wake, CAND_WAKE);
-	n += pg_sysfs_cache_init(&ctx->sched_mig, CAND_MIG);
-	n += pg_sysfs_cache_init(&ctx->sched_walt, CAND_WALT);
-	n += pg_sysfs_cache_init(&ctx->sched_ucl, CAND_UCL);
+	n += pg_node_cache_init(&ctx->sched_lat, CAND_LAT);
+	n += pg_node_cache_init(&ctx->sched_gran, CAND_GRAN);
+	n += pg_node_cache_init(&ctx->sched_wake, CAND_WAKE);
+	n += pg_node_cache_init(&ctx->sched_mig, CAND_MIG);
+	n += pg_node_cache_init(&ctx->sched_walt, CAND_WALT);
+	n += pg_node_cache_init(&ctx->sched_ucl, CAND_UCL);
 
 	return n;
 }
@@ -240,12 +240,12 @@ static void cleanup_context(struct pg_context *ctx)
 	pg_sensor_temp_close(&ctx->bat_temp_sensor);
 	pg_sensor_bat_close(&ctx->bat_cap_sensor);
 	pg_sensor_bl_close(&ctx->bl_sensor);
-	pg_sysfs_cache_cleanup(&ctx->sched_lat);
-	pg_sysfs_cache_cleanup(&ctx->sched_gran);
-	pg_sysfs_cache_cleanup(&ctx->sched_wake);
-	pg_sysfs_cache_cleanup(&ctx->sched_mig);
-	pg_sysfs_cache_cleanup(&ctx->sched_walt);
-	pg_sysfs_cache_cleanup(&ctx->sched_ucl);
+	pg_node_cache_cleanup(&ctx->sched_lat);
+	pg_node_cache_cleanup(&ctx->sched_gran);
+	pg_node_cache_cleanup(&ctx->sched_wake);
+	pg_node_cache_cleanup(&ctx->sched_mig);
+	pg_node_cache_cleanup(&ctx->sched_walt);
+	pg_node_cache_cleanup(&ctx->sched_ucl);
 }
 
 int pg_daemon_init(void)
@@ -271,8 +271,8 @@ int pg_daemon_init(void)
 		goto cleanup;
 	}
 
-	LOGD("daemon: mapping sysfs cache nodes");
-	if (init_sysfs_caches(&context) == 0) {
+	LOGD("daemon: mapping cache nodes");
+	if (init_node_caches(&context) == 0) {
 		LOGW("daemon: no node is writable on this kernel, gov goes dormant");
 		context.dormant = true;
 	}

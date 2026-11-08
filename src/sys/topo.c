@@ -6,7 +6,7 @@
 #include "pg/log.h"
 #include "compiler.h"
 #include "parser.h"
-#include "sysfs.h"
+#include "node.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
@@ -65,7 +65,7 @@ static bool build_cpuset(long num_cores, const char *RESTRICT fmt,
 
 		format_path(buf, sizeof(buf), fmt, i);
 
-		if (pg_sysfs_read_i32(buf, &val) != 0 || val <= 0)
+		if (pg_node_read_i32(buf, &val) != 0 || val <= 0)
 			continue;
 
 		found = true;
@@ -136,7 +136,7 @@ int32_t pg_topo_get_max_freq_khz(void)
 		int32_t val;
 
 		format_path(buf, sizeof(buf), CPU_MAX_FREQ, i);
-		if (pg_sysfs_read_i32(buf, &val) == 0 && val > freq)
+		if (pg_node_read_i32(buf, &val) == 0 && val > freq)
 			freq = val;
 	}
 
@@ -162,7 +162,7 @@ int pg_topo_get_cpu_capacity(int32_t *RESTRICT total,
 
 		format_path(buf, sizeof(buf), CPU_CAPACITY, i);
 
-		if (pg_sysfs_read_i32(buf, &val) != 0 || val <= 0)
+		if (pg_node_read_i32(buf, &val) != 0 || val <= 0)
 			continue;
 
 		t += val;

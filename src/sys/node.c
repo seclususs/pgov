@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "sysfs.h"
+#include "node.h"
 #include "parser.h"
 #include "pg/log.h"
 #include "pg/config.h"
@@ -10,8 +10,8 @@
 #include <time.h>
 #include <unistd.h>
 
-#define SYSFS_BACKOFF_BASE_MS 1000U
-#define SYSFS_BACKOFF_MAX_MS 60000U
+#define NODE_BACKOFF_BASE_MS 1000U
+#define NODE_BACKOFF_MAX_MS 60000U
 
 static inline uint32_t mono_ms(void)
 {
@@ -21,8 +21,8 @@ static inline uint32_t mono_ms(void)
 			  ((uint64_t)ts.tv_nsec / 1000000U));
 }
 
-int pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
-			const char *const *RESTRICT paths)
+int pg_node_cache_init(struct pg_node_cache *RESTRICT cache,
+		       const char *const *RESTRICT paths)
 {
 	if (UNLIKELY(!cache || !paths))
 		return -EINVAL;
@@ -44,20 +44,20 @@ int pg_sysfs_cache_init(struct pg_sysfs_cache *RESTRICT cache,
 		cache->fd = fd;
 		cache->active = true;
 
-		if (pg_sysfs_read_i32(paths[i], &cur) == 0 && cur >= 0) {
+		if (pg_node_read_i32(paths[i], &cur) == 0 && cur >= 0) {
 			cache->base = (uint32_t)cur;
 			cache->has_base = true;
 		}
 
-		LOGI("sysfs: node mapped to %s", paths[i]);
+		LOGI("node: mapped to %s", paths[i]);
 		return 1;
 	}
 
-	LOGW("sysfs: no usable node (candidate %s)", paths[0]);
+	LOGW("node: no usable (candidate %s)", paths[0]);
 	return 0;
 }
 
-void pg_sysfs_restore(struct pg_sysfs_cache *cache)
+void pg_node_restore(struct pg_node_cache *cache)
 {
 	if (UNLIKELY(!cache))
 		return;
@@ -66,11 +66,11 @@ void pg_sysfs_restore(struct pg_sysfs_cache *cache)
 	    cache->last == cache->base)
 		return;
 
-	if (pg_sysfs_write_strm(cache->fd, cache->base) == 0)
+	if (pg_node_write_strm(cache->fd, cache->base) == 0)
 		cache->last = cache->base;
 }
 
-void pg_sysfs_cache_cleanup(struct pg_sysfs_cache *cache)
+void pg_node_cache_cleanup(struct pg_node_cache *cache)
 {
 	if (UNLIKELY(!cache))
 		return;
@@ -83,7 +83,7 @@ void pg_sysfs_cache_cleanup(struct pg_sysfs_cache *cache)
 	cache->active = false;
 }
 
-int pg_sysfs_read_i32(const char *path, int32_t *out_val)
+int pg_node_read_i32(const char *RESTRICT path, int32_t *RESTRICT out_val)
 {
 	int ret = 0;
 
@@ -93,7 +93,7 @@ int pg_sysfs_read_i32(const char *path, int32_t *out_val)
 	int fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		int err = errno;
-		LOGE("sysfs: failed to open read %s err=%d", path, err);
+		LOGE("node: failed to open read %s err=%d", path, err);
 		return -err;
 	}
 
@@ -105,7 +105,7 @@ int pg_sysfs_read_i32(const char *path, int32_t *out_val)
 
 	if (bytes <= 0) {
 		ret = (bytes < 0) ? -errno : -ENODATA;
-		LOGE("sysfs: failed to read data %s err=%d", path, -ret);
+		LOGE("node: failed to read data %s err=%d", path, -ret);
 		goto out;
 	}
 
@@ -113,7 +113,7 @@ int pg_sysfs_read_i32(const char *path, int32_t *out_val)
 	int32_t val = pg_parse_i32((const uint8_t *)buf, (size_t)bytes, &valid);
 	if (!valid) {
 		ret = -EINVAL;
-		LOGE("sysfs: failed to parse valid i32 from %s", path);
+		LOGE("node: failed to parse valid i32 from %s", path);
 		goto out;
 	}
 
@@ -124,7 +124,7 @@ out:
 	return ret;
 }
 
-int pg_sysfs_write_strm(int fd, uint64_t value)
+int pg_node_write_strm(int fd, uint64_t value)
 {
 	ssize_t res;
 
@@ -140,19 +140,19 @@ int pg_sysfs_write_strm(int fd, uint64_t value)
 
 	if (res < 0) {
 		int err = errno;
-		LOGE("sysfs: failed to write strm fd=%d err=%d", fd, err);
+		LOGE("node: failed to write strm fd=%d err=%d", fd, err);
 		return -err;
 	}
 
 	if ((size_t)res != len) {
-		LOGE("sysfs: incomplete strm write fd=%d", fd);
+		LOGE("node: incomplete strm write fd=%d", fd);
 		return -EIO;
 	}
 
 	return 0;
 }
 
-int pg_sysfs_write(const char *RESTRICT path, const char *RESTRICT val)
+int pg_node_write(const char *RESTRICT path, const char *RESTRICT val)
 {
 	ssize_t res;
 	int ret = 0;
@@ -163,7 +163,7 @@ int pg_sysfs_write(const char *RESTRICT path, const char *RESTRICT val)
 	int fd = open(path, O_WRONLY | O_CLOEXEC);
 	if (fd < 0) {
 		int err = errno;
-		LOGE("sysfs: failed to open write %s err=%d", path, err);
+		LOGE("node: failed to open write %s err=%d", path, err);
 		return -err;
 	}
 
@@ -189,13 +189,13 @@ int pg_sysfs_write(const char *RESTRICT path, const char *RESTRICT val)
 
 	if (res < 0) {
 		ret = -errno;
-		LOGE("sysfs: failed to write %s err=%d", path, -ret);
+		LOGE("node: failed to write %s err=%d", path, -ret);
 		goto out;
 	}
 
 	if ((size_t)res != len) {
 		ret = -EIO;
-		LOGE("sysfs: incomplete write %s", path);
+		LOGE("node: incomplete write %s", path);
 		goto out;
 	}
 
@@ -231,8 +231,8 @@ static inline bool relative(uint64_t cur, uint64_t tgt, uint64_t tol)
 	return (diff * (uint64_t)1000) >= (cur * tol);
 }
 
-void pg_sysfs_update(struct pg_sysfs_cache *RESTRICT cache, uint64_t value,
-		     bool force, const struct pg_sysfs_chk *RESTRICT strat)
+void pg_node_update(struct pg_node_cache *RESTRICT cache, uint64_t value,
+		    bool force, const struct pg_node_chk *RESTRICT strat)
 {
 	if (UNLIKELY(!cache))
 		return;
@@ -270,18 +270,18 @@ void pg_sysfs_update(struct pg_sysfs_cache *RESTRICT cache, uint64_t value,
 	    (int32_t)(mono_ms() - cache->retry_ms) < 0)
 		return;
 
-	if (pg_sysfs_write_strm(cache->fd, value) == 0) {
+	if (pg_node_write_strm(cache->fd, value) == 0) {
 		cache->last = value;
 		cache->fails = 0;
 		return;
 	}
 
-	if (cache->fails < PG_SYSFS_FAIL_MAX)
+	if (cache->fails < PG_NODE_FAIL_MAX)
 		cache->fails++;
 
-	uint32_t delay = SYSFS_BACKOFF_BASE_MS << (cache->fails - 1);
-	if (delay > SYSFS_BACKOFF_MAX_MS)
-		delay = SYSFS_BACKOFF_MAX_MS;
+	uint32_t delay = NODE_BACKOFF_BASE_MS << (cache->fails - 1);
+	if (delay > NODE_BACKOFF_MAX_MS)
+		delay = NODE_BACKOFF_MAX_MS;
 
 	cache->retry_ms = mono_ms() + delay;
 }

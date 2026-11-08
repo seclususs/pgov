@@ -19,7 +19,7 @@ int pg_gov_init(struct pg_context *ctx);
  *
  * @note SIDE EFFECTS & SYSTEM IMPACT:
  *       - Performs blocking/non-blocking reads on hardware sensors (battery, thermal, backlight).
- *       - Emits pwrite() syscalls directly to kernel sysfs nodes if scheduler parameters drift.
+ *       - Emits pwrite() syscalls directly to kernel nodes if scheduler parameters drift.
  *       - Modifies `ctx->next_wake` to dictate the caller's subsequent sleep/poll duration.
  *       - In cases of system pressure read failure, it may automatically close and reopen
  *         epoll triggers for PSI recovery.

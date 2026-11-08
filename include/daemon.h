@@ -14,7 +14,7 @@
  *       - **Reactor Phase**: Transfers execution ownership to the `epoll` blocking loop.
  *       - **Teardown Phase**: Features a unified `cleanup:` jump label that guarantees 
  *         deterministic destruction of all acquired file descriptors
- *         (sysfs caches, signalfd, PSI triggers) regardless of exit status.
+ *         (node caches, signalfd, PSI triggers) regardless of exit status.
  *       - Failing to complete initialization aborts safely without leaking allocated resources.
  *
  * @return 0 upon successful, clean daemon shutdown, or a negative POSIX error code

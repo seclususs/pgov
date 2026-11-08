@@ -12,18 +12,18 @@
 #include "pg/poll.h"
 #include "psi.h"
 #include "sensor.h"
-#include "sysfs.h"
+#include "node.h"
 #include "pg/sweep.h"
 #include "pg/thermal.h"
 #include "pg/time.h"
 #include <unistd.h>
 
-static const struct pg_sysfs_chk CHK_LAT = { PG_CHK_REL, PG_CHK_LAT };
-static const struct pg_sysfs_chk CHK_GRAN = { PG_CHK_REL, PG_CHK_GRAN };
-static const struct pg_sysfs_chk CHK_WAKE = { PG_CHK_REL, PG_CHK_WAKE };
-static const struct pg_sysfs_chk CHK_MIG = { PG_CHK_ABS, PG_CHK_MIG };
-static const struct pg_sysfs_chk CHK_WALT = { PG_CHK_ABS, PG_CHK_WALT };
-static const struct pg_sysfs_chk CHK_UCL = { PG_CHK_ABS, PG_CHK_UCL };
+static const struct pg_node_chk CHK_LAT = { PG_CHK_REL, PG_CHK_LAT };
+static const struct pg_node_chk CHK_GRAN = { PG_CHK_REL, PG_CHK_GRAN };
+static const struct pg_node_chk CHK_WAKE = { PG_CHK_REL, PG_CHK_WAKE };
+static const struct pg_node_chk CHK_MIG = { PG_CHK_ABS, PG_CHK_MIG };
+static const struct pg_node_chk CHK_WALT = { PG_CHK_ABS, PG_CHK_WALT };
+static const struct pg_node_chk CHK_UCL = { PG_CHK_ABS, PG_CHK_UCL };
 
 int pg_gov_init(struct pg_context *ctx)
 {
@@ -303,12 +303,12 @@ static inline void apply_mapping(struct pg_context *RESTRICT ctx,
 	     (unsigned long long)v_wlt, (unsigned long long)v_ucl,
 	     ctx->next_wake);
 
-	pg_sysfs_update(&ctx->sched_lat, v_lat, false, &CHK_LAT);
-	pg_sysfs_update(&ctx->sched_gran, v_gran, false, &CHK_GRAN);
-	pg_sysfs_update(&ctx->sched_wake, v_wake, false, &CHK_WAKE);
-	pg_sysfs_update(&ctx->sched_mig, v_mig, false, &CHK_MIG);
-	pg_sysfs_update(&ctx->sched_walt, v_wlt, false, &CHK_WALT);
-	pg_sysfs_update(&ctx->sched_ucl, v_ucl, false, &CHK_UCL);
+	pg_node_update(&ctx->sched_lat, v_lat, false, &CHK_LAT);
+	pg_node_update(&ctx->sched_gran, v_gran, false, &CHK_GRAN);
+	pg_node_update(&ctx->sched_wake, v_wake, false, &CHK_WAKE);
+	pg_node_update(&ctx->sched_mig, v_mig, false, &CHK_MIG);
+	pg_node_update(&ctx->sched_walt, v_wlt, false, &CHK_WALT);
+	pg_node_update(&ctx->sched_ucl, v_ucl, false, &CHK_UCL);
 }
 
 static inline void exec_gov_logic(struct pg_context *RESTRICT ctx,

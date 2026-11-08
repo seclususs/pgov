@@ -8,7 +8,7 @@
 #include "pg/poll.h"
 #include "psi.h"
 #include "sensor.h"
-#include "sysfs.h"
+#include "node.h"
 #include "pg/thermal.h"
 #include "pg/math.h"
 #include <stdbool.h>
@@ -31,7 +31,7 @@ enum pg_disp_state {
  *       - Declared with `ALIGNED(64)`, so the object starts on 64-byte cache line boundary.
  *         Any addition or rearrangement of struct members MUST be carefully audited to 
  *         prevent cache line bouncing or unnecessary padding inflation.
- *       - Encapsulates all hardware sensors, sysfs file descriptors, and mathematical 
+ *       - Encapsulates all hardware sensors, node file descriptors, and mathematical 
  *         integrators (PID/Kalman). 
  *       - The lifecycle of this object spans the entire daemon execution; it must remain 
  *         valid and strictly mutated by a single event-reactor thread.
@@ -42,12 +42,12 @@ struct ALIGNED(64) pg_context {
 	struct pg_temp_sensor bat_temp_sensor;
 	struct pg_bat_sensor bat_cap_sensor;
 	struct pg_bl_sensor bl_sensor;
-	struct pg_sysfs_cache sched_lat;
-	struct pg_sysfs_cache sched_gran;
-	struct pg_sysfs_cache sched_wake;
-	struct pg_sysfs_cache sched_mig;
-	struct pg_sysfs_cache sched_walt;
-	struct pg_sysfs_cache sched_ucl;
+	struct pg_node_cache sched_lat;
+	struct pg_node_cache sched_gran;
+	struct pg_node_cache sched_wake;
+	struct pg_node_cache sched_mig;
+	struct pg_node_cache sched_walt;
+	struct pg_node_cache sched_ucl;
 	struct pg_thermal_state thermal_state;
 	struct pg_load_state load_state;
 	struct pg_poll_state poll_state;

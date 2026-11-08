@@ -6,7 +6,7 @@
 #include "block.h"
 #include "compiler.h"
 #include "str.h"
-#include "sysfs.h"
+#include "node.h"
 #include "pg/log.h"
 #include <dirent.h>
 #include <errno.h>
@@ -49,7 +49,7 @@ static inline bool check_rotational(const char *name)
 	int32_t val;
 
 	pg_str_build_path(path, sizeof(path), SYS_BLOCK, name, Q_ROTATIONAL);
-	if (pg_sysfs_read_i32(path, &val) == 0 && val == 1)
+	if (pg_node_read_i32(path, &val) == 0 && val == 1)
 		return true;
 
 	return false;
@@ -60,10 +60,10 @@ static inline void set_queue(const char *name)
 	char path[128];
 
 	pg_str_build_path(path, sizeof(path), SYS_BLOCK, name, Q_ADD_RANDOM);
-	pg_sysfs_write(path, "0");
+	pg_node_write(path, "0");
 
 	pg_str_build_path(path, sizeof(path), SYS_BLOCK, name, Q_RQ_AFFINITY);
-	pg_sysfs_write(path, "1");
+	pg_node_write(path, "1");
 }
 
 static int read_sched(const char *RESTRICT name, char *RESTRICT buf, size_t len)
@@ -127,20 +127,20 @@ static inline void set_sched(const char *RESTRICT name,
 	if (strcmp(sched, "mq-deadline") == 0 ||
 	    strcmp(sched, "deadline") == 0) {
 		pg_str_build_path(path, sizeof(path), SYS_BLOCK, name, Q_FB);
-		pg_sysfs_write(path, "16");
+		pg_node_write(path, "16");
 
 		pg_str_build_path(path, sizeof(path), SYS_BLOCK, name, Q_WS);
-		pg_sysfs_write(path, "2");
+		pg_node_write(path, "2");
 
 		pg_str_build_path(path, sizeof(path), SYS_BLOCK, name, Q_FM);
-		pg_sysfs_write(path, "1");
+		pg_node_write(path, "1");
 
 		return;
 	}
 
 	if (strcmp(sched, "bfq") == 0) {
 		pg_str_build_path(path, sizeof(path), SYS_BLOCK, name, Q_SI);
-		pg_sysfs_write(path, "0");
+		pg_node_write(path, "0");
 	}
 }
 
@@ -164,7 +164,7 @@ static int apply_block_tweaks(const char *name)
 	LOGD("block: set scheduler %s for %s", sched, name);
 	pg_str_build_path(path, sizeof(path), SYS_BLOCK, name, Q_SCHEDULER);
 
-	ret = pg_sysfs_write(path, sched);
+	ret = pg_node_write(path, sched);
 	if (ret < 0)
 		return ret;
 

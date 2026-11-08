@@ -7,7 +7,7 @@
 #include "compiler.h"
 #include "conf.h"
 #include "paths.h"
-#include "sysfs.h"
+#include "node.h"
 #include "prop.h"
 #include "str.h"
 #include "pg/log.h"
@@ -41,11 +41,11 @@ static int parse_cb(const char *RESTRICT key, const char *RESTRICT val)
 	const char *path;
 	const char *name;
 
-	if (pg_str_has_prefix(key, "sysfs.")) {
-		path = key + 6;
-		int ret = pg_sysfs_write(path, val);
+	if (pg_str_has_prefix(key, "node.")) {
+		path = key + 5;
+		int ret = pg_node_write(path, val);
 		if (ret != 0)
-			LOGW("opt: failed write sysfs %s err=%d", path, ret);
+			LOGW("opt: failed write node %s err=%d", path, ret);
 
 		return 0;
 	}
