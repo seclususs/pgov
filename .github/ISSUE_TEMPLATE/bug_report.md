@@ -19,7 +19,7 @@ A clear description of what's wrong and what you expected instead.
 - **Root method / Magisk (or fork) version, if applicable:**
 - **SELinux mode** (`getenforce`): enforcing / permissive
 
-## PSI & sysfs availability
+## PSI & node availability
 
 `pgovd` refuses to start without a readable+writable `/proc/pressure/cpu`,
 and several tunables degrade gracefully per-node if unavailable. Please

@@ -83,8 +83,8 @@ python3 tools/mkmod.py
 This stages whichever of `build/arm64-v8a/release/pgovd` and
 `build/armeabi-v7a/release/pgovd` exist into
 `modules/system/bin/<abi>/pgovd`, and zips `modules/` to
-`dist/pgovd-<version>.zip` (version read from `modules/module.prop`,
-currently `v1.0`). The staged binaries are removed again once the zip is
+`dist/pgovd-<version>.zip` (version read from `modules/module.prop`).
+The staged binaries are removed again once the zip is
 written - `modules/system/bin/` holding only `.gitkeep` afterward is
 expected, not a failure. Fails if neither binary is present.
 
@@ -101,9 +101,8 @@ Two things need to be merged into the target tree alongside it:
 - `android/file_contexts` and `android/pgovd.te` into the vendor sepolicy - the
   `pgovd_exec` / `pgovd_vendor_data_file` types, the
   `sys_nice`/`sys_resource`/`ipc_lock` capabilities, read-only access to the
-  thermal, battery, CPU topology, LED, and backlight sysfs nodes, and
-  read/write access to `proc_sched` and `proc_pressure` plus write access
-  to `proc_oom_score_adj`.
+  thermal, battery, CPU topology, and LED sysfs nodes, and
+  read/write access to `proc_sched` and `proc_pressure_cpu`.
 
 To extract just this path into its own tree:
 

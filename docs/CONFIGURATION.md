@@ -26,22 +26,22 @@ One directive per line:
   whole rather than truncated or misparsed.
 - A line with no `=`, or an empty key once whitespace is trimmed off
   it, is ignored.
-- A key that doesn't start with `sysfs.` or `prop.` is ignored.
+- A key that doesn't start with `node.` or `prop.` is ignored.
 
 ## Directives
 
-### `sysfs.*`
+### `node.*`
 
 Writes `<value>` to `<path>` once, in the order the lines appear in the
 file. `<path>` is used exactly as written, so it needs its own leading `/`:
 
 ```
-sysfs./proc/sys/kernel/sched_child_runs_first=0
+node./proc/sys/kernel/sched_child_runs_first=0
 ```
 
 A failed write - bad path, no permission - is logged and skipped; it
 doesn't stop the rest of the file from being processed. There's no limit
-on how many `sysfs.*` lines a file can have.
+on how many `node.*` lines a file can have.
 
 ### `prop.*`
 

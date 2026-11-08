@@ -12,11 +12,11 @@
 </div>
 
 pgov is a userspace scheduler daemon for Android that reads
-`/proc/pressure/cpu` and maps the metrics into six CFS tunable
+`/proc/pressure/cpu` and maps the metrics into six scheduler tunable
 writes latency, granularity, wakeup granularity, migration cost,
 WALT init-task load, and `uclamp_util_min` gated by thermal and
 battery state. It filters kernel PSI accounting through an adaptive
-Kalman filter and writes the computed parameters to sysfs to adjust
+Kalman filter and writes the computed parameters to adjust
 scheduler behavior based on workload.
 
 The daemon operates as a single thread, and its own code makes no calls
@@ -54,7 +54,6 @@ into an AOSP vendor tree via Soong, see [`BUILD`](docs/BUILD.md)
 
 ## Documentation
 
-- [`ARCHITECTURE`](docs/ARCHITECTURE.md)
 - [`BUILD`](docs/BUILD.md)
 - [`CHANGELOG`](docs/CHANGELOG.md)
 - [`CONFIGURATION`](docs/CONFIGURATION.md)
