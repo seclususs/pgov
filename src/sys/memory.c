@@ -48,7 +48,7 @@ void pg_memory_shield(void)
 	if (sz < 0)
 		LOGE("memory: failed to write oom protection score");
 	else
-		LOGD("memory: lmk shield active");
+		LOGD("memory: oom/lmkd shield active");
 
 	close(fd);
 }
