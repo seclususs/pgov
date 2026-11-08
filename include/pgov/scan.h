@@ -6,10 +6,10 @@
 
 #include <stddef.h>
 
-#define PG_BL_PATH_LEN 128
+#define BL_PATH_LEN 128
 
 int pg_scan_thermal_zone(char *path, size_t len);
-int pg_scan_backlight(char (*paths)[PG_BL_PATH_LEN], size_t max);
+int pg_scan_backlight(char (*paths)[BL_PATH_LEN], size_t max);
 int pg_scan_trip_point(char *path, size_t len);
 
 #endif // PGOV_SCAN_H

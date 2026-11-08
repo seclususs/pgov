@@ -18,12 +18,12 @@
 #include "pgov/time.h"
 #include <unistd.h>
 
-static const struct pg_node_chk CHK_LAT = { PG_CHK_REL, CFG_CHK_LAT };
-static const struct pg_node_chk CHK_GRAN = { PG_CHK_REL, CFG_CHK_GRAN };
-static const struct pg_node_chk CHK_WAKE = { PG_CHK_REL, CFG_CHK_WAKE };
-static const struct pg_node_chk CHK_MIG = { PG_CHK_ABS, CFG_CHK_MIG };
-static const struct pg_node_chk CHK_WALT = { PG_CHK_ABS, CFG_CHK_WALT };
-static const struct pg_node_chk CHK_UCL = { PG_CHK_ABS, CFG_CHK_UCL };
+static const struct pg_node_chk CHK_LAT = { CHK_REL, CFG_CHK_LAT };
+static const struct pg_node_chk CHK_GRAN = { CHK_REL, CFG_CHK_GRAN };
+static const struct pg_node_chk CHK_WAKE = { CHK_REL, CFG_CHK_WAKE };
+static const struct pg_node_chk CHK_MIG = { CHK_ABS, CFG_CHK_MIG };
+static const struct pg_node_chk CHK_WALT = { CHK_ABS, CFG_CHK_WALT };
+static const struct pg_node_chk CHK_UCL = { CHK_ABS, CFG_CHK_UCL };
 
 int pg_gov_init(struct pg_context *ctx)
 {
@@ -37,7 +37,7 @@ int pg_gov_init(struct pg_context *ctx)
 static inline bool update_disp(struct pg_context *ctx,
 			       const struct timespec *now)
 {
-	if (LIKELY(ctx->disp_state == PG_DISP_ON) &&
+	if (LIKELY(ctx->disp_state == DISP_ON) &&
 	    pg_dt_sec(&ctx->last_disp, now) < INT_TO_Q16(CFG_DISP_CHK_SEC))
 		return false;
 
@@ -47,21 +47,21 @@ static inline bool update_disp(struct pg_context *ctx,
 	int ret = pg_sensor_read_bl(&ctx->bl_sensor, &bl);
 	bool on = ((ret < 0) ? true : (bl > 0)) != 0;
 
-	if (on && UNLIKELY(ctx->disp_state != PG_DISP_ON)) {
+	if (on && UNLIKELY(ctx->disp_state != DISP_ON)) {
 		ctx->load_state.first_run = true;
 		pg_kalman_reset(&ctx->psi.filter);
 		ctx->psi.first_run = true;
-		ctx->disp_state = PG_DISP_ON;
-	} else if (!on && (ctx->disp_state == PG_DISP_ON ||
-			   ctx->disp_state == PG_DISP_UNKNOWN)) {
-		ctx->disp_state = PG_DISP_GRACE;
+		ctx->disp_state = DISP_ON;
+	} else if (!on && (ctx->disp_state == DISP_ON ||
+			   ctx->disp_state == DISP_UNKNOWN)) {
+		ctx->disp_state = DISP_GRACE;
 		ctx->last_dispoff = *now;
-	} else if (!on && ctx->disp_state == PG_DISP_GRACE) {
+	} else if (!on && ctx->disp_state == DISP_GRACE) {
 		if (pg_dt_sec(&ctx->last_dispoff, now) > INT_TO_Q16(10))
-			ctx->disp_state = PG_DISP_SUSPEND;
+			ctx->disp_state = DISP_SUSPEND;
 	}
 
-	if (ctx->disp_state == PG_DISP_SUSPEND) {
+	if (ctx->disp_state == DISP_SUSPEND) {
 		ctx->next_wake = 5000;
 		ctx->last_tick = *now;
 

@@ -18,10 +18,10 @@ struct pg_context;
 typedef void (*pg_event_cb)(struct pg_context *ctx);
 
 enum pg_disp_state {
-	PG_DISP_UNKNOWN = 0,
-	PG_DISP_ON,
-	PG_DISP_GRACE,
-	PG_DISP_SUSPEND,
+	DISP_UNKNOWN = 0,
+	DISP_ON,
+	DISP_GRACE,
+	DISP_SUSPEND,
 };
 
 /**

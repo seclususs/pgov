@@ -9,9 +9,9 @@
 #include <stdint.h>
 
 enum pg_node_chk_type {
-	PG_CHK_ABS,
-	PG_CHK_REL,
-	PG_CHK_STRICT,
+	CHK_ABS,
+	CHK_REL,
+	CHK_STRICT,
 };
 
 struct pg_node_chk {

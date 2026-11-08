@@ -249,15 +249,15 @@ void pg_node_update(struct pg_node_cache *cache, uint64_t value, bool force,
 			return;
 
 		switch (strat->type) {
-		case PG_CHK_ABS:
+		case CHK_ABS:
 			update = absolute(cache->last, value, strat->thresh);
 			break;
 
-		case PG_CHK_REL:
+		case CHK_REL:
 			update = relative(cache->last, value, strat->thresh);
 			break;
 
-		case PG_CHK_STRICT:
+		case CHK_STRICT:
 			update = (cache->last != value);
 			break;
 		}

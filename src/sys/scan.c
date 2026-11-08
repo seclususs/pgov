@@ -218,7 +218,7 @@ int pg_scan_thermal_zone(char *path, size_t len)
 	return -ENODEV;
 }
 
-int pg_scan_backlight(char (*paths)[PG_BL_PATH_LEN], size_t max)
+int pg_scan_backlight(char (*paths)[BL_PATH_LEN], size_t max)
 {
 	if (UNLIKELY(!paths || max == 0))
 		return -EINVAL;
@@ -234,7 +234,7 @@ int pg_scan_backlight(char (*paths)[PG_BL_PATH_LEN], size_t max)
 		if (entry->d_name[0] == '.')
 			continue;
 
-		pg_str_build_path(paths[n], PG_BL_PATH_LEN, PATH_BACKLIGHT_BASE,
+		pg_str_build_path(paths[n], BL_PATH_LEN, PATH_BACKLIGHT_BASE,
 				  entry->d_name, "brightness");
 
 		int fd = open(paths[n], O_RDONLY | O_CLOEXEC);

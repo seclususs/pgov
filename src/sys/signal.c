@@ -21,7 +21,7 @@ static const int CRASH_SIGS[NR_CRASH_SIGS] = {
 static struct sigaction prev_act[NR_CRASH_SIGS];
 static void (*crash_hook)(void);
 
-static void pg_crash_handler(int sig, siginfo_t *info, void *context)
+static void crash_handler(int sig, siginfo_t *info, void *context)
 {
 	const char msg[] = "\n[PGOV] fatal: daemon crashed\n";
 	ssize_t unused = write(STDERR_FILENO, msg, sizeof(msg) - 1);
@@ -87,7 +87,7 @@ void pg_signal_catch_crash(void (*hook)(void))
 {
 	struct sigaction sa = { 0 };
 	sa.sa_flags = SA_SIGINFO | SA_RESTART;
-	sa.sa_sigaction = pg_crash_handler;
+	sa.sa_sigaction = crash_handler;
 	sigemptyset(&sa.sa_mask);
 
 	crash_hook = hook;
