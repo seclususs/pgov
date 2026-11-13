@@ -5,10 +5,12 @@
 #include "pgov/compiler.h"
 #include "pgov/str.h"
 #include "pgov/path.h"
+#include "pgov/parser.h"
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
 #include <stdbool.h>
+#include <stdint.h>
 #include <string.h>
 #include <unistd.h>
 
@@ -47,10 +49,10 @@ static const char *const PRIORITY[] = {
 };
 
 static const char *const BLACKLIST[] = {
-	"battery",  "bms",	"bat",	    "charger", "usb",
-	"pa_therm", "pa-therm", "modem",    "wifi",    "wlan",
-	"gpu",	    "camera",	"flash",    "led",     "pmic",
-	"buck",	    "ldo",	"xo_therm", "quiet",   "backlight",
+	"battery",  "bms",	 "bat",	    "charger", "usb", "pa_therm",
+	"pa-therm", "modem",	 "wifi",    "wlan",    "gpu", "camera",
+	"flash",    "led",	 "pmic",    "buck",    "ldo", "xo_therm",
+	"quiet",    "backlight", "adapter",
 };
 
 struct tz_info {
@@ -81,6 +83,37 @@ static inline bool thermal_valid(const char *name)
 	return true;
 }
 
+static ssize_t read_sysfs_str(const char *path, char *buf, size_t len)
+{
+	if (UNLIKELY(!path || !buf || len == 0))
+		return -1;
+
+	int fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0)
+		return -1;
+
+	ssize_t bytes;
+	do {
+		bytes = read(fd, buf, len - 1);
+	} while (bytes < 0 && errno == EINTR);
+
+	close(fd);
+
+	if (bytes <= 0)
+		return -1;
+
+	buf[bytes] = '\0';
+	for (ssize_t i = 0; i < bytes; ++i) {
+		if (buf[i] == '\n' || buf[i] == '\r') {
+			buf[i] = '\0';
+			bytes = i;
+			break;
+		}
+	}
+
+	return bytes;
+}
+
 static bool type_valid(const char *name)
 {
 	char type_path[256];
@@ -89,28 +122,8 @@ static bool type_valid(const char *name)
 	pg_str_build_path(type_path, sizeof(type_path), PATH_THERMAL_BASE, name,
 			  "type");
 
-	int fd = open(type_path, O_RDONLY | O_CLOEXEC);
-	if (fd < 0)
+	if (read_sysfs_str(type_path, buf, sizeof(buf)) <= 0)
 		return false;
-
-	ssize_t bytes;
-	do {
-		bytes = read(fd, buf, sizeof(buf) - 1);
-	} while (bytes < 0 && errno == EINTR);
-
-	close(fd);
-
-	if (bytes <= 0)
-		return false;
-
-	buf[bytes] = '\0';
-
-	for (ssize_t i = 0; i < bytes; ++i) {
-		if (buf[i] == '\n' || buf[i] == '\r') {
-			buf[i] = '\0';
-			break;
-		}
-	}
 
 	for (size_t i = 0; i < ARRAY_SIZE(PRIORITY); ++i) {
 		if (strcmp(buf, PRIORITY[i]) == 0)
@@ -174,28 +187,8 @@ int pg_scan_thermal_zone(char *path, size_t len)
 		pg_str_build_path(type_path, sizeof(type_path),
 				  PATH_THERMAL_BASE, entry->d_name, "type");
 
-		int fd = open(type_path, O_RDONLY | O_CLOEXEC);
-		if (fd < 0)
+		if (read_sysfs_str(type_path, buf, sizeof(buf)) <= 0)
 			continue;
-
-		ssize_t bytes;
-		do {
-			bytes = read(fd, buf, sizeof(buf) - 1);
-		} while (bytes < 0 && errno == EINTR);
-
-		close(fd);
-
-		if (bytes <= 0)
-			continue;
-
-		buf[bytes] = '\0';
-
-		for (ssize_t i = 0; i < bytes; ++i) {
-			if (buf[i] == '\n' || buf[i] == '\r') {
-				buf[i] = '\0';
-				break;
-			}
-		}
 
 		strncpy(zones[nr_zones].name, buf, 63);
 		zones[nr_zones].name[63] = '\0';
@@ -218,33 +211,45 @@ int pg_scan_thermal_zone(char *path, size_t len)
 	return -ENODEV;
 }
 
+static void scan_brightness(const char *base, const char *sub_filter,
+			    char (*paths)[BL_PATH_LEN], size_t *n, size_t max)
+{
+	DIR *dir = opendir(base);
+	if (!dir)
+		return;
+
+	struct dirent *entry;
+	while (*n < max && (entry = readdir(dir)) != NULL) {
+		if (entry->d_name[0] == '.')
+			continue;
+
+		if (sub_filter && !pg_str_contains(entry->d_name, sub_filter))
+			continue;
+
+		pg_str_build_path(paths[*n], BL_PATH_LEN, base, entry->d_name,
+				  "brightness");
+
+		int fd = open(paths[*n], O_RDONLY | O_CLOEXEC);
+		if (fd < 0)
+			continue;
+
+		close(fd);
+		(*n)++;
+	}
+
+	closedir(dir);
+}
+
 int pg_scan_backlight(char (*paths)[BL_PATH_LEN], size_t max)
 {
 	if (UNLIKELY(!paths || max == 0))
 		return -EINVAL;
 
-	DIR *dir = opendir(PATH_BACKLIGHT_BASE);
-	if (!dir)
-		return -ENOENT;
-
-	struct dirent *entry;
 	size_t n = 0;
+	scan_brightness(PATH_BACKLIGHT_BASE, NULL, paths, &n, max);
+	if (n == 0)
+		scan_brightness(PATH_LEDS_BASE, "backlight", paths, &n, max);
 
-	while (n < max && (entry = readdir(dir)) != NULL) {
-		if (entry->d_name[0] == '.')
-			continue;
-
-		pg_str_build_path(paths[n], BL_PATH_LEN, PATH_BACKLIGHT_BASE,
-				  entry->d_name, "brightness");
-
-		int fd = open(paths[n], O_RDONLY | O_CLOEXEC);
-		if (fd >= 0) {
-			close(fd);
-			n++;
-		}
-	}
-
-	closedir(dir);
 	if (n == 0)
 		return -ENODEV;
 
@@ -275,39 +280,62 @@ static inline void format_trip_node(char *RESTRICT buf, size_t i,
 
 static int trip_point(const char *name, char *path, size_t len)
 {
-	char type[256];
-	char buf[64];
 	char file[32];
-	char temp[32];
+	char node_path[256];
+	char buf[64];
+	char best_path[256] = "";
+	int best_score = 0;
+	int32_t best_temp = INT32_MAX;
 
 	for (size_t i = 0; i <= 9; ++i) {
 		format_trip_node(file, i, "type");
-		pg_str_build_path(type, sizeof(type), PATH_THERMAL_BASE, name,
-				  file);
+		pg_str_build_path(node_path, sizeof(node_path),
+				  PATH_THERMAL_BASE, name, file);
 
-		int fd = open(type, O_RDONLY | O_CLOEXEC);
-		if (fd < 0)
+		if (read_sysfs_str(node_path, buf, sizeof(buf)) <= 0)
 			continue;
 
-		ssize_t bytes;
-		do {
-			bytes = read(fd, buf, sizeof(buf) - 1);
-		} while (bytes < 0 && errno == EINTR);
+		int score = 0;
 
-		close(fd);
+		if (pg_str_contains(buf, "passive"))
+			score = 3;
 
+		else if (pg_str_contains(buf, "active"))
+			score = 2;
+
+		else if (pg_str_contains(buf, "critical"))
+			score = 1;
+
+		if (score == 0)
+			continue;
+
+		format_trip_node(file, i, "temp");
+		pg_str_build_path(node_path, sizeof(node_path),
+				  PATH_THERMAL_BASE, name, file);
+
+		ssize_t bytes = read_sysfs_str(node_path, buf, sizeof(buf));
 		if (bytes <= 0)
 			continue;
 
-		buf[bytes] = '\0';
+		bool valid = false;
+		int32_t cur_temp = pg_parse_i32((const uint8_t *)buf,
+						(size_t)bytes, &valid);
+		if (!valid || cur_temp < 40000)
+			continue;
 
-		if (pg_str_contains(buf, "passive") ||
-		    pg_str_contains(buf, "critical")) {
-			format_trip_node(temp, i, "temp");
-			pg_str_build_path(path, len, PATH_THERMAL_BASE, name,
-					  temp);
-			return 0;
+		if (score > best_score ||
+		    (score == best_score && cur_temp < best_temp)) {
+			best_score = score;
+			best_temp = cur_temp;
+			strncpy(best_path, node_path, sizeof(best_path) - 1);
+			best_path[sizeof(best_path) - 1] = '\0';
 		}
+	}
+
+	if (best_score > 0 && best_path[0] != '\0') {
+		strncpy(path, best_path, len - 1);
+		path[len - 1] = '\0';
+		return 0;
 	}
 
 	return -ENOENT;

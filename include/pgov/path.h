@@ -19,6 +19,7 @@
 #define PATH_PSI_CPU "/proc/pressure/cpu"
 #define PATH_THERMAL_BASE "/sys/class/thermal"
 #define PATH_BACKLIGHT_BASE "/sys/class/backlight"
+#define PATH_LEDS_BASE "/sys/class/leds"
 #define PATH_SCHED_LAT_DBG "/sys/kernel/debug/sched/latency_ns"
 #define PATH_SCHED_GRAN_DBG "/sys/kernel/debug/sched/min_granularity_ns"
 #define PATH_SCHED_WAKEUP_DBG "/sys/kernel/debug/sched/wakeup_granularity_ns"
