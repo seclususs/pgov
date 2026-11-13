@@ -52,6 +52,7 @@ static inline bool update_disp(struct pg_context *ctx,
 		pg_kalman_reset(&ctx->psi.filter);
 		ctx->psi.first_run = true;
 		ctx->disp_state = DISP_ON;
+		ctx->remap_due = true;
 	} else if (!on && (ctx->disp_state == DISP_ON ||
 			   ctx->disp_state == DISP_UNKNOWN)) {
 		ctx->disp_state = DISP_GRACE;
@@ -62,6 +63,9 @@ static inline bool update_disp(struct pg_context *ctx,
 	}
 
 	if (ctx->disp_state == DISP_SUSPEND) {
+		if (ctx->sched_ucl.active && ctx->sched_ucl.last != 0)
+			pg_node_update(&ctx->sched_ucl, 0, true, NULL);
+
 		ctx->next_wake = 5000;
 		ctx->last_tick = *now;
 
