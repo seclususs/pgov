@@ -148,6 +148,15 @@ static inline int read_temp(struct pg_temp_sensor *sensor, q16_t *temp,
 		return -EINVAL;
 	}
 
+	if (val >= 10000 && val <= 150000)
+		sensor->scale = SCALE_MILLI;
+
+	else if (val >= 100 && val <= 1500)
+		sensor->scale = SCALE_DECI;
+
+	else if (val >= -30 && val <= 150)
+		sensor->scale = 1;
+
 	if (UNLIKELY(sensor->scale <= 0)) {
 		*temp = fallback;
 		return -EINVAL;
