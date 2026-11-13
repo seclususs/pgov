@@ -6,22 +6,28 @@
 #include "pgov/log.h"
 #include <errno.h> // IWYU pragma: keep
 #include <string.h>
+#include <time.h>
 #include <unistd.h>
+
+static inline void maybe_delay_stabilization(void)
+{
+	struct timespec ts;
+	if (clock_gettime(CLOCK_BOOTTIME, &ts) == 0 && ts.tv_sec < 60)
+		sleep(CFG_STAB_DELAY_SEC);
+}
 
 bool pg_prop_wait_boot(void)
 {
-	unsigned int retries = 0;
 	char val[PROP_VALUE_MAX];
 
-	while (retries <= CFG_BOOT_RETRY_MAX) {
+	for (unsigned int retries = 0; retries <= CFG_BOOT_RETRY_MAX;
+	     retries++) {
 		int len = __system_property_get("sys.boot_completed", val);
-
-		if (len > 0 && val[0] == '1' && val[1] == '\0') {
-			sleep(CFG_STAB_DELAY_SEC);
+		if (len == 1 && val[0] == '1') {
+			maybe_delay_stabilization();
 			return true;
 		}
 
-		retries++;
 		sleep(CFG_BOOT_POLL_SEC);
 	}
 

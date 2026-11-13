@@ -13,9 +13,12 @@
 void pg_log_err(const char *tag, const char *fmt, ...)
 	__attribute__((format(printf, 2, 3)));
 
+void pg_log_msg(int prio, const char *tag, const char *fmt, ...)
+	__attribute__((format(printf, 3, 4)));
+
 #define LOGE(...) pg_log_err(LOG_TAG, __VA_ARGS__)
-#define LOGW(...) __android_log_print(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
-#define LOGI(...) __android_log_print(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGW(...) pg_log_msg(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
+#define LOGI(...) pg_log_msg(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
 #if defined(NDEBUG) && !defined(ENABLE_VERBOSE_LOGS)
 #define LOGD(...) \

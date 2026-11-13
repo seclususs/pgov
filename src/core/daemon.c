@@ -166,6 +166,7 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->sched_mig.fd = -1;
 	ctx->sched_walt.fd = -1;
 	ctx->sched_ucl.fd = -1;
+	ctx->remap_due = true;
 	ctx->on_trigger = NULL;
 	ctx->on_timeout = NULL;
 }
@@ -251,14 +252,13 @@ static void cleanup_context(struct pg_context *ctx)
 
 int pg_daemon_init(void)
 {
-	int ret = 0;
-
-	LOGI("daemon: initiating daemon sequence");
-	init_context_defaults(&context);
-
-	ret = pg_detect_privilege();
+	int ret = pg_detect_privilege();
 	if (ret != 0)
-		goto cleanup;
+		return ret;
+
+	init_context_defaults(&context);
+	init_os_environment();
+	LOGI("daemon: initiating daemon sequence");
 
 	context.lock_fd = pg_lockfile_init(PATH_LOCK);
 	if (context.lock_fd < 0) {
@@ -278,9 +278,6 @@ int pg_daemon_init(void)
 		context.dormant = true;
 	}
 	restore_snapshot(&context);
-
-	LOGD("daemon: configuring os parameters");
-	init_os_environment();
 
 	if (!pg_detect_cpu_psi()) {
 		ret = -ENODEV;

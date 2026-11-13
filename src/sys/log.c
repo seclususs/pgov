@@ -45,6 +45,27 @@ static bool should_rate_limit(uint32_t *dropped_count)
 	return false;
 }
 
+static void log_write_stderr(const char *tag, const char *level_str,
+			     const char *msg)
+{
+	time_t now = time(NULL);
+	struct tm tm;
+	char ts[24] = { 0 };
+
+	if (localtime_r(&now, &tm))
+		(void)strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm);
+
+	char out[300];
+	int n = snprintf(out, sizeof(out), "[%s] [%s] [%s] %s\n", ts, tag,
+			 level_str, msg);
+	if (n > 0) {
+		size_t max = sizeof(out) - 1;
+		size_t w = (size_t)n < max ? (size_t)n : max;
+		ssize_t unused = write(STDERR_FILENO, out, w);
+		UNUSED(unused);
+	}
+}
+
 void pg_log_err(const char *tag, const char *fmt, ...)
 {
 	if (UNLIKELY(!tag || !fmt))
@@ -75,19 +96,26 @@ void pg_log_err(const char *tag, const char *fmt, ...)
 
 	__android_log_write(ANDROID_LOG_ERROR, tag, msg);
 
-	time_t now = time(NULL);
-	struct tm tm;
-	char ts[24] = { 0 };
+	log_write_stderr(tag, "E", msg);
+}
 
-	if (localtime_r(&now, &tm))
-		(void)strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm);
+void pg_log_msg(int prio, const char *tag, const char *fmt, ...)
+{
+	if (UNLIKELY(!tag || !fmt))
+		return;
 
-	char out[300];
-	int n = snprintf(out, sizeof(out), "[%s] [%s] [E] %s\n", ts, tag, msg);
-	if (n > 0) {
-		size_t max = sizeof(out) - 1;
-		size_t w = (size_t)n < max ? (size_t)n : max;
-		ssize_t unused = write(STDERR_FILENO, out, w);
-		UNUSED(unused);
-	}
+	char msg[256];
+	va_list args;
+
+	va_start(args, fmt);
+	int v_len = vsnprintf(msg, sizeof(msg), fmt, args);
+	va_end(args);
+
+	if (v_len < 0)
+		return;
+
+	__android_log_write(prio, tag, msg);
+
+	const char *level_str = (prio == ANDROID_LOG_WARN) ? "W" : "I";
+	log_write_stderr(tag, level_str, msg);
 }
