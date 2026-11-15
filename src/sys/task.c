@@ -3,10 +3,12 @@
 
 #define _GNU_SOURCE
 #include "pgov/task.h"
+#include "pgov/compiler.h"
 #include "pgov/log.h"
 #include "pgov/topo.h"
 #include <errno.h>
 #include <sched.h>
+#include <stdbool.h>
 #include <stdint.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
@@ -123,6 +125,11 @@ int pg_task_set_timer_slack(unsigned long slack_ns)
 
 int pg_task_set_uclamp(uint32_t util_max)
 {
+	static bool uclamp_supported = true;
+
+	if (UNLIKELY(!uclamp_supported))
+		return 0;
+
 	struct pg_sched_attr attr = { 0 };
 	attr.size = sizeof(attr);
 	attr.sched_flags = SCHED_FLAG_KEEP_POLICY | SCHED_FLAG_KEEP_PARAMS |
@@ -134,6 +141,12 @@ int pg_task_set_uclamp(uint32_t util_max)
 
 	if (syscall(__NR_sched_setattr, 0, &attr, 0) == -1) {
 		int err = errno;
+
+		if (err == E2BIG || err == ENOSYS || err == EINVAL) {
+			uclamp_supported = false;
+			return 0;
+		}
+
 		LOGW("task: failed to set uclamp max limit err=%d", err);
 		return -err;
 	}
