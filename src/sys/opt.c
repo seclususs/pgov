@@ -6,13 +6,13 @@
 #include "pgov/opt.h"
 #include "pgov/compiler.h"
 #include "pgov/conf.h"
-#include "pgov/path.h"
 #include "pgov/node.h"
 #include "pgov/prop.h"
 #include "pgov/str.h"
 #include "pgov/log.h"
 #include <errno.h> // IWYU pragma: keep
 
+#define PATH_CONF "/data/adb/modules/pgovd/system/etc/pgovd.conf"
 #define MAX_PROPS 64
 
 static struct pg_prop_state props[MAX_PROPS];

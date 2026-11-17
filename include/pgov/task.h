@@ -6,6 +6,8 @@
 
 #include <stdint.h>
 
+#define UCLAMP_MAX 102
+
 int pg_task_set_rt_prio(int priority);
 int pg_task_set_io_prio(int ioprio_class, int ioprio_data);
 int pg_task_set_core_efficiency(void);

@@ -4,7 +4,6 @@
 #include "pgov/scan.h"
 #include "pgov/compiler.h"
 #include "pgov/str.h"
-#include "pgov/path.h"
 #include "pgov/parser.h"
 #include <dirent.h>
 #include <errno.h>
@@ -13,6 +12,10 @@
 #include <stdint.h>
 #include <string.h>
 #include <unistd.h>
+
+#define THERMAL_BASE "/sys/class/thermal"
+#define BACKLIGHT_BASE "/sys/class/backlight"
+#define LEDS_BASE "/sys/class/leds"
 
 static const char *const PRIORITY[] = {
 	"cpu",
@@ -119,7 +122,7 @@ static bool type_valid(const char *name)
 	char type_path[256];
 	char buf[64];
 
-	pg_str_build_path(type_path, sizeof(type_path), PATH_THERMAL_BASE, name,
+	pg_str_build_path(type_path, sizeof(type_path), THERMAL_BASE, name,
 			  "type");
 
 	if (read_sysfs_str(type_path, buf, sizeof(buf)) <= 0)
@@ -139,7 +142,7 @@ static inline int find_priority(const struct tz_info *zones, size_t nr_zones,
 	for (size_t i = 0; i < ARRAY_SIZE(PRIORITY); ++i) {
 		for (size_t z = 0; z < nr_zones; ++z) {
 			if (strcmp(zones[z].name, PRIORITY[i]) == 0) {
-				pg_str_build_path(path, len, PATH_THERMAL_BASE,
+				pg_str_build_path(path, len, THERMAL_BASE,
 						  zones[z].folder, "temp");
 				return 0;
 			}
@@ -154,7 +157,7 @@ static inline int find_heuristic(const struct tz_info *zones, size_t nr_zones,
 {
 	for (size_t z = 0; z < nr_zones; ++z) {
 		if (thermal_valid(zones[z].name)) {
-			pg_str_build_path(path, len, PATH_THERMAL_BASE,
+			pg_str_build_path(path, len, THERMAL_BASE,
 					  zones[z].folder, "temp");
 			return 0;
 		}
@@ -168,7 +171,7 @@ int pg_scan_thermal_zone(char *path, size_t len)
 	if (UNLIKELY(!path || len == 0))
 		return -EINVAL;
 
-	DIR *dir = opendir(PATH_THERMAL_BASE);
+	DIR *dir = opendir(THERMAL_BASE);
 	if (!dir) {
 		path[0] = '\0';
 		return -ENOENT;
@@ -184,8 +187,8 @@ int pg_scan_thermal_zone(char *path, size_t len)
 		if (!pg_str_has_prefix(entry->d_name, "thermal_zone"))
 			continue;
 
-		pg_str_build_path(type_path, sizeof(type_path),
-				  PATH_THERMAL_BASE, entry->d_name, "type");
+		pg_str_build_path(type_path, sizeof(type_path), THERMAL_BASE,
+				  entry->d_name, "type");
 
 		if (read_sysfs_str(type_path, buf, sizeof(buf)) <= 0)
 			continue;
@@ -246,9 +249,9 @@ int pg_scan_backlight(char (*paths)[BL_PATH_LEN], size_t max)
 		return -EINVAL;
 
 	size_t n = 0;
-	scan_brightness(PATH_BACKLIGHT_BASE, NULL, paths, &n, max);
+	scan_brightness(BACKLIGHT_BASE, NULL, paths, &n, max);
 	if (n == 0)
-		scan_brightness(PATH_LEDS_BASE, "backlight", paths, &n, max);
+		scan_brightness(LEDS_BASE, "backlight", paths, &n, max);
 
 	if (n == 0)
 		return -ENODEV;
@@ -289,8 +292,8 @@ static int trip_point(const char *name, char *path, size_t len)
 
 	for (size_t i = 0; i <= 9; ++i) {
 		format_trip_node(file, i, "type");
-		pg_str_build_path(node_path, sizeof(node_path),
-				  PATH_THERMAL_BASE, name, file);
+		pg_str_build_path(node_path, sizeof(node_path), THERMAL_BASE,
+				  name, file);
 
 		if (read_sysfs_str(node_path, buf, sizeof(buf)) <= 0)
 			continue;
@@ -310,8 +313,8 @@ static int trip_point(const char *name, char *path, size_t len)
 			continue;
 
 		format_trip_node(file, i, "temp");
-		pg_str_build_path(node_path, sizeof(node_path),
-				  PATH_THERMAL_BASE, name, file);
+		pg_str_build_path(node_path, sizeof(node_path), THERMAL_BASE,
+				  name, file);
 
 		ssize_t bytes = read_sysfs_str(node_path, buf, sizeof(buf));
 		if (bytes <= 0)
@@ -346,7 +349,7 @@ int pg_scan_trip_point(char *path, size_t len)
 	if (UNLIKELY(!path || len == 0))
 		return -EINVAL;
 
-	DIR *dir = opendir(PATH_THERMAL_BASE);
+	DIR *dir = opendir(THERMAL_BASE);
 	struct dirent *entry;
 	int ret = -ENODEV;
 

@@ -10,6 +10,10 @@
 #include <stdint.h>
 #include <time.h>
 
+#define PSI_CPU "/proc/pressure/cpu"
+#define PSI_THRESHOLD_US 100000
+#define PSI_WINDOW_US 1000000
+
 struct pg_psi_trend {
 	q16_t cur;
 	q16_t vel;

@@ -4,9 +4,10 @@
 #ifndef PGOV_SENSOR_H
 #define PGOV_SENSOR_H
 
-#include "pgov/config.h"
 #include "pgov/math.h"
 #include <stdint.h>
+
+#define BACKLIGHT_MAX 4
 
 struct pg_temp_sensor {
 	int fd;
@@ -20,7 +21,7 @@ struct pg_bat_sensor {
 };
 
 struct pg_bl_sensor {
-	int fd[CFG_BL_MAX];
+	int fd[BACKLIGHT_MAX];
 	uint8_t n;
 	uint8_t buf[16];
 };

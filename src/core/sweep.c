@@ -6,11 +6,9 @@
 #define _GNU_SOURCE
 #include "pgov/sweep.h"
 #include "pgov/fs.h"
-#include "pgov/config.h"
 #include "pgov/log.h"
 #include "pgov/task.h"
 #include "pgov/sensor.h"
-#include "pgov/path.h"
 #include "pgov/compiler.h"
 #include "pgov/psi.h"
 #include <dirent.h>
@@ -88,7 +86,7 @@ static bool sweep_chk_intr(struct sweep_ctx *sctx)
 	}
 
 	q16_t avg10 = 0;
-	if (pg_psi_read_raw(PATH_PSI_CPU, &avg10) == 0) {
+	if (pg_psi_read_raw(PSI_CPU, &avg10) == 0) {
 		if (avg10 > INT_TO_Q16(MAX_PSI)) {
 			sctx->intr = true;
 			return true;
@@ -239,7 +237,7 @@ void pg_sweep_run(struct pg_context *ctx)
 		pg_fs_walk(TEMP_PATHS[i], sweep_cb, &sctx, MAX_DEPTH);
 	}
 
-	pg_task_set_uclamp(CFG_UCLAMP_MAX);
+	pg_task_set_uclamp(UCLAMP_MAX);
 
 	if (sctx.intr)
 		LOGD("sweep: cycle preempted, intr=1");

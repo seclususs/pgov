@@ -2,7 +2,6 @@
 // Copyright (C) 2026 seclususs
 
 #include "pgov/poll.h"
-#include "pgov/config.h"
 #include "pgov/time.h"
 
 void pg_poll_init(struct pg_poll_state *state)
@@ -10,8 +9,8 @@ void pg_poll_init(struct pg_poll_state *state)
 	if (UNLIKELY(!state))
 		return;
 
-	state->cur_ivl = CFG_MIN_POLL_MS;
-	state->last_wait = CFG_MIN_POLL_MS;
+	state->cur_ivl = MIN_POLL_MS;
+	state->last_wait = MIN_POLL_MS;
 	clock_gettime(CLOCK_MONOTONIC, &state->last_tick);
 
 	struct timespec now;
@@ -81,7 +80,7 @@ uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
 			   q16_t avg300, q16_t press_vel)
 {
 	if (UNLIKELY(!state))
-		return CFG_MIN_POLL_MS;
+		return MIN_POLL_MS;
 
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
@@ -93,37 +92,39 @@ uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
 	uint64_t ms = (uint64_t)((((q32_t)elapsed) * 1000) >> Q16_SHIFT);
 	if (UNLIKELY(ms > ((uint64_t)state->last_wait + 200))) {
 		state->last_tick = now;
-		state->cur_ivl = CFG_MIN_POLL_MS;
-		state->last_wait = CFG_MIN_POLL_MS;
-		return CFG_MIN_POLL_MS;
+		state->cur_ivl = MIN_POLL_MS;
+		state->last_wait = MIN_POLL_MS;
+		return MIN_POLL_MS;
 	}
 
 	q16_t pred = cur_press + q16_mul(press_vel, Q16_HALF);
 	uint64_t nxt_ivl = state->cur_ivl;
 
 	if (pred > INT_TO_Q16(5) || press_vel > INT_TO_Q16(2))
-		nxt_ivl = CFG_MIN_POLL_MS;
+		nxt_ivl = MIN_POLL_MS;
+
 	else if (pred > FLOAT_TO_Q16(1.5F))
 		nxt_ivl /= 2;
+
 	else if (avg300 < INT_TO_Q16(2))
 		nxt_ivl += 200;
 
-	if (nxt_ivl < CFG_MIN_POLL_MS)
-		nxt_ivl = CFG_MIN_POLL_MS;
-	else if (nxt_ivl > CFG_MAX_POLL_MS)
-		nxt_ivl = CFG_MAX_POLL_MS;
+	if (nxt_ivl < MIN_POLL_MS)
+		nxt_ivl = MIN_POLL_MS;
+
+	else if (nxt_ivl > MAX_POLL_MS)
+		nxt_ivl = MAX_POLL_MS;
 
 	state->last_tick = now;
 
 	uint64_t diff = (nxt_ivl > state->cur_ivl) ?
 				(nxt_ivl - state->cur_ivl) :
 				(state->cur_ivl - nxt_ivl);
+
 	if (nxt_ivl < state->cur_ivl || diff >= 200)
 		state->cur_ivl = (uint32_t)nxt_ivl;
 
-	uint64_t wait =
-		jitter(state, state->cur_ivl, CFG_MIN_POLL_MS, CFG_MAX_POLL_MS);
-
+	uint64_t wait = jitter(state, state->cur_ivl, MIN_POLL_MS, MAX_POLL_MS);
 	state->last_wait = (uint32_t)wait;
 	return wait;
 }

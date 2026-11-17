@@ -3,7 +3,6 @@
 
 #define _GNU_SOURCE
 #include "pgov/daemon.h"
-#include "pgov/config.h"
 #include "pgov/compiler.h"
 #include "pgov/detect.h"
 #include "pgov/epoll.h"
@@ -12,7 +11,6 @@
 #include "pgov/log.h"
 #include "pgov/memory.h"
 #include "pgov/parser.h"
-#include "pgov/path.h"
 #include "pgov/prop.h"
 #include "pgov/rlimit.h"
 #include "pgov/scan.h"
@@ -30,59 +28,73 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#define RT_PRIORITY 50
+#define STACK_SIZE (512UL * 1024UL)
+#define TIMER_SLACK_NS (50UL * 1000UL * 1000UL)
+#define IOPRIO_CLASS 2
+#define IOPRIO_DATA 0
+
+#if defined(NDK_BUILD)
+#define PATH_LOCK "/data/local/tmp/pgovd.lock"
+#define PATH_LOG "/data/adb/modules/pgovd/pgovd.log"
+#else
+#define PATH_LOCK "/data/vendor/pgovd/pgovd.lock"
+#define PATH_LOG "/data/vendor/pgovd/pgovd.log"
+#endif
+
 static struct pg_context context;
 
 static const char *const CAND_LAT[] = {
-	PATH_SCHED_LAT,
-	PATH_SCHED_LAT_DBG,
+	"/proc/sys/kernel/sched_latency_ns",
+	"/sys/kernel/debug/sched/latency_ns",
 	NULL,
 };
 
 static const char *const CAND_GRAN[] = {
-	PATH_SCHED_GRAN,
-	PATH_SCHED_GRAN_DBG,
+	"/proc/sys/kernel/sched_min_granularity_ns",
+	"/sys/kernel/debug/sched/min_granularity_ns",
 	NULL,
 };
 
 static const char *const CAND_WAKE[] = {
-	PATH_SCHED_WAKEUP,
-	PATH_SCHED_WAKEUP_DBG,
+	"/proc/sys/kernel/sched_wakeup_granularity_ns",
+	"/sys/kernel/debug/sched/wakeup_granularity_ns",
 	NULL,
 };
 
 static const char *const CAND_MIG[] = {
-	PATH_SCHED_MIG,
-	PATH_SCHED_MIG_DBG,
+	"/proc/sys/kernel/sched_migration_cost_ns",
+	"/sys/kernel/debug/sched/migration_cost_ns",
 	NULL,
 };
 
 static const char *const CAND_WALT[] = {
-	PATH_SCHED_WALT,
-	PATH_SCHED_WALT_ALT,
+	"/proc/sys/kernel/sched_walt_init_task_load_pct",
+	"/proc/sys/kernel/sched_init_task_load",
 	NULL,
 };
 
 static const char *const CAND_UCL[] = {
-	PATH_SCHED_UCLAMP_UTIL,
-	PATH_SCHED_UTIL_CLAMP,
+	"/proc/sys/kernel/sched_uclamp_util_min",
+	"/proc/sys/kernel/sched_util_clamp_min",
 	NULL,
 };
 
 static const char *const CAND_UCL_MAX[] = {
-	PATH_SCHED_UCLAMP_UTIL_MAX,
-	PATH_SCHED_UTIL_CLAMP_MAX,
+	"/proc/sys/kernel/sched_uclamp_util_max",
+	"/proc/sys/kernel/sched_util_clamp_max",
 	NULL,
 };
 
 static const char *const CAND_BAT_TEMP[] = {
-	PATH_BATTERY_TEMP,
-	PATH_BATTERY_TEMP_BMS,
+	"/sys/class/power_supply/battery/temp",
+	"/sys/class/power_supply/bms/temp",
 	NULL,
 };
 
 static const char *const CAND_BAT_CAP[] = {
-	PATH_BATTERY_CAP,
-	PATH_BATTERY_CAP_BMS,
+	"/sys/class/power_supply/battery/capacity",
+	"/sys/class/power_supply/bms/capacity",
 	NULL,
 };
 
@@ -150,18 +162,18 @@ static void init_os_environment(void)
 	pg_memory_shield();
 	pg_memory_lock();
 	pg_rlimit_set_max_fd();
-	pg_rlimit_set_stack(CFG_STACK_SIZE);
+	pg_rlimit_set_stack(STACK_SIZE);
 	pg_task_set_core_efficiency();
-	pg_task_set_rt_prio(CFG_RT_PRIORITY);
-	pg_task_set_timer_slack(CFG_TIMER_SLACK_NS);
-	pg_task_set_uclamp(CFG_UCLAMP_MAX);
-	pg_task_set_io_prio(CFG_IOPRIO_CLASS, CFG_IOPRIO_DATA);
+	pg_task_set_rt_prio(RT_PRIORITY);
+	pg_task_set_timer_slack(TIMER_SLACK_NS);
+	pg_task_set_uclamp(UCLAMP_MAX);
+	pg_task_set_io_prio(IOPRIO_CLASS, IOPRIO_DATA);
 }
 
 static inline void init_context_defaults(struct pg_context *ctx)
 {
 	ctx->shutdown_req = false;
-	ctx->next_wake = CFG_MIN_POLL_MS;
+	ctx->next_wake = MIN_POLL_MS;
 	ctx->disp_state = DISP_UNKNOWN;
 	ctx->cached_th_scl = Q16_ONE;
 	ctx->load_state.first_run = true;
@@ -178,7 +190,7 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->bat_cap_sensor.fd = -1;
 
 	ctx->bl_sensor.n = 0;
-	for (size_t i = 0; i < CFG_BL_MAX; i++)
+	for (size_t i = 0; i < BACKLIGHT_MAX; i++)
 		ctx->bl_sensor.fd[i] = -1;
 
 	ctx->sched_lat.fd = -1;
@@ -219,8 +231,8 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	pg_sensor_init_bat_cap(&ctx->bat_cap_sensor, CAND_BAT_CAP);
 
 	if (!ctx->dormant) {
-		ctx->trg_fd = pg_psi_open_trg(
-			PATH_PSI_CPU, CFG_PSI_THRESHOLD_US, CFG_PSI_WINDOW_US);
+		ctx->trg_fd = pg_psi_open_trg(PSI_CPU, PSI_THRESHOLD_US,
+					      PSI_WINDOW_US);
 
 		if (ctx->trg_fd < 0) {
 			LOGE("daemon: failed inject err=%d", ctx->trg_fd);
@@ -228,7 +240,7 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 		}
 	}
 
-	pg_psi_init(&ctx->psi, PATH_PSI_CPU);
+	pg_psi_init(&ctx->psi, PSI_CPU);
 
 	ctx->sig_fd = pg_signal_init();
 	if (ctx->sig_fd < 0)
@@ -237,8 +249,8 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	pg_thermal_init(&ctx->thermal_state);
 	pg_poll_init(&ctx->poll_state);
 
-	char b_path[CFG_BL_MAX][BL_PATH_LEN];
-	int n_bl = pg_scan_backlight(b_path, CFG_BL_MAX);
+	char b_path[BACKLIGHT_MAX][BL_PATH_LEN];
+	int n_bl = pg_scan_backlight(b_path, BACKLIGHT_MAX);
 	for (int i = 0; i < n_bl; i++)
 		pg_sensor_init_bl(&ctx->bl_sensor, b_path[i]);
 

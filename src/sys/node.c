@@ -4,12 +4,12 @@
 #include "pgov/node.h"
 #include "pgov/parser.h"
 #include "pgov/log.h"
-#include "pgov/config.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <time.h>
 #include <unistd.h>
 
+#define NODE_FAIL_MAX 7
 #define NODE_BACKOFF_BASE_MS 1000U
 #define NODE_BACKOFF_MAX_MS 60000U
 
@@ -276,7 +276,7 @@ void pg_node_update(struct pg_node_cache *cache, uint64_t value, bool force,
 		return;
 	}
 
-	if (cache->fails < CFG_NODE_FAIL_MAX)
+	if (cache->fails < NODE_FAIL_MAX)
 		cache->fails++;
 
 	uint32_t delay = NODE_BACKOFF_BASE_MS << (cache->fails - 1);

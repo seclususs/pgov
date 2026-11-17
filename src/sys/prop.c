@@ -2,33 +2,35 @@
 // Copyright (C) 2026 seclususs
 
 #include "pgov/prop.h"
-#include "pgov/config.h"
 #include "pgov/log.h"
 #include <errno.h> // IWYU pragma: keep
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
 
+#define STAB_DELAY_SEC 10
+#define BOOT_RETRY_MAX 300
+#define BOOT_POLL_SEC 1
+
 static inline void maybe_delay_stabilization(void)
 {
 	struct timespec ts;
 	if (clock_gettime(CLOCK_BOOTTIME, &ts) == 0 && ts.tv_sec < 60)
-		sleep(CFG_STAB_DELAY_SEC);
+		sleep(STAB_DELAY_SEC);
 }
 
 bool pg_prop_wait_boot(void)
 {
 	char val[PROP_VALUE_MAX];
 
-	for (unsigned int retries = 0; retries <= CFG_BOOT_RETRY_MAX;
-	     retries++) {
+	for (unsigned int retries = 0; retries <= BOOT_RETRY_MAX; retries++) {
 		int len = __system_property_get("sys.boot_completed", val);
 		if (len == 1 && val[0] == '1') {
 			maybe_delay_stabilization();
 			return true;
 		}
 
-		sleep(CFG_BOOT_POLL_SEC);
+		sleep(BOOT_POLL_SEC);
 	}
 
 	LOGE("prop: timeout waiting for sys.boot_completed");

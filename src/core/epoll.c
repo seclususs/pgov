@@ -3,7 +3,6 @@
 
 #define _GNU_SOURCE
 #include "pgov/epoll.h"
-#include "pgov/config.h"
 #include "pgov/log.h"
 #include "pgov/state.h"
 #include "pgov/compiler.h"
@@ -13,6 +12,8 @@
 #include <sys/signalfd.h>
 #include <time.h>
 #include <unistd.h>
+
+#define MAX_EVENTS 16
 
 static inline void epoll_error(struct pg_context *ctx,
 			       const struct timespec *wait_start)
@@ -135,13 +136,13 @@ int pg_epoll_run(struct pg_context *ctx)
 	if (ret < 0)
 		return ret;
 
-	struct epoll_event events[CFG_MAX_EVENTS];
+	struct epoll_event events[MAX_EVENTS];
 
 	while (LIKELY(!ctx->shutdown_req)) {
 		struct timespec wait_start;
 		clock_gettime(CLOCK_MONOTONIC, &wait_start);
 
-		int nfds = epoll_wait(ctx->epoll_fd, events, CFG_MAX_EVENTS,
+		int nfds = epoll_wait(ctx->epoll_fd, events, MAX_EVENTS,
 				      ctx->next_wake);
 
 		if (UNLIKELY(nfds < 0)) {

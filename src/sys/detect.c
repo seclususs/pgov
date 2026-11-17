@@ -3,13 +3,13 @@
 
 #include "pgov/detect.h"
 #include "pgov/log.h"
-#include "pgov/path.h"
+#include "pgov/psi.h"
 #include <errno.h> // IWYU pragma: keep
 #include <unistd.h>
 
 bool pg_detect_cpu_psi(void)
 {
-	if (access(PATH_PSI_CPU, R_OK | W_OK) == 0)
+	if (access(PSI_CPU, R_OK | W_OK) == 0)
 		return true;
 
 	LOGE("detect: cpu psi node missing or access denied");

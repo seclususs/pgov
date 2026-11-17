@@ -8,6 +8,9 @@
 #include <stdint.h>
 #include <time.h>
 
+#define MIN_POLL_MS 100
+#define MAX_POLL_MS 10000
+
 struct pg_poll_state {
 	uint32_t cur_ivl;
 	uint32_t last_wait;
