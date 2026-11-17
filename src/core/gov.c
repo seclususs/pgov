@@ -34,6 +34,50 @@ int pg_gov_init(struct pg_context *ctx)
 	return 0;
 }
 
+static inline void relax_sched_tunables(struct pg_context *ctx)
+{
+	const struct pg_cpu_lim *l = &LIM_CPU;
+	const uint64_t q_ns = CFG_QUANT_NS;
+
+	if (ctx->sched_ucl.active && ctx->sched_ucl.last != 0)
+		pg_node_update(&ctx->sched_ucl, 0, true, NULL);
+
+	if (ctx->sched_lat.active) {
+		uint64_t v_lat =
+			pg_math_san_quant_u64(l->max_lat, l->max_lat, q_ns);
+		if (ctx->sched_lat.last != v_lat)
+			pg_node_update(&ctx->sched_lat, v_lat, true, NULL);
+	}
+
+	if (ctx->sched_gran.active) {
+		uint64_t v_gran =
+			pg_math_san_quant_u64(l->max_gran, l->max_gran, q_ns);
+		if (ctx->sched_gran.last != v_gran)
+			pg_node_update(&ctx->sched_gran, v_gran, true, NULL);
+	}
+
+	if (ctx->sched_wake.active) {
+		uint64_t v_wake =
+			pg_math_san_quant_u64(l->max_wake, l->max_wake, q_ns);
+		if (ctx->sched_wake.last != v_wake)
+			pg_node_update(&ctx->sched_wake, v_wake, true, NULL);
+	}
+
+	if (ctx->sched_mig.active) {
+		uint64_t v_mig =
+			pg_math_san_quant_u64(l->max_mig, l->min_mig, q_ns);
+		if (ctx->sched_mig.last != v_mig)
+			pg_node_update(&ctx->sched_mig, v_mig, true, NULL);
+	}
+
+	if (ctx->sched_walt.active) {
+		uint64_t v_wlt = pg_math_san_u64(
+			l->min_walt, (uint64_t)Q16_TO_INT(l->min_walt));
+		if (ctx->sched_walt.last != v_wlt)
+			pg_node_update(&ctx->sched_walt, v_wlt, true, NULL);
+	}
+}
+
 static inline bool update_disp(struct pg_context *ctx,
 			       const struct timespec *now)
 {
@@ -63,8 +107,7 @@ static inline bool update_disp(struct pg_context *ctx,
 	}
 
 	if (ctx->disp_state == DISP_SUSPEND) {
-		if (ctx->sched_ucl.active && ctx->sched_ucl.last != 0)
-			pg_node_update(&ctx->sched_ucl, 0, true, NULL);
+		relax_sched_tunables(ctx);
 
 		ctx->next_wake = 5000;
 		ctx->last_tick = *now;
