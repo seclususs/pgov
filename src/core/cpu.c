@@ -303,3 +303,34 @@ PURE q16_t pg_cpu_calc_uclamp(q16_t press, q16_t th_scl,
 	q16_t ucl = lim->min_ucl + q16_mul(rng, sig);
 	return pg_math_clamp(q16_mul(ucl, th_scl), lim->min_ucl, lim->max_ucl);
 }
+
+PURE q16_t pg_cpu_calc_uclamp_max(q16_t th_scl, q16_t bat_lvl,
+				  const struct pg_cpu_lim *lim)
+{
+	if (UNLIKELY(!lim))
+		return INT_TO_Q16(UCL_MAX_CEILING);
+
+	q16_t b_lvl = pg_math_clamp(bat_lvl, 0, INT_TO_Q16(100));
+	q16_t th_norm = Q16_ONE;
+
+	if (th_scl < FLOAT_TO_Q16(0.80F)) {
+		q16_t clamped_th = pg_math_clamp(th_scl, FLOAT_TO_Q16(0.10F),
+						 FLOAT_TO_Q16(0.80F));
+		th_norm = q16_div(clamped_th - FLOAT_TO_Q16(0.10F),
+				  FLOAT_TO_Q16(0.70F));
+	}
+
+	q16_t bat_norm = Q16_ONE;
+	if (b_lvl < INT_TO_Q16(15))
+		bat_norm = q16_div(b_lvl, INT_TO_Q16(15));
+
+	q16_t health = q16_mul(th_norm, bat_norm);
+	if (health >= Q16_ONE)
+		return INT_TO_Q16(UCL_MAX_CEILING);
+
+	q16_t ceiling = INT_TO_Q16(UCL_MAX_CEILING);
+	q16_t rng = ceiling - lim->min_ucl_max;
+	q16_t val = lim->min_ucl_max + q16_mul(rng, health);
+
+	return pg_math_clamp(val, lim->min_ucl_max, ceiling);
+}

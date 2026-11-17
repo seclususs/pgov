@@ -24,6 +24,7 @@ static const struct pg_node_chk CHK_WAKE = { CHK_REL, CFG_CHK_WAKE };
 static const struct pg_node_chk CHK_MIG = { CHK_ABS, CFG_CHK_MIG };
 static const struct pg_node_chk CHK_WALT = { CHK_ABS, CFG_CHK_WALT };
 static const struct pg_node_chk CHK_UCL = { CHK_ABS, CFG_CHK_UCL };
+static const struct pg_node_chk CHK_UCL_MAX = { CHK_ABS, CFG_CHK_UCL };
 
 int pg_gov_init(struct pg_context *ctx)
 {
@@ -41,6 +42,13 @@ static inline void relax_sched_tunables(struct pg_context *ctx)
 
 	if (ctx->sched_ucl.active && ctx->sched_ucl.last != 0)
 		pg_node_update(&ctx->sched_ucl, 0, true, NULL);
+
+	if (ctx->sched_ucl_max.active) {
+		uint64_t v_ucl = pg_math_san_u64(
+			l->susp_ucl_max, (uint64_t)Q16_TO_INT(l->susp_ucl_max));
+		if (ctx->sched_ucl_max.last != v_ucl)
+			pg_node_update(&ctx->sched_ucl_max, v_ucl, true, NULL);
+	}
 
 	if (ctx->sched_lat.active) {
 		uint64_t v_lat =
@@ -301,6 +309,7 @@ static inline void apply_mapping(struct pg_context *ctx,
 	uint64_t v_mig = 0;
 	uint64_t v_wlt = 0;
 	uint64_t v_ucl = 0;
+	uint64_t v_ucl_max = UCL_MAX_CEILING;
 
 	q16_t th = 0;
 	q16_t lat = 0;
@@ -309,6 +318,7 @@ static inline void apply_mapping(struct pg_context *ctx,
 	q16_t mig = 0;
 	q16_t wlt = 0;
 	q16_t ucl = 0;
+	q16_t ucl_max = 0;
 
 	if (ctx->sched_lat.active || ctx->sched_gran.active) {
 		th = pg_cpu_calc_therm_lat(th_scl, l);
@@ -338,16 +348,23 @@ static inline void apply_mapping(struct pg_context *ctx,
 		v_wlt = pg_math_san_u64(wlt, (uint64_t)Q16_TO_INT(l->min_walt));
 	}
 
+	if (ctx->sched_ucl_max.active) {
+		ucl_max = pg_cpu_calc_uclamp_max(th_scl, ctx->bat_lvl, l);
+		v_ucl_max = pg_math_san_u64(ucl_max, (uint64_t)UCL_MAX_CEILING);
+	}
+
 	if (ctx->sched_ucl.active) {
 		ucl = pg_cpu_calc_uclamp(p_eff, th_scl, c, eff, l);
 		v_ucl = pg_math_san_u64(ucl, (uint64_t)Q16_TO_INT(l->min_ucl));
+		if (ctx->sched_ucl_max.active && v_ucl > v_ucl_max)
+			v_ucl = v_ucl_max;
 	}
 
-	LOGD("gov: lat=%llu gran=%llu wake=%llu mig=%llu walt=%llu uclamp=%llu poll=%d",
+	LOGD("gov: lat=%llu gran=%llu wake=%llu mig=%llu walt=%llu uclamp=%llu uclamp_max=%llu poll=%d",
 	     (unsigned long long)v_lat, (unsigned long long)v_gran,
 	     (unsigned long long)v_wake, (unsigned long long)v_mig,
 	     (unsigned long long)v_wlt, (unsigned long long)v_ucl,
-	     ctx->next_wake);
+	     (unsigned long long)v_ucl_max, ctx->next_wake);
 
 	pg_node_update(&ctx->sched_lat, v_lat, false, &CHK_LAT);
 	pg_node_update(&ctx->sched_gran, v_gran, false, &CHK_GRAN);
@@ -355,6 +372,7 @@ static inline void apply_mapping(struct pg_context *ctx,
 	pg_node_update(&ctx->sched_mig, v_mig, false, &CHK_MIG);
 	pg_node_update(&ctx->sched_walt, v_wlt, false, &CHK_WALT);
 	pg_node_update(&ctx->sched_ucl, v_ucl, false, &CHK_UCL);
+	pg_node_update(&ctx->sched_ucl_max, v_ucl_max, false, &CHK_UCL_MAX);
 }
 
 static inline void exec_gov_logic(struct pg_context *ctx,

@@ -8,6 +8,8 @@
 #include "pgov/math.h"
 #include <stdbool.h>
 
+#define UCL_MAX_CEILING 1024
+
 struct pg_cpu_lim {
 	q16_t min_lat;
 	q16_t max_lat;
@@ -21,6 +23,8 @@ struct pg_cpu_lim {
 	q16_t max_walt;
 	q16_t min_ucl;
 	q16_t max_ucl;
+	q16_t min_ucl_max;
+	q16_t susp_ucl_max;
 };
 
 struct pg_cpu_cfg {
@@ -106,5 +110,8 @@ PURE q16_t pg_cpu_calc_uclamp(q16_t press, q16_t th_scl,
 			      const struct pg_cpu_cfg *cfg,
 			      const struct pg_cpu_eff *eff,
 			      const struct pg_cpu_lim *lim);
+
+PURE q16_t pg_cpu_calc_uclamp_max(q16_t th_scl, q16_t bat_lvl,
+				  const struct pg_cpu_lim *lim);
 
 #endif // PGOV_CPU_H

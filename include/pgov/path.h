@@ -32,6 +32,8 @@
 #define PATH_SCHED_WALT_ALT "/proc/sys/kernel/sched_init_task_load"
 #define PATH_SCHED_UCLAMP_UTIL "/proc/sys/kernel/sched_uclamp_util_min"
 #define PATH_SCHED_UTIL_CLAMP "/proc/sys/kernel/sched_util_clamp_min"
+#define PATH_SCHED_UCLAMP_UTIL_MAX "/proc/sys/kernel/sched_uclamp_util_max"
+#define PATH_SCHED_UTIL_CLAMP_MAX "/proc/sys/kernel/sched_util_clamp_max"
 #define PATH_BATTERY_TEMP "/sys/class/power_supply/battery/temp"
 #define PATH_BATTERY_TEMP_BMS "/sys/class/power_supply/bms/temp"
 #define PATH_BATTERY_CAP "/sys/class/power_supply/battery/capacity"

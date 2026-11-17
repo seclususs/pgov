@@ -17,6 +17,8 @@ struct pg_cpu_lim LIM_CPU = {
 	.max_walt = FLOAT_TO_Q16(40.0F),
 	.min_ucl = FLOAT_TO_Q16(0.0F),
 	.max_ucl = FLOAT_TO_Q16(384.0F),
+	.min_ucl_max = FLOAT_TO_Q16(512.0F),
+	.susp_ucl_max = FLOAT_TO_Q16(384.0F),
 };
 
 struct pg_cpu_cfg CFG_CPU = {

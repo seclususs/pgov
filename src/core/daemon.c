@@ -68,6 +68,12 @@ static const char *const CAND_UCL[] = {
 	NULL,
 };
 
+static const char *const CAND_UCL_MAX[] = {
+	PATH_SCHED_UCLAMP_UTIL_MAX,
+	PATH_SCHED_UTIL_CLAMP_MAX,
+	NULL,
+};
+
 static const char *const CAND_BAT_TEMP[] = {
 	PATH_BATTERY_TEMP,
 	PATH_BATTERY_TEMP_BMS,
@@ -80,7 +86,7 @@ static const char *const CAND_BAT_CAP[] = {
 	NULL,
 };
 
-#define NR_SINKS 6
+#define NR_SINKS 7
 
 static struct {
 	int fd;
@@ -92,8 +98,9 @@ static size_t rs_cnt;
 static void restore_snapshot(const struct pg_context *ctx)
 {
 	const struct pg_node_cache *const c[NR_SINKS] = {
-		&ctx->sched_lat, &ctx->sched_gran, &ctx->sched_wake,
-		&ctx->sched_mig, &ctx->sched_walt, &ctx->sched_ucl,
+		&ctx->sched_lat,     &ctx->sched_gran, &ctx->sched_wake,
+		&ctx->sched_mig,     &ctx->sched_walt, &ctx->sched_ucl,
+		&ctx->sched_ucl_max,
 	};
 
 	rs_cnt = 0;
@@ -125,6 +132,7 @@ static void restore_all(struct pg_context *ctx)
 	pg_node_restore(&ctx->sched_mig);
 	pg_node_restore(&ctx->sched_walt);
 	pg_node_restore(&ctx->sched_ucl);
+	pg_node_restore(&ctx->sched_ucl_max);
 	rs_cnt = 0;
 }
 
@@ -179,6 +187,7 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->sched_mig.fd = -1;
 	ctx->sched_walt.fd = -1;
 	ctx->sched_ucl.fd = -1;
+	ctx->sched_ucl_max.fd = -1;
 	ctx->remap_due = true;
 	ctx->on_trigger = NULL;
 	ctx->on_timeout = NULL;
@@ -194,6 +203,7 @@ static int init_node_caches(struct pg_context *ctx)
 	n += pg_node_cache_init(&ctx->sched_mig, CAND_MIG);
 	n += pg_node_cache_init(&ctx->sched_walt, CAND_WALT);
 	n += pg_node_cache_init(&ctx->sched_ucl, CAND_UCL);
+	n += pg_node_cache_init(&ctx->sched_ucl_max, CAND_UCL_MAX);
 
 	return n;
 }
@@ -261,6 +271,7 @@ static void cleanup_context(struct pg_context *ctx)
 	pg_node_cache_cleanup(&ctx->sched_mig);
 	pg_node_cache_cleanup(&ctx->sched_walt);
 	pg_node_cache_cleanup(&ctx->sched_ucl);
+	pg_node_cache_cleanup(&ctx->sched_ucl_max);
 }
 
 int pg_daemon_init(void)
