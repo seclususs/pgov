@@ -15,6 +15,7 @@
 #include "pgov/psi.h"
 #include <dirent.h>
 #include <fcntl.h>
+#include <string.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <time.h>
@@ -27,7 +28,8 @@ struct sweep_ctx {
 	bool intr;
 };
 
-#define AGE_LIMIT 86400
+#define AGE_LIMIT 43200
+#define MAX_PSI 10
 #define MAX_DEPTH 12
 #define UCLAMP_UNRESTRICTED 1024
 #define INTR_MASK 1023
@@ -44,6 +46,31 @@ static const char *const APP_ROOTS[] = {
 	"/data/data",
 	"/data/media/0/Android/data",
 };
+
+static const char *const SUB_CACHE_DIRS[] = {
+	"cache",
+	"files/cache",
+	"files/disk_cache",
+};
+
+static bool sweep_database_file(const char *name)
+{
+	static const char *const DB_EXTS[] = {
+		".db",	   ".db-wal",	  ".db-shm",	 ".db-journal",
+		".sqlite", ".sqlite-wal", ".sqlite-shm", ".sqlite-journal",
+		".wal",	   ".shm",	  ".journal",
+	};
+
+	size_t len = strlen(name);
+	for (size_t i = 0; i < ARRAY_SIZE(DB_EXTS); ++i) {
+		size_t elen = strlen(DB_EXTS[i]);
+		if (len >= elen &&
+		    memcmp(name + len - elen, DB_EXTS[i], elen) == 0)
+			return true;
+	}
+
+	return false;
+}
 
 static bool sweep_chk_intr(struct sweep_ctx *sctx)
 {
@@ -62,7 +89,7 @@ static bool sweep_chk_intr(struct sweep_ctx *sctx)
 
 	q16_t avg10 = 0;
 	if (pg_psi_read_raw(PATH_PSI_CPU, &avg10) == 0) {
-		if (avg10 > INT_TO_Q16(3)) {
+		if (avg10 > INT_TO_Q16(MAX_PSI)) {
 			sctx->intr = true;
 			return true;
 		}
@@ -82,6 +109,9 @@ static enum pg_fs_act sweep_cb(int dfd, const char *name, uint8_t type,
 		return FS_STOP;
 
 	if (type == DT_DIR)
+		return FS_KEEP;
+
+	if (sweep_database_file(name))
 		return FS_KEEP;
 
 	if (fstatat(dfd, name, &st, AT_SYMLINK_NOFOLLOW) != 0)
@@ -105,10 +135,15 @@ static void sweep_package(int root_fd, const char *pkg_name,
 	if (pkg_fd < 0)
 		return;
 
-	int cache_fd = openat(pkg_fd, "cache", DIR_FLAGS);
-	if (cache_fd >= 0) {
-		pg_fs_walk_fd(cache_fd, sweep_cb, sctx, MAX_DEPTH);
-		close(cache_fd);
+	for (size_t i = 0; i < ARRAY_SIZE(SUB_CACHE_DIRS); ++i) {
+		if (sctx->intr)
+			break;
+
+		int cache_fd = openat(pkg_fd, SUB_CACHE_DIRS[i], DIR_FLAGS);
+		if (cache_fd >= 0) {
+			pg_fs_walk_fd(cache_fd, sweep_cb, sctx, MAX_DEPTH);
+			close(cache_fd);
+		}
 	}
 
 	close(pkg_fd);
