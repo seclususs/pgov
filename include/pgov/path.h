@@ -29,9 +29,12 @@
 #define PATH_SCHED_WAKEUP "/proc/sys/kernel/sched_wakeup_granularity_ns"
 #define PATH_SCHED_MIG "/proc/sys/kernel/sched_migration_cost_ns"
 #define PATH_SCHED_WALT "/proc/sys/kernel/sched_walt_init_task_load_pct"
+#define PATH_SCHED_WALT_ALT "/proc/sys/kernel/sched_init_task_load"
 #define PATH_SCHED_UCLAMP_UTIL "/proc/sys/kernel/sched_uclamp_util_min"
 #define PATH_SCHED_UTIL_CLAMP "/proc/sys/kernel/sched_util_clamp_min"
 #define PATH_BATTERY_TEMP "/sys/class/power_supply/battery/temp"
+#define PATH_BATTERY_TEMP_BMS "/sys/class/power_supply/bms/temp"
 #define PATH_BATTERY_CAP "/sys/class/power_supply/battery/capacity"
+#define PATH_BATTERY_CAP_BMS "/sys/class/power_supply/bms/capacity"
 
 #endif // PGOV_PATH_H

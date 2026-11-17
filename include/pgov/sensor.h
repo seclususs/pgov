@@ -27,11 +27,13 @@ struct pg_bl_sensor {
 
 void pg_sensor_init_cpu_temp(struct pg_temp_sensor *sensor, const char *path);
 
-void pg_sensor_init_bat_temp(struct pg_temp_sensor *sensor, const char *path);
+void pg_sensor_init_bat_temp(struct pg_temp_sensor *sensor,
+			     const char *const *paths);
 
 void pg_sensor_temp_close(struct pg_temp_sensor *sensor);
 
-void pg_sensor_init_bat_cap(struct pg_bat_sensor *sensor, const char *path);
+void pg_sensor_init_bat_cap(struct pg_bat_sensor *sensor,
+			    const char *const *paths);
 
 void pg_sensor_bat_close(struct pg_bat_sensor *sensor);
 

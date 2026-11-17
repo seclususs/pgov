@@ -34,7 +34,8 @@ void pg_sensor_init_cpu_temp(struct pg_temp_sensor *sensor, const char *path)
 		LOGW("sensor: failed to open node %s err=%d", path, errno);
 }
 
-void pg_sensor_init_bat_temp(struct pg_temp_sensor *sensor, const char *path)
+void pg_sensor_init_bat_temp(struct pg_temp_sensor *sensor,
+			     const char *const *paths)
 {
 	if (UNLIKELY(!sensor))
 		return;
@@ -42,12 +43,19 @@ void pg_sensor_init_bat_temp(struct pg_temp_sensor *sensor, const char *path)
 	sensor->fd = -1;
 	sensor->scale = SCALE_DECI;
 
-	if (UNLIKELY(!path || path[0] == '\0'))
+	if (UNLIKELY(!paths))
 		return;
 
-	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (sensor->fd < 0)
-		LOGW("sensor: failed to open node %s err=%d", path, errno);
+	for (size_t i = 0; paths[i] != NULL; i++) {
+		int fd = open(paths[i], O_RDONLY | O_CLOEXEC);
+		if (fd >= 0) {
+			sensor->fd = fd;
+			LOGI("sensor: mapped bat temp to %s", paths[i]);
+			return;
+		}
+	}
+
+	LOGW("sensor: no usable bat temp node");
 }
 
 void pg_sensor_temp_close(struct pg_temp_sensor *sensor)
@@ -61,19 +69,27 @@ void pg_sensor_temp_close(struct pg_temp_sensor *sensor)
 	}
 }
 
-void pg_sensor_init_bat_cap(struct pg_bat_sensor *sensor, const char *path)
+void pg_sensor_init_bat_cap(struct pg_bat_sensor *sensor,
+			    const char *const *paths)
 {
 	if (UNLIKELY(!sensor))
 		return;
 
 	sensor->fd = -1;
 
-	if (UNLIKELY(!path || path[0] == '\0'))
+	if (UNLIKELY(!paths))
 		return;
 
-	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (sensor->fd < 0)
-		LOGW("sensor: failed to open node %s err=%d", path, errno);
+	for (size_t i = 0; paths[i] != NULL; i++) {
+		int fd = open(paths[i], O_RDONLY | O_CLOEXEC);
+		if (fd >= 0) {
+			sensor->fd = fd;
+			LOGI("sensor: mapped bat cap to %s", paths[i]);
+			return;
+		}
+	}
+
+	LOGW("sensor: no usable bat cap node");
 }
 
 void pg_sensor_bat_close(struct pg_bat_sensor *sensor)

@@ -58,12 +58,25 @@ static const char *const CAND_MIG[] = {
 
 static const char *const CAND_WALT[] = {
 	PATH_SCHED_WALT,
+	PATH_SCHED_WALT_ALT,
 	NULL,
 };
 
 static const char *const CAND_UCL[] = {
 	PATH_SCHED_UCLAMP_UTIL,
 	PATH_SCHED_UTIL_CLAMP,
+	NULL,
+};
+
+static const char *const CAND_BAT_TEMP[] = {
+	PATH_BATTERY_TEMP,
+	PATH_BATTERY_TEMP_BMS,
+	NULL,
+};
+
+static const char *const CAND_BAT_CAP[] = {
+	PATH_BATTERY_CAP,
+	PATH_BATTERY_CAP_BMS,
 	NULL,
 };
 
@@ -192,8 +205,8 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	LOGD("daemon: cpu thermal sensor mapped to %s", t_path);
 	pg_sensor_init_cpu_temp(&ctx->cpu_temp_sensor, t_path);
 
-	pg_sensor_init_bat_temp(&ctx->bat_temp_sensor, PATH_BATTERY_TEMP);
-	pg_sensor_init_bat_cap(&ctx->bat_cap_sensor, PATH_BATTERY_CAP);
+	pg_sensor_init_bat_temp(&ctx->bat_temp_sensor, CAND_BAT_TEMP);
+	pg_sensor_init_bat_cap(&ctx->bat_cap_sensor, CAND_BAT_CAP);
 
 	if (!ctx->dormant) {
 		ctx->trg_fd = pg_psi_open_trg(
