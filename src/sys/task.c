@@ -12,6 +12,7 @@
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/prctl.h>
+#include <sys/resource.h>
 #include <sys/syscall.h>
 #include <unistd.h>
 
@@ -197,5 +198,52 @@ int task_protect_oom(void)
 	}
 
 	LOGD("task: oom protection active");
+	return 0;
+}
+
+int task_set_max_fd(void)
+{
+	struct rlimit limit = { 0 };
+	int err;
+
+	if (getrlimit(RLIMIT_NOFILE, &limit) != 0)
+		return -errno;
+
+	limit.rlim_cur = limit.rlim_max;
+	if (setrlimit(RLIMIT_NOFILE, &limit) != 0) {
+		err = errno;
+		LOGW("task: failed to maximize fd limit err=%d", err);
+		return -err;
+	}
+
+	LOGD("task: fd limit maximized to %llu",
+	     (unsigned long long)limit.rlim_cur);
+
+	return 0;
+}
+
+int task_set_stack_limit(size_t bytes)
+{
+	struct rlimit limit = { 0 };
+	rlim_t target;
+	int err;
+
+	if (getrlimit(RLIMIT_STACK, &limit) != 0)
+		return -errno;
+
+	target = (rlim_t)bytes;
+	if (limit.rlim_max != RLIM_INFINITY && target > limit.rlim_max)
+		target = limit.rlim_max;
+
+	limit.rlim_cur = target;
+	if (setrlimit(RLIMIT_STACK, &limit) != 0) {
+		err = errno;
+		LOGW("task: failed to set stack limit err=%d", err);
+		return -err;
+	}
+
+	LOGD("task: stack bounded to %llu bytes",
+	     (unsigned long long)limit.rlim_cur);
+
 	return 0;
 }

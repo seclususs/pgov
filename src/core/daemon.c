@@ -11,7 +11,6 @@
 #include "pgov/memory.h"
 #include "pgov/parser.h"
 #include "pgov/prop.h"
-#include "pgov/rlimit.h"
 #include "pgov/scan.h"
 #include "pgov/signal.h"
 #include "pgov/tune.h"
@@ -160,8 +159,8 @@ static void init_os_environment(void)
 	pg_signal_catch_crash(crash_restore);
 	task_protect_oom();
 	pg_memory_lock();
-	pg_rlimit_set_max_fd();
-	pg_rlimit_set_stack(STACK_SIZE);
+	task_set_max_fd();
+	task_set_stack_limit(STACK_SIZE);
 	task_set_core_affinity();
 	task_set_rt_priority(RT_PRIORITY);
 	task_set_timer_slack(TIMER_SLACK_NS);
