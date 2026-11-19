@@ -158,15 +158,15 @@ static void init_os_environment(void)
 	}
 
 	pg_signal_catch_crash(crash_restore);
-	pg_memory_shield();
+	task_protect_oom();
 	pg_memory_lock();
 	pg_rlimit_set_max_fd();
 	pg_rlimit_set_stack(STACK_SIZE);
-	pg_task_set_core_efficiency();
-	pg_task_set_rt_prio(RT_PRIORITY);
-	pg_task_set_timer_slack(TIMER_SLACK_NS);
-	pg_task_set_uclamp(UCLAMP_MAX);
-	pg_task_set_io_prio(IOPRIO_CLASS, IOPRIO_DATA);
+	task_set_core_affinity();
+	task_set_rt_priority(RT_PRIORITY);
+	task_set_timer_slack(TIMER_SLACK_NS);
+	task_set_uclamp(TASK_UCLAMP_MAX);
+	task_set_io_priority(IOPRIO_CLASS, IOPRIO_DATA);
 }
 
 static inline void init_context_defaults(struct pg_context *ctx)

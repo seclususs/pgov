@@ -7,12 +7,16 @@
 #include "pgov/log.h"
 #include "pgov/topo.h"
 #include <errno.h>
+#include <fcntl.h>
 #include <sched.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <sys/prctl.h>
 #include <sys/syscall.h>
 #include <unistd.h>
+
+#define OOM_SCORE_ADJ "/proc/self/oom_score_adj"
+#define OOM_SCORE_MIN "-1000\n"
 
 #ifndef __NR_ioprio_set
 #if defined(__aarch64__)
@@ -56,7 +60,8 @@
 #define SCHED_FLAG_UTIL_CLAMP_MAX 0x40
 #endif
 
-struct pg_sched_attr {
+#ifndef _UAPI_LINUX_SCHED_TYPES_H
+struct sched_attr {
 	uint32_t size;
 	uint32_t sched_policy;
 	uint64_t sched_flags;
@@ -68,14 +73,17 @@ struct pg_sched_attr {
 	uint32_t sched_util_min;
 	uint32_t sched_util_max;
 };
+#endif
 
-int pg_task_set_rt_prio(int priority)
+int task_set_rt_priority(int priority)
 {
 	struct sched_param param = { 0 };
+	int err;
+
 	param.sched_priority = priority;
 
 	if (sched_setscheduler(0, SCHED_FIFO, &param) == -1) {
-		int err = errno;
+		err = errno;
 		LOGE("task: failed to set realtime sched_fifo err=%d", err);
 		return -err;
 	}
@@ -84,12 +92,13 @@ int pg_task_set_rt_prio(int priority)
 	return 0;
 }
 
-int pg_task_set_io_prio(int ioprio_class, int ioprio_data)
+int task_set_io_priority(int ioprio_class, int ioprio_data)
 {
-	const int ioprio_val = (ioprio_class << 13) | ioprio_data;
+	int ioprio_val = (ioprio_class << 13) | ioprio_data;
+	int err;
 
 	if (syscall(__NR_ioprio_set, IOPRIO_WHO_PROCESS, 0, ioprio_val) == -1) {
-		int err = errno;
+		err = errno;
 		LOGE("task: failed to elevate i/o priority err=%d", err);
 		return -err;
 	}
@@ -98,11 +107,14 @@ int pg_task_set_io_prio(int ioprio_class, int ioprio_data)
 	return 0;
 }
 
-int pg_task_set_core_efficiency(void)
+int task_set_core_affinity(void)
 {
-	int ret = pg_topo_set_little_core();
+	int err;
+	int ret;
+
+	ret = pg_topo_set_little_core();
 	if (ret < 0) {
-		int err = (ret == -1) ? errno : -ret;
+		err = (ret == -1) ? errno : -ret;
 		LOGE("task: failed to set topo affinity err=%d", err);
 		return -err;
 	}
@@ -111,10 +123,12 @@ int pg_task_set_core_efficiency(void)
 	return 0;
 }
 
-int pg_task_set_timer_slack(unsigned long slack_ns)
+int task_set_timer_slack(unsigned long slack_ns)
 {
+	int err;
+
 	if (prctl(PR_SET_TIMERSLACK, slack_ns) == -1) {
-		int err = errno;
+		err = errno;
 		LOGW("task: failed to relax timer slack err=%d", err);
 		return -err;
 	}
@@ -123,14 +137,15 @@ int pg_task_set_timer_slack(unsigned long slack_ns)
 	return 0;
 }
 
-int pg_task_set_uclamp(uint32_t util_max)
+int task_set_uclamp(uint32_t util_max)
 {
 	static bool uclamp_supported = true;
+	struct sched_attr attr = { 0 };
+	int err;
 
 	if (UNLIKELY(!uclamp_supported))
 		return 0;
 
-	struct pg_sched_attr attr = { 0 };
 	attr.size = sizeof(attr);
 	attr.sched_flags = SCHED_FLAG_KEEP_POLICY | SCHED_FLAG_KEEP_PARAMS |
 			   SCHED_FLAG_UTIL_CLAMP_MIN |
@@ -140,7 +155,7 @@ int pg_task_set_uclamp(uint32_t util_max)
 	attr.sched_util_max = util_max;
 
 	if (syscall(__NR_sched_setattr, 0, &attr, 0) == -1) {
-		int err = errno;
+		err = errno;
 
 		if (err == E2BIG || err == ENOSYS || err == EINVAL) {
 			uclamp_supported = false;
@@ -152,5 +167,35 @@ int pg_task_set_uclamp(uint32_t util_max)
 	}
 
 	LOGD("task: uclamp-max limitation active max=%u", util_max);
+	return 0;
+}
+
+int task_protect_oom(void)
+{
+	ssize_t bytes_written;
+	int err;
+	int fd;
+
+	fd = open(OOM_SCORE_ADJ, O_WRONLY | O_CLOEXEC);
+	if (fd < 0) {
+		err = errno;
+		LOGW("task: failed to open %s err=%d", OOM_SCORE_ADJ, err);
+		return -err;
+	}
+
+	do {
+		bytes_written =
+			write(fd, OOM_SCORE_MIN, sizeof(OOM_SCORE_MIN) - 1);
+	} while (bytes_written < 0 && errno == EINTR);
+
+	close(fd);
+
+	if (bytes_written < 0) {
+		err = errno;
+		LOGE("task: failed to write oom protection score err=%d", err);
+		return -err;
+	}
+
+	LOGD("task: oom protection active");
 	return 0;
 }

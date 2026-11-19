@@ -216,7 +216,7 @@ void pg_sweep_run(struct pg_context *ctx)
 	if (sweep_chk_intr(&sctx))
 		return;
 
-	pg_task_set_uclamp(UCLAMP_UNRESTRICTED);
+	task_set_uclamp(UCLAMP_UNRESTRICTED);
 
 	for (size_t i = 0; i < ARRAY_SIZE(APP_ROOTS); ++i) {
 		if (sctx.intr)
@@ -237,7 +237,7 @@ void pg_sweep_run(struct pg_context *ctx)
 		pg_fs_walk(TEMP_PATHS[i], sweep_cb, &sctx, MAX_DEPTH);
 	}
 
-	pg_task_set_uclamp(UCLAMP_MAX);
+	task_set_uclamp(TASK_UCLAMP_MAX);
 
 	if (sctx.intr)
 		LOGD("sweep: cycle preempted, intr=1");

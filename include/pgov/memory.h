@@ -18,6 +18,4 @@
  */
 void pg_memory_lock(void);
 
-void pg_memory_shield(void);
-
 #endif // PGOV_MEMORY_H

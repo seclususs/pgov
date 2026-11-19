@@ -6,12 +6,13 @@
 
 #include <stdint.h>
 
-#define UCLAMP_MAX 102
+#define TASK_UCLAMP_MAX 102
 
-int pg_task_set_rt_prio(int priority);
-int pg_task_set_io_prio(int ioprio_class, int ioprio_data);
-int pg_task_set_core_efficiency(void);
-int pg_task_set_timer_slack(unsigned long slack_ns);
-int pg_task_set_uclamp(uint32_t util_max);
+int task_set_rt_priority(int priority);
+int task_set_io_priority(int ioprio_class, int ioprio_data);
+int task_set_core_affinity(void);
+int task_set_timer_slack(unsigned long slack_ns);
+int task_set_uclamp(uint32_t util_max);
+int task_protect_oom(void);
 
 #endif // PGOV_TASK_H
