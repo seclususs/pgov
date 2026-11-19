@@ -28,7 +28,7 @@ struct psi_sample {
 
 struct psi_state {
 	int fd;
-	uint8_t buffer[512];
+	uint8_t buf[512];
 	struct timespec last_read_time;
 	uint64_t last_total;
 	bool initial;
@@ -56,7 +56,7 @@ void psi_cleanup(struct psi_state *state);
  *
  * @note IMPLICIT CONTRACTS & SYSTEM IMPACT:
  *       - Performs zero-allocation string parsing directly on the state's fixed 512-byte
- *         buffer (`state->buffer`) to minimize hot-path latency.
+ *         buffer (`state->buf`) to minimize hot-path latency.
  *       - Implements a resilient `pread` loop to bypass seeking overhead.
  *       - Deeply mutates `state->filter` (Kalman state) by injecting the newly parsed metrics.
  *

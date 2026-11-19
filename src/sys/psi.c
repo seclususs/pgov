@@ -249,8 +249,8 @@ int psi_read(struct psi_state *state, struct psi_sample *sample,
 	}
 
 	do {
-		bytes_read = pread(state->fd, state->buffer,
-				   sizeof(state->buffer), 0);
+		bytes_read =
+			pread(state->fd, state->buf, sizeof(state->buf), 0);
 	} while (bytes_read < 0 && errno == EINTR);
 
 	if (bytes_read <= 0) {
@@ -271,13 +271,13 @@ int psi_read(struct psi_state *state, struct psi_sample *sample,
 
 	while (pos < len) {
 		if (pos + 5 <= len &&
-		    match_token(&state->buffer[pos], "some ", 5)) {
+		    match_token(&state->buf[pos], "some ", 5)) {
 			pos += 5;
 			found = true;
 			break;
 		}
 
-		while (pos < len && state->buffer[pos] != '\n')
+		while (pos < len && state->buf[pos] != '\n')
 			pos++;
 
 		pos++;
@@ -286,7 +286,7 @@ int psi_read(struct psi_state *state, struct psi_sample *sample,
 	if (!found)
 		return -ENODATA;
 
-	parse_metrics(state->buffer, len, pos, state->initial, &metrics,
+	parse_metrics(state->buf, len, pos, state->initial, &metrics,
 		      &cur_total);
 
 	update_filter(state, &metrics, cur_total, dt_sec);
@@ -300,7 +300,7 @@ int psi_read(struct psi_state *state, struct psi_sample *sample,
 
 int psi_read_avg10(const char *path, q16_t *avg10)
 {
-	uint8_t buffer[256];
+	uint8_t buf[256];
 	ssize_t bytes_read;
 	size_t next_pos;
 	size_t len;
@@ -315,7 +315,7 @@ int psi_read_avg10(const char *path, q16_t *avg10)
 		return -errno;
 
 	do {
-		bytes_read = read(fd, buffer, sizeof(buffer));
+		bytes_read = read(fd, buf, sizeof(buf));
 	} while (bytes_read < 0 && errno == EINTR);
 
 	close(fd);
@@ -325,8 +325,8 @@ int psi_read_avg10(const char *path, q16_t *avg10)
 
 	len = (size_t)bytes_read;
 	while (pos + 6 <= len) {
-		if (match_token(&buffer[pos], "avg10=", 6)) {
-			*avg10 = pg_parse_q16(buffer, len, pos + 6, &next_pos);
+		if (match_token(&buf[pos], "avg10=", 6)) {
+			*avg10 = pg_parse_q16(buf, len, pos + 6, &next_pos);
 			return 0;
 		}
 
