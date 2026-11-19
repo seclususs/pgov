@@ -118,7 +118,7 @@ static inline bool update_disp(struct pg_context *ctx,
 	if (on && UNLIKELY(ctx->disp_state != DISP_ON)) {
 		ctx->load_state.first_run = true;
 		pg_kalman_reset(&ctx->psi.filter);
-		ctx->psi.first_run = true;
+		ctx->psi.initial = true;
 		ctx->disp_state = DISP_ON;
 		ctx->remap_due = true;
 	} else if (!on && (ctx->disp_state == DISP_ON ||
@@ -152,21 +152,22 @@ static inline bool update_disp(struct pg_context *ctx,
 
 static void arm_trigger(struct pg_context *ctx)
 {
-	int fd = pg_psi_open_trg(PSI_CPU, PSI_THRESHOLD_US, PSI_WINDOW_US);
+	int fd =
+		psi_trigger_open(PSI_CPU_PATH, PSI_THRESHOLD_US, PSI_WINDOW_US);
 	if (fd < 0)
 		return;
 
 	ctx->trg_fd = fd;
 	if (pg_epoll_add_trg(ctx) < 0) {
-		pg_psi_close_trg(fd);
+		psi_trigger_close(fd);
 		ctx->trg_fd = -1;
 	}
 }
 
 static inline bool read_psi(struct pg_context *ctx, const struct timespec *now,
-			    struct pg_psi_data *psi)
+			    struct psi_sample *sample)
 {
-	int status = pg_psi_read(&ctx->psi, psi, now);
+	int status = psi_read(&ctx->psi, sample, now);
 
 	if (LIKELY(status == 0)) {
 		if (UNLIKELY(ctx->psi_fails != 0)) {
@@ -187,11 +188,11 @@ static inline bool read_psi(struct pg_context *ctx, const struct timespec *now,
 	pg_epoll_rm_trg(ctx);
 
 	if (ctx->trg_fd >= 0) {
-		pg_psi_close_trg(ctx->trg_fd);
+		psi_trigger_close(ctx->trg_fd);
 		ctx->trg_fd = -1;
 	}
 
-	pg_psi_recov(&ctx->psi, PSI_CPU);
+	psi_recover(&ctx->psi, PSI_CPU_PATH);
 
 	arm_trigger(ctx);
 
@@ -246,7 +247,7 @@ static inline void poll_thermal_metrics(struct pg_context *ctx,
 
 static inline void calc_demand(struct pg_context *ctx,
 			       const struct timespec *now,
-			       const struct pg_psi_data *psi,
+			       const struct psi_sample *sample,
 			       q16_t *RESTRICT th_scl, q16_t *RESTRICT l_dem,
 			       q16_t *RESTRICT p_eff)
 {
@@ -256,7 +257,7 @@ static inline void calc_demand(struct pg_context *ctx,
 	*th_scl = ctx->cached_th_scl;
 
 	struct pg_cpu_eff *eff = &ctx->load_state.eff;
-	pg_cpu_upd_eff(eff, ctx->bat_lvl, *th_scl, psi->some.avg300);
+	pg_cpu_upd_eff(eff, ctx->bat_lvl, *th_scl, sample->some.avg300);
 
 	q16_t dt_real = pg_dt_sec(&ctx->last_tick, now);
 	q16_t dt_safe = pg_math_clamp(dt_real, 1, FLOAT_TO_Q16(0.1F));
@@ -266,11 +267,11 @@ static inline void calc_demand(struct pg_context *ctx,
 	q16_t i_dt;
 	pg_cpu_upd_intg(&ctx->load_state, ctx->bat_lvl, dt_real, &i, &i_dt);
 
-	q16_t t_fact = pg_cpu_calc_trend_gain(psi->some.vel);
-	bool s_break = psi->some.nis > eff->nis_thresh;
+	q16_t t_fact = pg_cpu_calc_trend_gain(sample->some.velocity);
+	bool s_break = sample->some.nis > eff->nis_thresh;
 	struct pg_demand_input d_in = {
-		.tgt_psi = psi->some.cur,
-		.vel = psi->some.vel,
+		.tgt_psi = sample->some.stall_rate,
+		.vel = sample->some.velocity,
 		.dt_safe = dt_safe,
 		.therm_scale = *th_scl,
 		.trend_fact = t_fact,
@@ -284,14 +285,15 @@ static inline void calc_demand(struct pg_context *ctx,
 }
 
 static inline bool gov_gate(struct pg_context *ctx,
-			    const struct pg_psi_data *psi, q16_t p_eff)
+			    const struct psi_sample *sample, q16_t p_eff)
 {
 	const struct pg_cpu_cfg *c = &CFG_CPU;
 	int32_t n_poll;
 	int32_t t_poll;
 
 	n_poll = (int32_t)pg_poll_calc_next(&ctx->poll_state, p_eff,
-					    psi->some.avg300, psi->some.vel);
+					    sample->some.avg300,
+					    sample->some.velocity);
 	ctx->next_wake = n_poll;
 
 	bool moving = pg_cpu_trans(&ctx->load_state, c);
@@ -310,7 +312,7 @@ static inline bool gov_gate(struct pg_context *ctx,
 }
 
 static inline void apply_mapping(struct pg_context *ctx,
-				 const struct pg_psi_data *psi, q16_t th_scl,
+				 const struct psi_sample *sample, q16_t th_scl,
 				 q16_t l_dem, q16_t p_eff)
 {
 	const struct pg_cpu_cfg *c = &CFG_CPU;
@@ -354,7 +356,7 @@ static inline void apply_mapping(struct pg_context *ctx,
 	}
 
 	if (ctx->sched_mig.active) {
-		mig = pg_cpu_calc_migration(psi->some.vel, p_eff, l);
+		mig = pg_cpu_calc_migration(sample->some.velocity, p_eff, l);
 		v_mig = pg_math_san_quant_u64(mig, l->min_mig, q_ns);
 	}
 
@@ -396,16 +398,16 @@ static inline void exec_gov_logic(struct pg_context *ctx,
 	if (update_disp(ctx, now))
 		return;
 
-	struct pg_psi_data psi;
-	if (!read_psi(ctx, now, &psi))
+	struct psi_sample sample;
+	if (!read_psi(ctx, now, &sample))
 		return;
 
 	q16_t th_scl;
 	q16_t l_dem;
 	q16_t p_eff;
-	calc_demand(ctx, now, &psi, &th_scl, &l_dem, &p_eff);
-	if (gov_gate(ctx, &psi, p_eff))
-		apply_mapping(ctx, &psi, th_scl, l_dem, p_eff);
+	calc_demand(ctx, now, &sample, &th_scl, &l_dem, &p_eff);
+	if (gov_gate(ctx, &sample, p_eff))
+		apply_mapping(ctx, &sample, th_scl, l_dem, p_eff);
 }
 
 static void dormant_tick(struct pg_context *ctx)

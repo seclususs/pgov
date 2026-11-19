@@ -4,7 +4,6 @@
 #define _GNU_SOURCE
 #include "pgov/daemon.h"
 #include "pgov/compiler.h"
-#include "pgov/detect.h"
 #include "pgov/epoll.h"
 #include "pgov/lockfile.h"
 #include "pgov/opt.h"
@@ -231,8 +230,8 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	pg_sensor_init_bat_cap(&ctx->bat_cap_sensor, CAND_BAT_CAP);
 
 	if (!ctx->dormant) {
-		ctx->trg_fd = pg_psi_open_trg(PSI_CPU, PSI_THRESHOLD_US,
-					      PSI_WINDOW_US);
+		ctx->trg_fd = psi_trigger_open(PSI_CPU_PATH, PSI_THRESHOLD_US,
+					       PSI_WINDOW_US);
 
 		if (ctx->trg_fd < 0) {
 			LOGE("daemon: failed inject err=%d", ctx->trg_fd);
@@ -240,7 +239,7 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 		}
 	}
 
-	pg_psi_init(&ctx->psi, PSI_CPU);
+	psi_init(&ctx->psi, PSI_CPU_PATH);
 
 	ctx->sig_fd = pg_signal_init();
 	if (ctx->sig_fd < 0)
@@ -266,13 +265,13 @@ static void cleanup_context(struct pg_context *ctx)
 #endif // NDK_BUILD
 
 	if (ctx->trg_fd >= 0)
-		pg_psi_close_trg(ctx->trg_fd);
+		psi_trigger_close(ctx->trg_fd);
 
 	if (ctx->sig_fd >= 0)
 		pg_signal_close(ctx->sig_fd);
 
 	pg_lockfile_close(ctx->lock_fd);
-	pg_psi_cleanup(&ctx->psi);
+	psi_cleanup(&ctx->psi);
 	pg_sensor_temp_close(&ctx->cpu_temp_sensor);
 	pg_sensor_temp_close(&ctx->bat_temp_sensor);
 	pg_sensor_bat_close(&ctx->bat_cap_sensor);
@@ -288,9 +287,7 @@ static void cleanup_context(struct pg_context *ctx)
 
 int pg_daemon_init(void)
 {
-	int ret = pg_detect_privilege();
-	if (ret != 0)
-		return ret;
+	int ret = 0;
 
 	init_context_defaults(&context);
 	init_os_environment();
@@ -315,7 +312,7 @@ int pg_daemon_init(void)
 	}
 	restore_snapshot(&context);
 
-	if (!pg_detect_cpu_psi()) {
+	if (!psi_available()) {
 		ret = -ENODEV;
 		goto cleanup;
 	}

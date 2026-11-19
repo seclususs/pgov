@@ -37,7 +37,7 @@ enum pg_disp_state {
  *         valid and strictly mutated by a single event-reactor thread.
  */
 struct ALIGNED(64) pg_context {
-	struct pg_psi_monitor psi;
+	struct psi_state psi;
 	struct pg_temp_sensor cpu_temp_sensor;
 	struct pg_temp_sensor bat_temp_sensor;
 	struct pg_bat_sensor bat_cap_sensor;

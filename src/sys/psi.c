@@ -9,40 +9,51 @@
 #include <fcntl.h>
 #include <unistd.h>
 
-int pg_psi_open_trg(const char *path, int32_t threshold_us, int32_t window_us)
+bool psi_available(void)
 {
+	if (access(PSI_CPU_PATH, R_OK | W_OK) == 0)
+		return true;
+
+	LOGE("psi: cpu node missing or access denied");
+	return false;
+}
+
+int psi_trigger_open(const char *path, int32_t threshold_us, int32_t window_us)
+{
+	ssize_t bytes_written;
+	char payload[64];
+	size_t pos;
+	int fd;
 	int err;
 
 	if (UNLIKELY(!path))
 		return -EINVAL;
 
-	int fd = open(path, O_RDWR | O_CLOEXEC | O_NONBLOCK);
+	fd = open(path, O_RDWR | O_CLOEXEC | O_NONBLOCK);
 	if (fd < 0) {
 		err = errno;
 		LOGE("psi: failed to open trigger node %s err=%d", path, err);
 		return -err;
 	}
 
-	char buf[64];
-	buf[0] = 's';
-	buf[1] = 'o';
-	buf[2] = 'm';
-	buf[3] = 'e';
-	buf[4] = ' ';
-	size_t pos = 5;
+	payload[0] = 's';
+	payload[1] = 'o';
+	payload[2] = 'm';
+	payload[3] = 'e';
+	payload[4] = ' ';
+	pos = 5;
 
-	pos += pg_fmt_u32(threshold_us, buf + pos);
-	buf[pos++] = ' ';
+	pos += pg_fmt_u32(threshold_us, payload + pos);
+	payload[pos++] = ' ';
 
-	pos += pg_fmt_u32(window_us, buf + pos);
-	buf[pos++] = '\n';
+	pos += pg_fmt_u32(window_us, payload + pos);
+	payload[pos++] = '\n';
 
-	ssize_t sz;
 	do {
-		sz = write(fd, buf, pos);
-	} while (sz < 0 && errno == EINTR);
+		bytes_written = write(fd, payload, pos);
+	} while (bytes_written < 0 && errno == EINTR);
 
-	if (sz < 0) {
+	if (bytes_written < 0) {
 		err = errno;
 		LOGE("psi: failed to write trigger config err=%d", err);
 		goto out_err;
@@ -56,64 +67,65 @@ out_err:
 	return -err;
 }
 
-void pg_psi_close_trg(int fd)
+void psi_trigger_close(int fd)
 {
 	if (fd >= 0)
 		close(fd);
 }
 
-int pg_psi_recov(struct pg_psi_monitor *mon, const char *path)
+int psi_recover(struct psi_state *state, const char *path)
 {
-	if (UNLIKELY(!mon || !path))
+	if (UNLIKELY(!state || !path))
 		return -EINVAL;
 
-	if (mon->fd >= 0) {
-		close(mon->fd);
-		mon->fd = -1;
+	if (state->fd >= 0) {
+		close(state->fd);
+		state->fd = -1;
 	}
 
-	mon->fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (mon->fd < 0)
+	state->fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (state->fd < 0)
 		return -errno;
 
-	pg_kalman_reset(&mon->filter);
-	mon->first_run = true;
+	pg_kalman_reset(&state->filter);
+	state->initial = true;
 	return 0;
 }
 
-void pg_psi_init(struct pg_psi_monitor *mon, const char *path)
+void psi_init(struct psi_state *state, const char *path)
 {
-	if (UNLIKELY(!mon || !path))
+	if (UNLIKELY(!state || !path))
 		return;
 
-	mon->fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (mon->fd < 0)
+	state->fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (state->fd < 0)
 		LOGE("psi: failed to open node %s", path);
 
-	clock_gettime(CLOCK_MONOTONIC, &mon->last_read_ts);
-	mon->last_tot = 0;
-	mon->first_run = true;
-	pg_kalman_init(&mon->filter);
+	clock_gettime(CLOCK_MONOTONIC, &state->last_read_time);
+	state->last_total = 0;
+	state->initial = true;
+	pg_kalman_init(&state->filter);
 }
 
-void pg_psi_cleanup(struct pg_psi_monitor *mon)
+void psi_cleanup(struct psi_state *state)
 {
-	if (UNLIKELY(!mon))
+	if (UNLIKELY(!state))
 		return;
 
-	if (mon->fd >= 0) {
-		close(mon->fd);
-		mon->fd = -1;
+	if (state->fd >= 0) {
+		close(state->fd);
+		state->fd = -1;
 	}
 }
 
-static inline int buffer_cmp(const uint8_t *buf, const char *str, size_t len)
+static inline bool match_token(const uint8_t *buf, const char *str, size_t len)
 {
-	for (size_t i = 0; i < len; ++i)
+	for (size_t i = 0; i < len; ++i) {
 		if (buf[i] != (uint8_t)str[i])
-			return -1;
+			return false;
+	}
 
-	return 0;
+	return true;
 }
 
 static inline size_t skip_token(const uint8_t *buf, size_t len, size_t pos)
@@ -124,45 +136,49 @@ static inline size_t skip_token(const uint8_t *buf, size_t len, size_t pos)
 	return pos;
 }
 
-static inline size_t parse(const uint8_t *RESTRICT buf, size_t len, size_t pos,
-			   bool first_run, struct pg_psi_trend *RESTRICT trend,
-			   uint64_t *RESTRICT cur_tot)
+static inline size_t parse_metrics(const uint8_t *RESTRICT buf, size_t len,
+				   size_t pos, bool initial,
+				   struct psi_metrics *RESTRICT metrics,
+				   uint64_t *RESTRICT cur_total)
 {
+	uint64_t parsed_total;
+	size_t next_pos;
+
 	while (pos < len && buf[pos] != '\n') {
 		if (buf[pos] == ' ') {
 			pos++;
 			continue;
 		}
 
-		if (pos + 6 <= len && buffer_cmp(&buf[pos], "avg10=", 6) == 0) {
-			if (LIKELY(!first_run)) {
+		if (pos + 6 <= len && match_token(&buf[pos], "avg10=", 6)) {
+			if (LIKELY(!initial)) {
 				pos = skip_token(buf, len, pos + 6);
 				continue;
 			}
 
-			size_t n_pos;
-			trend->avg10 = pg_parse_q16(buf, len, pos + 6, &n_pos);
-			pos = n_pos;
+			metrics->avg10 =
+				pg_parse_q16(buf, len, pos + 6, &next_pos);
+
+			pos = next_pos;
 			continue;
 		}
 
-		if (pos + 7 <= len &&
-		    buffer_cmp(&buf[pos], "avg300=", 7) == 0) {
-			size_t n_pos;
-			trend->avg300 = pg_parse_q16(buf, len, pos + 7, &n_pos);
-			pos = n_pos;
+		if (pos + 7 <= len && match_token(&buf[pos], "avg300=", 7)) {
+			metrics->avg300 =
+				pg_parse_q16(buf, len, pos + 7, &next_pos);
+
+			pos = next_pos;
 			continue;
 		}
 
-		if (pos + 6 <= len && buffer_cmp(&buf[pos], "total=", 6) == 0) {
-			size_t n_pos;
-			uint64_t tmp_tot =
-				pg_parse_u64(buf, len, pos + 6, &n_pos);
+		if (pos + 6 <= len && match_token(&buf[pos], "total=", 6)) {
+			parsed_total =
+				pg_parse_u64(buf, len, pos + 6, &next_pos);
 
-			if (LIKELY(n_pos > pos + 6))
-				*cur_tot = tmp_tot;
+			if (LIKELY(next_pos > pos + 6))
+				*cur_total = parsed_total;
 
-			pos = n_pos;
+			pos = next_pos;
 			continue;
 		}
 
@@ -172,86 +188,96 @@ static inline size_t parse(const uint8_t *RESTRICT buf, size_t len, size_t pos,
 	return pos;
 }
 
-static inline void calc_kalman(struct pg_psi_monitor *mon,
-			       struct pg_psi_trend *trend, uint64_t cur_tot,
-			       q16_t dt_sec)
+static inline void update_filter(struct psi_state *state,
+				 struct psi_metrics *metrics,
+				 uint64_t cur_total, q16_t dt_sec)
 {
-	if (mon->first_run) {
-		trend->cur = trend->avg10;
-		trend->vel = 0;
+	uint64_t instant_rate;
+	uint64_t delta;
+	uint64_t dt_us;
+	q16_t stall_rate;
 
-		pg_kalman_reset(&mon->filter);
-		pg_kalman_update(&mon->filter, trend->avg10, Q16_ONE);
-		mon->first_run = false;
-	} else {
-		q16_t r_some = 0;
-		if (LIKELY(cur_tot > mon->last_tot)) {
-			uint64_t delta = cur_tot - mon->last_tot;
+	if (state->initial) {
+		metrics->stall_rate = metrics->avg10;
+		metrics->velocity = 0;
 
-			uint64_t dt_us = ((uint64_t)dt_sec * 1000000ULL) >> 16;
-			if (dt_us == 0)
-				dt_us = 1;
-
-			uint64_t raw_u64 = (delta * 100ULL << 16) / dt_us;
-			if (raw_u64 > (uint64_t)INT_TO_Q16(500))
-				r_some = INT_TO_Q16(500);
-			else
-				r_some = (q16_t)raw_u64;
-		}
-
-		trend->cur = pg_kalman_update(&mon->filter, r_some, dt_sec);
-		trend->vel = mon->filter.x_vel;
-		trend->nis = mon->filter.nis;
+		pg_kalman_reset(&state->filter);
+		pg_kalman_update(&state->filter, metrics->avg10, Q16_ONE);
+		state->initial = false;
+		return;
 	}
+
+	stall_rate = 0;
+	if (LIKELY(cur_total > state->last_total)) {
+		delta = cur_total - state->last_total;
+
+		dt_us = ((uint64_t)dt_sec * 1000000ULL) >> 16;
+		if (dt_us == 0)
+			dt_us = 1;
+
+		instant_rate = (delta * 100ULL << 16) / dt_us;
+		if (instant_rate > (uint64_t)INT_TO_Q16(500))
+			stall_rate = INT_TO_Q16(500);
+		else
+			stall_rate = (q16_t)instant_rate;
+	}
+
+	metrics->stall_rate =
+		pg_kalman_update(&state->filter, stall_rate, dt_sec);
+
+	metrics->velocity = state->filter.x_vel;
+	metrics->nis = state->filter.nis;
 }
 
-int pg_psi_read(struct pg_psi_monitor *mon, struct pg_psi_data *data,
-		const struct timespec *now)
+int psi_read(struct psi_state *state, struct psi_sample *sample,
+	     const struct timespec *now)
 {
-	if (UNLIKELY(!mon || !data || !now))
+	struct psi_metrics metrics = { 0 };
+	ssize_t bytes_read;
+	uint64_t cur_total;
+	q16_t dt_sec;
+	size_t len;
+	size_t pos = 0;
+	bool found = false;
+
+	if (UNLIKELY(!state || !sample || !now))
 		return -EINVAL;
 
-	if (mon->fd < 0) {
+	if (state->fd < 0) {
 		LOGE("psi: invalid fd for read");
 		return -EBADF;
 	}
 
-	ssize_t sz;
 	do {
-		sz = pread(mon->fd, mon->buf, sizeof(mon->buf), 0);
-	} while (sz < 0 && errno == EINTR);
+		bytes_read = pread(state->fd, state->buffer,
+				   sizeof(state->buffer), 0);
+	} while (bytes_read < 0 && errno == EINTR);
 
-	if (sz <= 0) {
+	if (bytes_read <= 0) {
 		LOGE("psi: read failed or empty err=%d", errno);
 		return -EIO;
 	}
 
-	q16_t dt_sec;
-	if (mon->first_run) {
+	if (state->initial) {
 		dt_sec = Q16_ONE;
 	} else {
-		dt_sec = pg_dt_sec(&mon->last_read_ts, now);
+		dt_sec = pg_dt_sec(&state->last_read_time, now);
 		if (dt_sec < FLOAT_TO_Q16(0.001F))
 			dt_sec = FLOAT_TO_Q16(0.001F);
 	}
 
-	struct pg_psi_trend trend = { 0 };
-	uint64_t cur_tot = mon->last_tot;
-
-	size_t pos = 0;
-	size_t len = (size_t)sz;
-
-	bool found = false;
+	cur_total = state->last_total;
+	len = (size_t)bytes_read;
 
 	while (pos < len) {
 		if (pos + 5 <= len &&
-		    buffer_cmp(&mon->buf[pos], "some ", 5) == 0) {
+		    match_token(&state->buffer[pos], "some ", 5)) {
 			pos += 5;
 			found = true;
 			break;
 		}
 
-		while (pos < len && mon->buf[pos] != '\n')
+		while (pos < len && state->buffer[pos] != '\n')
 			pos++;
 
 		pos++;
@@ -260,44 +286,47 @@ int pg_psi_read(struct pg_psi_monitor *mon, struct pg_psi_data *data,
 	if (!found)
 		return -ENODATA;
 
-	parse(mon->buf, len, pos, mon->first_run, &trend, &cur_tot);
-	calc_kalman(mon, &trend, cur_tot, dt_sec);
+	parse_metrics(state->buffer, len, pos, state->initial, &metrics,
+		      &cur_total);
 
-	mon->last_read_ts = *now;
-	mon->last_tot = cur_tot;
-	data->some = trend;
+	update_filter(state, &metrics, cur_total, dt_sec);
+
+	state->last_read_time = *now;
+	state->last_total = cur_total;
+	sample->some = metrics;
 
 	return 0;
 }
 
-int pg_psi_read_raw(const char *path, q16_t *avg10)
+int psi_read_avg10(const char *path, q16_t *avg10)
 {
+	uint8_t buffer[256];
+	ssize_t bytes_read;
+	size_t next_pos;
+	size_t len;
+	size_t pos = 0;
+	int fd;
+
 	if (UNLIKELY(!path || !avg10))
 		return -EINVAL;
 
-	int fd = open(path, O_RDONLY | O_CLOEXEC);
+	fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0)
 		return -errno;
 
-	char buf[256];
-	ssize_t sz;
 	do {
-		sz = read(fd, buf, sizeof(buf));
-	} while (sz < 0 && errno == EINTR);
+		bytes_read = read(fd, buffer, sizeof(buffer));
+	} while (bytes_read < 0 && errno == EINTR);
 
 	close(fd);
 
-	if (sz <= 0)
+	if (bytes_read <= 0)
 		return -EIO;
 
-	size_t pos = 0;
-	size_t len = (size_t)sz;
-
+	len = (size_t)bytes_read;
 	while (pos + 6 <= len) {
-		if (buffer_cmp((const uint8_t *)&buf[pos], "avg10=", 6) == 0) {
-			size_t n_pos;
-			*avg10 = pg_parse_q16((const uint8_t *)buf, len,
-					      pos + 6, &n_pos);
+		if (match_token(&buffer[pos], "avg10=", 6)) {
+			*avg10 = pg_parse_q16(buffer, len, pos + 6, &next_pos);
 			return 0;
 		}
 

@@ -86,7 +86,7 @@ static bool sweep_chk_intr(struct sweep_ctx *sctx)
 	}
 
 	q16_t avg10 = 0;
-	if (pg_psi_read_raw(PSI_CPU, &avg10) == 0) {
+	if (psi_read_avg10(PSI_CPU_PATH, &avg10) == 0) {
 		if (avg10 > INT_TO_Q16(MAX_PSI)) {
 			sctx->intr = true;
 			return true;
