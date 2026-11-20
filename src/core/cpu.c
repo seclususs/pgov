@@ -3,138 +3,191 @@
 
 #include "pgov/cpu.h"
 
-PURE bool pg_cpu_trans(const struct pg_load_state *state,
-		       const struct pg_cpu_cfg *cfg)
+PURE bool cpu_transient(const struct cpu_state *state,
+			const struct cpu_param *param)
 {
-	if (UNLIKELY(!state || !cfg))
+	bool diff;
+	bool rate;
+
+	if (UNLIKELY(!state || !param))
 		return false;
 
-	bool rate = math_abs_q16(state->rate) > cfg->trans_rate;
-	bool diff = math_abs_q16(state->psi_val - state->psi_ref) >
-		    cfg->trans_diff;
+	rate = math_abs_q16(state->rate) > param->trans_rate;
+	diff = math_abs_q16(state->psi_val - state->psi_ref) >
+	       param->trans_diff;
 
 	return (rate || diff) != 0;
 }
 
-void pg_cpu_upd_intg(struct pg_load_state *RESTRICT state, q16_t bat_lvl,
-		     q16_t dt_real, q16_t *RESTRICT i, q16_t *RESTRICT i_dt)
+void cpu_update_integral(struct cpu_state *RESTRICT state, q16_t bat_level,
+			 q16_t dt_real, q16_t *RESTRICT integral,
+			 q16_t *RESTRICT integral_dt)
 {
-	if (UNLIKELY(!state || !i || !i_dt))
+	q16_t curve;
+	q16_t delta;
+	q16_t diff;
+	q16_t level;
+	q16_t norm;
+	q16_t rate = 0;
+	q16_t sq;
+	q16_t target;
+	q16_t tau;
+
+	if (UNLIKELY(!state || !integral || !integral_dt))
 		return;
 
-	q16_t b_lvl = math_clamp(bat_lvl, 0, INT_TO_Q16(100));
-	q16_t d_bat = INT_TO_Q16(100) - b_lvl;
-	q16_t depl = math_div_q16(d_bat, INT_TO_Q16(100));
-	q16_t depl2 = math_mul_q16(depl, depl);
-	q16_t depl3 = math_mul_q16(depl2, depl);
-	q16_t c_intg = math_mul_q16(FLOAT_TO_Q16(97.0F), depl3);
+	level = math_clamp(bat_level, 0, INT_TO_Q16(100));
+	delta = INT_TO_Q16(100) - level;
+	norm = math_div_q16(delta, INT_TO_Q16(100));
+	sq = math_mul_q16(norm, norm);
+	curve = math_mul_q16(sq, norm);
+	target = math_mul_q16(FLOAT_TO_Q16(97.0F), curve);
 
 	if (UNLIKELY(state->first_run)) {
-		state->prev_integ = c_intg;
+		state->prev_integral = target;
 		state->first_run = false;
-		*i = c_intg;
-		*i_dt = 0;
+		*integral = target;
+		*integral_dt = 0;
 		return;
 	}
 
-	q16_t c_dt = 0;
 	if (LIKELY(dt_real > 0)) {
-		q16_t diff = c_intg - state->prev_integ;
-		q16_t tau = INT_TO_Q16(5);
-		c_dt = math_div_q16(diff, tau);
+		diff = target - state->prev_integral;
+		tau = INT_TO_Q16(5);
+		rate = math_div_q16(diff, tau);
 	}
 
-	state->prev_integ = c_intg;
-	*i = c_intg;
-	*i_dt = c_dt;
+	state->prev_integral = target;
+	*integral = target;
+	*integral_dt = rate;
 }
 
-static inline q32_t calc_l_term(q16_t integ, q16_t psi_val, q16_t k_fin)
+static inline q32_t calculate_loss(q16_t integral, q16_t psi_val, q16_t k_final)
 {
-	q32_t l_term = math_mul_q32(Q16_TO_Q32(integ), Q16_TO_Q32(psi_val));
-	q32_t m_rsp =
-		math_mul_q32(Q16_TO_Q32(k_fin), Q16_TO_Q32(INT_TO_Q16(100)));
+	q32_t limit;
+	q32_t loss;
+	q32_t resp;
 
-	q32_t lim_l = math_mul_q32(m_rsp, Q16_TO_Q32(FLOAT_TO_Q16(1.5F)));
-	return (l_term > lim_l) ? lim_l : l_term;
+	loss = math_mul_q32(Q16_TO_Q32(integral), Q16_TO_Q32(psi_val));
+	resp = math_mul_q32(Q16_TO_Q32(k_final), Q16_TO_Q32(INT_TO_Q16(100)));
+	limit = math_mul_q32(resp, Q16_TO_Q32(FLOAT_TO_Q16(1.5F)));
+
+	return (loss > limit) ? limit : loss;
 }
 
-static inline q16_t calc_c_final(q16_t k_fin, q16_t vel, q16_t i_dt,
-				 q16_t psi_val, q16_t th,
-				 const struct pg_cpu_eff *eff)
+static inline q16_t calculate_damping(q16_t k_final, q16_t velocity,
+				      q16_t integral_dt, q16_t psi_val,
+				      q16_t therm_scale,
+				      const struct cpu_efficiency *efficiency)
 {
-	q16_t c_crit = math_mul_q16(INT_TO_Q16(2), math_sqrt_q16(k_fin));
-	q16_t c_base = math_mul_q16(c_crit, eff->stab_rat);
-	q32_t load = Q16_TO_Q32(vel);
-	q32_t r_sq =
-		math_mul_q32(load, load) + Q16_TO_Q32(FLOAT_TO_Q16(0.001F));
+	q16_t c_base;
+	q16_t c_crit;
+	q16_t c_max;
+	q32_t c_req;
+	q16_t c_stab;
+	q16_t c_therm;
+	q16_t clamped;
+	q32_t num;
+	q32_t rate;
+	q16_t root;
+	q32_t v;
+	q32_t v_sq;
+	q32_t x;
+	q32_t x_sq;
 
-	q32_t d_n1 = Q16_TO_Q32(math_mul_q16(Q16_HALF, math_abs_q16(i_dt)));
-	q32_t p_val = Q16_TO_Q32(psi_val);
-	q32_t d_n2 = math_mul_q32(p_val, p_val);
-	q32_t d_num = math_mul_q32(d_n1, d_n2);
+	c_crit = math_mul_q16(INT_TO_Q16(2), math_sqrt_q16(k_final));
+	c_base = math_mul_q16(c_crit, efficiency->stab_ratio);
+	v = Q16_TO_Q32(velocity);
+	v_sq = math_mul_q32(v, v) + Q16_TO_Q32(FLOAT_TO_Q16(0.001F));
 
-	q32_t c_req = (r_sq > 0) ? d_num / (r_sq >> Q16_SHIFT) : 0;
-	q16_t c_max = math_mul_q16(c_base, INT_TO_Q16(4));
-	q16_t c_clp;
+	rate = Q16_TO_Q32(math_mul_q16(Q16_HALF, math_abs_q16(integral_dt)));
+	x = Q16_TO_Q32(psi_val);
+	x_sq = math_mul_q32(x, x);
+	num = math_mul_q32(rate, x_sq);
+
+	c_req = (v_sq > 0) ? num / (v_sq >> Q16_SHIFT) : 0;
+	c_max = math_mul_q16(c_base, INT_TO_Q16(4));
 
 	if (c_req >= c_max)
-		c_clp = c_max;
-
+		clamped = c_max;
 	else if (c_req <= 0)
-		c_clp = 0;
+		clamped = 0;
 	else
-		c_clp = (q16_t)c_req;
+		clamped = (q16_t)c_req;
 
-	q16_t c_stb = math_mul_q16(c_clp, FLOAT_TO_Q16(3.1F));
+	c_stab = math_mul_q16(clamped, FLOAT_TO_Q16(3.1F));
 
-	q16_t th_sq = math_sqrt_q16(th);
-	q16_t c_th = (th_sq > 0) ? math_div_q16(c_base, th_sq) : c_base;
+	root = math_sqrt_q16(therm_scale);
+	c_therm = (root > 0) ? math_div_q16(c_base, root) : c_base;
 
-	return (c_th > c_stb) ? c_th : c_stb;
+	return (c_therm > c_stab) ? c_therm : c_stab;
 }
 
-void pg_cpu_upd_eff(struct pg_cpu_eff *eff, q16_t bat_lvl, q16_t th_scl,
-		    q16_t avg300)
+void cpu_update_efficiency(struct cpu_efficiency *efficiency, q16_t bat_level,
+			   q16_t therm_scale, q16_t avg300)
 {
-	if (UNLIKELY(!eff))
+	q16_t factor;
+	q16_t health;
+	q16_t level;
+	q16_t noise;
+
+	if (UNLIKELY(!efficiency))
 		return;
 
-	q16_t b_lvl = math_clamp(bat_lvl, 0, INT_TO_Q16(100));
-	q16_t bat_fact = math_div_q16(b_lvl, INT_TO_Q16(100));
-	q16_t health = math_mul_q16(bat_fact, th_scl);
+	level = math_clamp(bat_level, 0, INT_TO_Q16(100));
+	factor = math_div_q16(level, INT_TO_Q16(100));
+	health = math_mul_q16(factor, therm_scale);
 
-	eff->resp_gain = math_mul_q16(FLOAT_TO_Q16(31.0F), health);
-	eff->surge_gain = math_mul_q16(FLOAT_TO_Q16(0.095F), health);
-	eff->trend_amp = math_mul_q16(FLOAT_TO_Q16(0.115F), health);
-	eff->lookahead = math_mul_q16(FLOAT_TO_Q16(0.17F), th_scl);
-	eff->decay = math_mul_q16(FLOAT_TO_Q16(0.019F), th_scl);
-	eff->sig_mid =
+	efficiency->resp_gain = math_mul_q16(FLOAT_TO_Q16(31.0F), health);
+	efficiency->surge_gain = math_mul_q16(FLOAT_TO_Q16(0.095F), health);
+	efficiency->trend_amp = math_mul_q16(FLOAT_TO_Q16(0.115F), health);
+	efficiency->lookahead = math_mul_q16(FLOAT_TO_Q16(0.17F), therm_scale);
+	efficiency->decay = math_mul_q16(FLOAT_TO_Q16(0.019F), therm_scale);
+
+	efficiency->sigmoid_mid =
 		FLOAT_TO_Q16(6.8F) + math_mul_q16(FLOAT_TO_Q16(0.5F), avg300);
-	eff->ucl_mid = eff->sig_mid + FLOAT_TO_Q16(2.7F);
 
-	q16_t noise = math_mul_q16(avg300, FLOAT_TO_Q16(0.1F));
+	efficiency->uclamp_mid = efficiency->sigmoid_mid + FLOAT_TO_Q16(2.7F);
+
+	noise = math_mul_q16(avg300, FLOAT_TO_Q16(0.1F));
 	noise = math_clamp(noise, 0, Q16_ONE);
 
-	eff->nis_thresh =
+	efficiency->nis_thresh =
 		math_lerp(FLOAT_TO_Q16(3.0F), FLOAT_TO_Q16(12.0F), noise);
-	eff->stab_rat =
+
+	efficiency->stab_ratio =
 		math_lerp(FLOAT_TO_Q16(1.5F), FLOAT_TO_Q16(3.5F), noise);
-	eff->gain_alpha =
+
+	efficiency->gain_alpha =
 		math_lerp(FLOAT_TO_Q16(0.99F), FLOAT_TO_Q16(0.85F), noise);
 }
 
-q16_t pg_cpu_calc_load_demand(struct pg_load_state *state,
-			      const struct pg_demand_input *input,
-			      const struct pg_cpu_cfg *cfg)
+q16_t cpu_calc_load_demand(struct cpu_state *state,
+			   const struct cpu_demand *demand,
+			   const struct cpu_param *param)
 {
-	if (UNLIKELY(!state || !input || !cfg))
+	q16_t c;
+	q16_t den;
+	q16_t disp;
+	q16_t dt;
+	struct cpu_efficiency *eff;
+	q32_t f_loss;
+	q32_t f_net;
+	q32_t f_spring;
+	q16_t k_dyn;
+	q16_t k_final;
+	q16_t pred;
+	q16_t th;
+	q16_t trend;
+	q16_t v;
+
+	if (UNLIKELY(!state || !demand || !param))
 		return 0;
 
-	struct pg_cpu_eff *eff = &state->eff;
+	eff = &state->efficiency;
 
-	if (UNLIKELY(input->tgt_psi < INT_TO_Q16(1) &&
-		     math_abs_q16(input->vel) < FLOAT_TO_Q16(0.01F) &&
+	if (UNLIKELY(demand->target_psi < INT_TO_Q16(1) &&
+		     math_abs_q16(demand->velocity) < FLOAT_TO_Q16(0.01F) &&
 		     state->psi_val < INT_TO_Q16(1) &&
 		     math_abs_q16(state->rate) < FLOAT_TO_Q16(0.01F))) {
 		state->psi_val = 0;
@@ -142,40 +195,40 @@ q16_t pg_cpu_calc_load_demand(struct pg_load_state *state,
 		return 0;
 	}
 
-	if (UNLIKELY(input->struct_break)) {
-		state->psi_val = input->tgt_psi;
+	if (UNLIKELY(demand->struct_break)) {
+		state->psi_val = demand->target_psi;
 		state->rate = 0;
 	}
 
-	q16_t l_rate = input->vel;
-	if (math_abs_q16(l_rate) > cfg->surge_thresh)
-		state->rate += math_mul_q16(l_rate, eff->surge_gain);
+	v = demand->velocity;
+	if (math_abs_q16(v) > param->surge_thresh)
+		state->rate += math_mul_q16(v, eff->surge_gain);
 
-	q16_t pred = input->tgt_psi + math_mul_q16(l_rate, eff->lookahead);
-	q16_t trend = math_mul_q16(eff->gain_alpha, input->trend_fact);
-	q16_t k_dyn = math_mul_q16(eff->resp_gain, Q16_ONE + trend);
-	q16_t th = math_clamp(input->therm_scale, FLOAT_TO_Q16(0.1F), Q16_ONE);
+	pred = demand->target_psi + math_mul_q16(v, eff->lookahead);
+	trend = math_mul_q16(eff->gain_alpha, demand->trend_factor);
+	k_dyn = math_mul_q16(eff->resp_gain, Q16_ONE + trend);
+	th = math_clamp(demand->therm_scale, FLOAT_TO_Q16(0.1F), Q16_ONE);
 
-	q16_t k_fin = math_mul_q16(k_dyn, math_mul_q16(th, th));
-	q16_t disp = pred - state->psi_val;
-	q32_t p_term = math_mul_q32(Q16_TO_Q32(k_fin), Q16_TO_Q32(disp));
+	k_final = math_mul_q16(k_dyn, math_mul_q16(th, th));
+	disp = pred - state->psi_val;
+	f_spring = math_mul_q32(Q16_TO_Q32(k_final), Q16_TO_Q32(disp));
 
-	q32_t l_term = calc_l_term(input->integ, state->psi_val, k_fin);
-	q16_t c_fin = calc_c_final(k_fin, l_rate, input->integ_dt,
-				   state->psi_val, th, eff);
+	f_loss = calculate_loss(demand->integral, state->psi_val, k_final);
+	c = calculate_damping(k_final, v, demand->integral_dt, state->psi_val,
+			      th, eff);
 
-	q32_t f_q32 = p_term - l_term;
+	f_net = f_spring - f_loss;
 
-	if (f_q32 > Q16_TO_Q32(INT_TO_Q16(32000)))
-		f_q32 = Q16_TO_Q32(INT_TO_Q16(32000));
+	if (f_net > Q16_TO_Q32(INT_TO_Q16(32000)))
+		f_net = Q16_TO_Q32(INT_TO_Q16(32000));
 
-	else if (f_q32 < Q16_TO_Q32(INT_TO_Q16(-32000)))
-		f_q32 = Q16_TO_Q32(INT_TO_Q16(-32000));
+	else if (f_net < Q16_TO_Q32(INT_TO_Q16(-32000)))
+		f_net = Q16_TO_Q32(INT_TO_Q16(-32000));
 
-	q16_t dt = input->dt_safe;
-	q16_t den = Q16_ONE + math_mul_q16(c_fin, dt);
+	dt = demand->dt_safe;
+	den = Q16_ONE + math_mul_q16(c, dt);
 	state->rate = math_div_q16(
-		state->rate + math_mul_q16(Q32_TO_Q16(f_q32), dt), den);
+		state->rate + math_mul_q16(Q32_TO_Q16(f_net), dt), den);
 
 	state->psi_val += math_mul_q16(state->rate, dt);
 
@@ -190,156 +243,210 @@ q16_t pg_cpu_calc_load_demand(struct pg_load_state *state,
 	return state->psi_val;
 }
 
-PURE q16_t pg_cpu_calc_trend_gain(q16_t vel)
+PURE q16_t cpu_calc_trend_gain(q16_t velocity)
 {
-	if (vel > 0)
-		return math_algebraic_sigmoid(vel);
+	if (velocity > 0)
+		return math_algebraic_sigmoid(velocity);
 
 	return 0;
 }
 
-PURE q16_t pg_cpu_calc_eff_press(q16_t l_dem, q16_t t_fact,
-				 const struct pg_cpu_eff *eff)
+PURE q16_t cpu_calc_effective_pressure(q16_t demand, q16_t trend_factor,
+				       const struct cpu_efficiency *efficiency)
 {
-	if (UNLIKELY(!eff))
-		return l_dem;
+	q16_t scale;
 
-	q16_t t_mul = Q16_ONE + math_mul_q16(t_fact, eff->trend_amp);
-	return math_mul_q16(l_dem, t_mul);
+	if (UNLIKELY(!efficiency))
+		return demand;
+
+	scale = Q16_ONE + math_mul_q16(trend_factor, efficiency->trend_amp);
+
+	return math_mul_q16(demand, scale);
 }
 
-PURE q16_t pg_cpu_calc_therm_lat(q16_t th_scl, const struct pg_cpu_lim *lim)
+PURE q16_t cpu_calc_thermal_latency(q16_t therm_scale,
+				    const struct cpu_limit *limit)
 {
-	if (UNLIKELY(!lim))
+	q16_t range;
+	q16_t ratio;
+
+	if (UNLIKELY(!limit))
 		return 0;
 
-	q16_t l_rat = math_clamp(Q16_ONE - th_scl, 0, Q16_ONE);
-	q16_t l_rng = lim->max_lat - lim->min_lat;
-	return lim->min_lat + math_mul_q16(l_rng, l_rat);
+	ratio = math_clamp(Q16_ONE - therm_scale, 0, Q16_ONE);
+	range = limit->max_lat - limit->min_lat;
+
+	return limit->min_lat + math_mul_q16(range, ratio);
 }
 
-PURE q16_t pg_cpu_calc_lat(q16_t p_eff, q16_t l_dem, q16_t th_lat,
-			   const struct pg_cpu_cfg *cfg,
-			   const struct pg_cpu_eff *eff,
-			   const struct pg_cpu_lim *lim)
+PURE q16_t cpu_calc_latency(q16_t pressure, q16_t demand, q16_t therm_lat,
+			    const struct cpu_param *param,
+			    const struct cpu_efficiency *efficiency,
+			    const struct cpu_limit *limit)
 {
-	if (UNLIKELY(!cfg || !eff || !lim))
+	q16_t final;
+	q16_t inv;
+	q16_t load;
+	q16_t nom;
+	q16_t norm;
+	q16_t range;
+	q16_t sig;
+	q16_t target;
+
+	if (UNLIKELY(!param || !efficiency || !limit))
 		return 0;
 
-	q16_t sig = math_sigmoid(p_eff, cfg->sigmoid_k, eff->sig_mid);
-	q16_t fac = Q16_ONE - sig;
-	q16_t rng = lim->max_lat - lim->min_lat;
-	q16_t n_lat = lim->min_lat + math_mul_q16(rng, fac);
-	q16_t e_dem =
-		math_clamp(math_div_q16(l_dem, INT_TO_Q16(100)), 0, Q16_ONE);
+	sig = math_sigmoid(pressure, param->sigmoid_k, efficiency->sigmoid_mid);
+	inv = Q16_ONE - sig;
+	range = limit->max_lat - limit->min_lat;
+	nom = limit->min_lat + math_mul_q16(range, inv);
+	norm = math_clamp(math_div_q16(demand, INT_TO_Q16(100)), 0, Q16_ONE);
 
-	q16_t l_lat = lim->max_lat - math_mul_q16(e_dem, rng);
-	q16_t i_lat = (n_lat < l_lat) ? n_lat : l_lat;
-	q16_t f_lat = (i_lat > th_lat) ? i_lat : th_lat;
+	load = limit->max_lat - math_mul_q16(norm, range);
+	target = (nom < load) ? nom : load;
+	final = (target > therm_lat) ? target : therm_lat;
 
-	return math_clamp(f_lat, lim->min_lat, lim->max_lat);
+	return math_clamp(final, limit->min_lat, limit->max_lat);
 }
 
-PURE q16_t pg_cpu_calc_gran(q16_t lat, const struct pg_cpu_cfg *cfg,
-			    const struct pg_cpu_lim *lim)
+PURE q16_t cpu_calc_granularity(q16_t latency, const struct cpu_param *param,
+				const struct cpu_limit *limit)
 {
-	if (UNLIKELY(!cfg || !lim))
-		return lat;
+	q16_t scaled;
+	q16_t target;
 
-	q16_t r_grn = math_mul_q16(lat, cfg->lat_gran_rat);
-	q16_t a_grn = math_clamp(r_grn, lim->min_gran, lim->max_gran);
+	if (UNLIKELY(!param || !limit))
+		return latency;
 
-	return (a_grn < lat) ? a_grn : lat;
+	scaled = math_mul_q16(latency, param->lat_gran_rat);
+	target = math_clamp(scaled, limit->min_gran, limit->max_gran);
+
+	return (target < latency) ? target : latency;
 }
 
-PURE q16_t pg_cpu_calc_wakeup(q16_t p_eff, const struct pg_cpu_eff *eff,
-			      const struct pg_cpu_lim *lim)
+PURE q16_t cpu_calc_wakeup(q16_t pressure,
+			   const struct cpu_efficiency *efficiency,
+			   const struct cpu_limit *limit)
 {
-	if (UNLIKELY(!eff || !lim))
+	q16_t decay;
+	q16_t range;
+	q16_t target;
+
+	if (UNLIKELY(!efficiency || !limit))
 		return 0;
 
-	q16_t dec = math_decay(p_eff, eff->decay);
-	q16_t rng = lim->max_wake - lim->min_wake;
-	q16_t r_wake = lim->min_wake + math_mul_q16(rng, dec);
-	return math_clamp(r_wake, lim->min_wake, lim->max_wake);
+	decay = math_decay(pressure, efficiency->decay);
+	range = limit->max_wake - limit->min_wake;
+	target = limit->min_wake + math_mul_q16(range, decay);
+
+	return math_clamp(target, limit->min_wake, limit->max_wake);
 }
 
-PURE q16_t pg_cpu_calc_migration(q16_t vel, q16_t p_eff,
-				 const struct pg_cpu_lim *lim)
+PURE q16_t cpu_calc_migration(q16_t velocity, q16_t pressure,
+			      const struct cpu_limit *limit)
 {
-	if (UNLIKELY(!lim))
+	q16_t base;
+	q16_t curve;
+	q16_t inv;
+	q16_t norm;
+	q16_t range;
+	q16_t ratio;
+	q16_t target;
+	q16_t v;
+
+	if (UNLIKELY(!limit))
 		return 0;
 
-	q16_t x = math_clamp(math_div_q16(p_eff, INT_TO_Q16(100)), 0, Q16_ONE);
-	q16_t fac = Q16_ONE - x;
-	q16_t crv = math_mul_q16(fac, fac);
-	q16_t rng = lim->max_mig - lim->min_mig;
-	q16_t r_mig = lim->min_mig + math_mul_q16(rng, crv);
+	norm = math_clamp(math_div_q16(pressure, INT_TO_Q16(100)), 0, Q16_ONE);
+	inv = Q16_ONE - norm;
+	curve = math_mul_q16(inv, inv);
+	range = limit->max_mig - limit->min_mig;
+	base = limit->min_mig + math_mul_q16(range, curve);
 
-	q16_t a_vel = math_abs_q16(vel);
-	q16_t v_rat =
-		math_clamp(math_div_q16(a_vel, INT_TO_Q16(25)), 0, Q16_ONE);
-	q16_t mig =
-		math_mul_q16(r_mig, Q16_ONE - math_mul_q16(v_rat, Q16_HALF));
+	v = math_abs_q16(velocity);
+	ratio = math_clamp(math_div_q16(v, INT_TO_Q16(25)), 0, Q16_ONE);
+	target = math_mul_q16(base, Q16_ONE - math_mul_q16(ratio, Q16_HALF));
 
-	return math_clamp(mig, lim->min_mig, lim->max_mig);
+	return math_clamp(target, limit->min_mig, limit->max_mig);
 }
 
-PURE q16_t pg_cpu_calc_walt(q16_t press, const struct pg_cpu_lim *lim)
+PURE q16_t cpu_calc_walt(q16_t pressure, const struct cpu_limit *limit)
 {
-	if (UNLIKELY(!lim))
+	q16_t curve;
+	q16_t norm;
+	q16_t range;
+	q16_t target;
+
+	if (UNLIKELY(!limit))
 		return 0;
 
-	q16_t rat =
-		math_clamp(math_div_q16(press, INT_TO_Q16(100)), 0, Q16_ONE);
-	q16_t crv = math_mul_q16(rat, rat);
-	q16_t rng = lim->max_walt - lim->min_walt;
-	q16_t val = lim->min_walt + math_mul_q16(rng, crv);
-	return math_clamp(val, lim->min_walt, lim->max_walt);
+	norm = math_clamp(math_div_q16(pressure, INT_TO_Q16(100)), 0, Q16_ONE);
+	curve = math_mul_q16(norm, norm);
+	range = limit->max_walt - limit->min_walt;
+	target = limit->min_walt + math_mul_q16(range, curve);
+
+	return math_clamp(target, limit->min_walt, limit->max_walt);
 }
 
-PURE q16_t pg_cpu_calc_uclamp(q16_t press, q16_t th_scl,
-			      const struct pg_cpu_cfg *cfg,
-			      const struct pg_cpu_eff *eff,
-			      const struct pg_cpu_lim *lim)
+PURE q16_t cpu_calc_uclamp_min(q16_t pressure, q16_t therm_scale,
+			       const struct cpu_param *param,
+			       const struct cpu_efficiency *efficiency,
+			       const struct cpu_limit *limit)
 {
-	if (UNLIKELY(!cfg || !eff || !lim))
+	q16_t range;
+	q16_t scaled;
+	q16_t sig;
+	q16_t target;
+
+	if (UNLIKELY(!param || !efficiency || !limit))
 		return 0;
 
-	q16_t sig = math_sigmoid(press, cfg->uclamp_k, eff->ucl_mid);
-	q16_t rng = lim->max_ucl - lim->min_ucl;
-	q16_t ucl = lim->min_ucl + math_mul_q16(rng, sig);
-	return math_clamp(math_mul_q16(ucl, th_scl), lim->min_ucl,
-			  lim->max_ucl);
+	sig = math_sigmoid(pressure, param->uclamp_k, efficiency->uclamp_mid);
+	range = limit->max_ucl - limit->min_ucl;
+	target = limit->min_ucl + math_mul_q16(range, sig);
+	scaled = math_mul_q16(target, therm_scale);
+
+	return math_clamp(scaled, limit->min_ucl, limit->max_ucl);
 }
 
-PURE q16_t pg_cpu_calc_uclamp_max(q16_t th_scl, q16_t bat_lvl,
-				  const struct pg_cpu_lim *lim)
+PURE q16_t cpu_calc_uclamp_max(q16_t therm_scale, q16_t bat_level,
+			       const struct cpu_limit *limit)
 {
-	if (UNLIKELY(!lim))
-		return INT_TO_Q16(UCL_MAX_CEILING);
+	q16_t ceiling;
+	q16_t clamped;
+	q16_t factor;
+	q16_t health = Q16_ONE;
+	q16_t level;
+	q16_t norm;
+	q16_t range;
+	q16_t target;
 
-	q16_t b_lvl = math_clamp(bat_lvl, 0, INT_TO_Q16(100));
-	q16_t th_norm = Q16_ONE;
+	if (UNLIKELY(!limit))
+		return INT_TO_Q16(CPU_UCLAMP_MAX_CEILING);
 
-	if (th_scl < FLOAT_TO_Q16(0.80F)) {
-		q16_t clamped_th = math_clamp(th_scl, FLOAT_TO_Q16(0.10F),
-					      FLOAT_TO_Q16(0.80F));
-		th_norm = math_div_q16(clamped_th - FLOAT_TO_Q16(0.10F),
-				       FLOAT_TO_Q16(0.70F));
+	level = math_clamp(bat_level, 0, INT_TO_Q16(100));
+
+	if (therm_scale < FLOAT_TO_Q16(0.80F)) {
+		clamped = math_clamp(therm_scale, FLOAT_TO_Q16(0.10F),
+				     FLOAT_TO_Q16(0.80F));
+
+		norm = math_div_q16(clamped - FLOAT_TO_Q16(0.10F),
+				    FLOAT_TO_Q16(0.70F));
+
+		health = math_mul_q16(health, norm);
 	}
 
-	q16_t bat_norm = Q16_ONE;
-	if (b_lvl < INT_TO_Q16(15))
-		bat_norm = math_div_q16(b_lvl, INT_TO_Q16(15));
+	if (level < INT_TO_Q16(15)) {
+		factor = math_div_q16(level, INT_TO_Q16(15));
+		health = math_mul_q16(health, factor);
+	}
 
-	q16_t health = math_mul_q16(th_norm, bat_norm);
 	if (health >= Q16_ONE)
-		return INT_TO_Q16(UCL_MAX_CEILING);
+		return INT_TO_Q16(CPU_UCLAMP_MAX_CEILING);
 
-	q16_t ceiling = INT_TO_Q16(UCL_MAX_CEILING);
-	q16_t rng = ceiling - lim->min_ucl_max;
-	q16_t val = lim->min_ucl_max + math_mul_q16(rng, health);
+	ceiling = INT_TO_Q16(CPU_UCLAMP_MAX_CEILING);
+	range = ceiling - limit->ucl_max;
+	target = limit->ucl_max + math_mul_q16(range, health);
 
-	return math_clamp(val, lim->min_ucl_max, ceiling);
+	return math_clamp(target, limit->ucl_max, ceiling);
 }

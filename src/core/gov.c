@@ -80,7 +80,7 @@ int pg_gov_init(struct pg_context *ctx)
 
 static inline void relax_sched_tunables(struct pg_context *ctx)
 {
-	const struct pg_cpu_lim *l = &param_sched;
+	const struct cpu_limit *l = &param_sched;
 	const uint64_t q_ns = QUANT_NS;
 
 	if (ctx->sched_ucl.active && ctx->sched_ucl.last != 0)
@@ -88,7 +88,7 @@ static inline void relax_sched_tunables(struct pg_context *ctx)
 
 	if (ctx->sched_ucl_max.active) {
 		uint64_t v_ucl = math_sanitize_u64(
-			l->susp_ucl_max, (uint64_t)Q16_TO_INT(l->susp_ucl_max));
+			l->susp_ucl, (uint64_t)Q16_TO_INT(l->susp_ucl));
 		if (ctx->sched_ucl_max.last != v_ucl)
 			node_update(&ctx->sched_ucl_max, v_ucl, true, NULL);
 	}
@@ -275,16 +275,17 @@ static inline void poll_thermal_metrics(struct pg_context *ctx,
 static inline void calc_demand(struct pg_context *ctx,
 			       const struct timespec *now,
 			       const struct psi_sample *sample,
-			       q16_t *RESTRICT th_scl, q16_t *RESTRICT l_dem,
-			       q16_t *RESTRICT p_eff)
+			       q16_t *RESTRICT therm_scale,
+			       q16_t *RESTRICT l_dem, q16_t *RESTRICT p_eff)
 {
 	poll_battery_metrics(ctx, now);
 	poll_thermal_metrics(ctx, now);
 
-	*th_scl = ctx->cached_th_scl;
+	*therm_scale = ctx->cached_th_scl;
 
-	struct pg_cpu_eff *eff = &ctx->load_state.eff;
-	pg_cpu_upd_eff(eff, ctx->bat_lvl, *th_scl, sample->some.avg300);
+	struct cpu_efficiency *eff = &ctx->load_state.efficiency;
+	cpu_update_efficiency(eff, ctx->bat_lvl, *therm_scale,
+			      sample->some.avg300);
 
 	q16_t dt_real = pg_dt_sec(&ctx->last_tick, now);
 	q16_t dt_safe = math_clamp(dt_real, 1, FLOAT_TO_Q16(0.1F));
@@ -292,29 +293,29 @@ static inline void calc_demand(struct pg_context *ctx,
 
 	q16_t i;
 	q16_t i_dt;
-	pg_cpu_upd_intg(&ctx->load_state, ctx->bat_lvl, dt_real, &i, &i_dt);
+	cpu_update_integral(&ctx->load_state, ctx->bat_lvl, dt_real, &i, &i_dt);
 
-	q16_t t_fact = pg_cpu_calc_trend_gain(sample->some.velocity);
+	q16_t t_fact = cpu_calc_trend_gain(sample->some.velocity);
 	bool s_break = sample->some.nis > eff->nis_thresh;
-	struct pg_demand_input d_in = {
-		.tgt_psi = sample->some.stall_rate,
-		.vel = sample->some.velocity,
+	struct cpu_demand d_in = {
+		.target_psi = sample->some.stall_rate,
+		.velocity = sample->some.velocity,
 		.dt_safe = dt_safe,
-		.therm_scale = *th_scl,
-		.trend_fact = t_fact,
-		.integ = i,
-		.integ_dt = i_dt,
+		.therm_scale = *therm_scale,
+		.trend_factor = t_fact,
+		.integral = i,
+		.integral_dt = i_dt,
 		.struct_break = s_break,
 	};
 
-	*l_dem = pg_cpu_calc_load_demand(&ctx->load_state, &d_in, &param_cpu);
-	*p_eff = pg_cpu_calc_eff_press(*l_dem, t_fact, eff);
+	*l_dem = cpu_calc_load_demand(&ctx->load_state, &d_in, &param_cpu);
+	*p_eff = cpu_calc_effective_pressure(*l_dem, t_fact, eff);
 }
 
 static inline bool gov_gate(struct pg_context *ctx,
 			    const struct psi_sample *sample, q16_t p_eff)
 {
-	const struct pg_cpu_cfg *c = &param_cpu;
+	const struct cpu_param *c = &param_cpu;
 	int32_t n_poll;
 	int32_t t_poll;
 
@@ -323,7 +324,7 @@ static inline bool gov_gate(struct pg_context *ctx,
 					    sample->some.velocity);
 	ctx->next_wake = n_poll;
 
-	bool moving = pg_cpu_trans(&ctx->load_state, c);
+	bool moving = cpu_transient(&ctx->load_state, c);
 	if (!moving && !ctx->remap_due)
 		return false;
 
@@ -339,13 +340,13 @@ static inline bool gov_gate(struct pg_context *ctx,
 }
 
 static inline void apply_mapping(struct pg_context *ctx,
-				 const struct psi_sample *sample, q16_t th_scl,
-				 q16_t l_dem, q16_t p_eff)
+				 const struct psi_sample *sample,
+				 q16_t therm_scale, q16_t l_dem, q16_t p_eff)
 {
-	const struct pg_cpu_cfg *c = &param_cpu;
-	const struct pg_cpu_lim *l = &param_sched;
+	const struct cpu_param *c = &param_cpu;
+	const struct cpu_limit *l = &param_sched;
 	const uint64_t q_ns = QUANT_NS;
-	struct pg_cpu_eff *eff = &ctx->load_state.eff;
+	struct cpu_efficiency *eff = &ctx->load_state.efficiency;
 
 	uint64_t v_lat = 0;
 	uint64_t v_gran = 0;
@@ -353,54 +354,54 @@ static inline void apply_mapping(struct pg_context *ctx,
 	uint64_t v_mig = 0;
 	uint64_t v_wlt = 0;
 	uint64_t v_ucl = 0;
-	uint64_t v_ucl_max = UCL_MAX_CEILING;
+	uint64_t v_ucl_max = CPU_UCLAMP_MAX_CEILING;
 
-	q16_t th = 0;
-	q16_t lat = 0;
 	q16_t gran = 0;
-	q16_t wake = 0;
+	q16_t lat = 0;
 	q16_t mig = 0;
-	q16_t wlt = 0;
+	q16_t therm_lat = 0;
 	q16_t ucl = 0;
 	q16_t ucl_max = 0;
+	q16_t wake = 0;
+	q16_t wlt = 0;
 
 	if (ctx->sched_lat.active || ctx->sched_gran.active) {
-		th = pg_cpu_calc_therm_lat(th_scl, l);
-		lat = pg_cpu_calc_lat(p_eff, l_dem, th, c, eff, l);
+		therm_lat = cpu_calc_thermal_latency(therm_scale, l);
+		lat = cpu_calc_latency(p_eff, l_dem, therm_lat, c, eff, l);
 
 		if (ctx->sched_lat.active)
 			v_lat = math_quantize_u64(lat, l->max_lat, q_ns);
 	}
 
 	if (ctx->sched_gran.active) {
-		gran = pg_cpu_calc_gran(lat, c, l);
+		gran = cpu_calc_granularity(lat, c, l);
 		v_gran = math_quantize_u64(gran, l->max_gran, q_ns);
 	}
 
 	if (ctx->sched_wake.active) {
-		wake = pg_cpu_calc_wakeup(p_eff, eff, l);
+		wake = cpu_calc_wakeup(p_eff, eff, l);
 		v_wake = math_quantize_u64(wake, l->max_wake, q_ns);
 	}
 
 	if (ctx->sched_mig.active) {
-		mig = pg_cpu_calc_migration(sample->some.velocity, p_eff, l);
+		mig = cpu_calc_migration(sample->some.velocity, p_eff, l);
 		v_mig = math_quantize_u64(mig, l->min_mig, q_ns);
 	}
 
 	if (ctx->sched_walt.active) {
-		wlt = pg_cpu_calc_walt(p_eff, l);
+		wlt = cpu_calc_walt(p_eff, l);
 		v_wlt = math_sanitize_u64(wlt,
 					  (uint64_t)Q16_TO_INT(l->min_walt));
 	}
 
 	if (ctx->sched_ucl_max.active) {
-		ucl_max = pg_cpu_calc_uclamp_max(th_scl, ctx->bat_lvl, l);
-		v_ucl_max =
-			math_sanitize_u64(ucl_max, (uint64_t)UCL_MAX_CEILING);
+		ucl_max = cpu_calc_uclamp_max(therm_scale, ctx->bat_lvl, l);
+		v_ucl_max = math_sanitize_u64(ucl_max,
+					      (uint64_t)CPU_UCLAMP_MAX_CEILING);
 	}
 
 	if (ctx->sched_ucl.active) {
-		ucl = pg_cpu_calc_uclamp(p_eff, th_scl, c, eff, l);
+		ucl = cpu_calc_uclamp_min(p_eff, therm_scale, c, eff, l);
 		v_ucl = math_sanitize_u64(ucl,
 					  (uint64_t)Q16_TO_INT(l->min_ucl));
 		if (ctx->sched_ucl_max.active && v_ucl > v_ucl_max)
@@ -432,12 +433,12 @@ static inline void exec_gov_logic(struct pg_context *ctx,
 	if (!read_psi(ctx, now, &sample))
 		return;
 
-	q16_t th_scl;
 	q16_t l_dem;
 	q16_t p_eff;
-	calc_demand(ctx, now, &sample, &th_scl, &l_dem, &p_eff);
+	q16_t therm_scale;
+	calc_demand(ctx, now, &sample, &therm_scale, &l_dem, &p_eff);
 	if (gov_gate(ctx, &sample, p_eff))
-		apply_mapping(ctx, &sample, th_scl, l_dem, p_eff);
+		apply_mapping(ctx, &sample, therm_scale, l_dem, p_eff);
 }
 
 static void dormant_tick(struct pg_context *ctx)

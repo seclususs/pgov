@@ -176,7 +176,7 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->load_state.first_run = true;
 	ctx->load_state.psi_val = 0;
 	ctx->load_state.rate = 0;
-	ctx->load_state.prev_integ = 0;
+	ctx->load_state.prev_integral = 0;
 	ctx->epoll_fd = -1;
 	ctx->sig_fd = -1;
 	ctx->trg_fd = -1;

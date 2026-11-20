@@ -37,11 +37,11 @@ void pg_tune_limits(void)
 		math_clamp(val, FLOAT_TO_Q16(384.0F), FLOAT_TO_Q16(1024.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(448.0F), FLOAT_TO_Q16(640.0F), cap);
-	param_sched.min_ucl_max =
+	param_sched.ucl_max =
 		math_clamp(val, FLOAT_TO_Q16(448.0F), FLOAT_TO_Q16(640.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(320.0F), FLOAT_TO_Q16(448.0F), cap);
-	param_sched.susp_ucl_max =
+	param_sched.susp_ucl =
 		math_clamp(val, FLOAT_TO_Q16(320.0F), FLOAT_TO_Q16(448.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(20.0F), FLOAT_TO_Q16(4.0F), cap);
@@ -110,7 +110,7 @@ static void calc_topo_metrics(q16_t *RESTRICT rat, q16_t *RESTRICT rel,
 	*therm = math_clamp(*therm, 0, Q16_ONE);
 }
 
-static void tune_cpu_configs(q16_t rel, q16_t rat)
+static void tune_cpu_params(q16_t rel, q16_t rat)
 {
 	q16_t val;
 
@@ -170,6 +170,6 @@ void pg_tune_configs(void)
 	q16_t therm = 0;
 
 	calc_topo_metrics(&rat, &rel, &therm);
-	tune_cpu_configs(rel, rat);
+	tune_cpu_params(rel, rat);
 	tune_thermal_configs(therm);
 }

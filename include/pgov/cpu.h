@@ -8,9 +8,9 @@
 #include "pgov/math.h"
 #include <stdbool.h>
 
-#define UCL_MAX_CEILING 1024
+#define CPU_UCLAMP_MAX_CEILING 1024
 
-struct pg_cpu_lim {
+struct cpu_limit {
 	q16_t min_lat;
 	q16_t max_lat;
 	q16_t min_gran;
@@ -23,11 +23,11 @@ struct pg_cpu_lim {
 	q16_t max_walt;
 	q16_t min_ucl;
 	q16_t max_ucl;
-	q16_t min_ucl_max;
-	q16_t susp_ucl_max;
+	q16_t ucl_max;
+	q16_t susp_ucl;
 };
 
-struct pg_cpu_cfg {
+struct cpu_param {
 	q16_t lat_gran_rat;
 	q16_t uclamp_k;
 	q16_t sigmoid_k;
@@ -37,81 +37,84 @@ struct pg_cpu_cfg {
 	q16_t trans_poll;
 };
 
-struct pg_cpu_eff {
+struct cpu_efficiency {
 	q16_t resp_gain;
 	q16_t surge_gain;
 	q16_t trend_amp;
 	q16_t lookahead;
 	q16_t decay;
-	q16_t sig_mid;
-	q16_t ucl_mid;
-	q16_t stab_rat;
+	q16_t sigmoid_mid;
+	q16_t uclamp_mid;
+	q16_t stab_ratio;
 	q16_t gain_alpha;
 	q16_t nis_thresh;
 };
 
-struct pg_demand_input {
-	q16_t tgt_psi;
-	q16_t vel;
+struct cpu_demand {
+	q16_t target_psi;
+	q16_t velocity;
 	q16_t dt_safe;
 	q16_t therm_scale;
-	q16_t trend_fact;
-	q16_t integ;
-	q16_t integ_dt;
+	q16_t trend_factor;
+	q16_t integral;
+	q16_t integral_dt;
 	bool struct_break;
 };
 
-struct pg_load_state {
+struct cpu_state {
 	q16_t psi_val;
 	q16_t rate;
 	q16_t psi_ref;
-	q16_t prev_integ;
+	q16_t prev_integral;
 	bool first_run;
-	struct pg_cpu_eff eff;
+	struct cpu_efficiency efficiency;
 };
 
-PURE bool pg_cpu_trans(const struct pg_load_state *state,
-		       const struct pg_cpu_cfg *cfg);
+PURE bool cpu_transient(const struct cpu_state *state,
+			const struct cpu_param *param);
 
-void pg_cpu_upd_intg(struct pg_load_state *RESTRICT state, q16_t bat_lvl,
-		     q16_t dt_real, q16_t *RESTRICT i, q16_t *RESTRICT i_dt);
+void cpu_update_integral(struct cpu_state *RESTRICT state, q16_t bat_level,
+			 q16_t dt_real, q16_t *RESTRICT integral,
+			 q16_t *RESTRICT integral_dt);
 
-void pg_cpu_upd_eff(struct pg_cpu_eff *eff, q16_t bat_lvl, q16_t th_scl,
-		    q16_t avg300);
+void cpu_update_efficiency(struct cpu_efficiency *efficiency, q16_t bat_level,
+			   q16_t therm_scale, q16_t avg300);
 
-q16_t pg_cpu_calc_load_demand(struct pg_load_state *state,
-			      const struct pg_demand_input *input,
-			      const struct pg_cpu_cfg *cfg);
+q16_t cpu_calc_load_demand(struct cpu_state *state,
+			   const struct cpu_demand *demand,
+			   const struct cpu_param *param);
 
-PURE q16_t pg_cpu_calc_trend_gain(q16_t vel);
+PURE q16_t cpu_calc_trend_gain(q16_t velocity);
 
-PURE q16_t pg_cpu_calc_eff_press(q16_t l_dem, q16_t t_fact,
-				 const struct pg_cpu_eff *eff);
+PURE q16_t cpu_calc_effective_pressure(q16_t demand, q16_t trend_factor,
+				       const struct cpu_efficiency *efficiency);
 
-PURE q16_t pg_cpu_calc_therm_lat(q16_t th_scl, const struct pg_cpu_lim *lim);
+PURE q16_t cpu_calc_thermal_latency(q16_t therm_scale,
+				    const struct cpu_limit *limit);
 
-PURE q16_t pg_cpu_calc_lat(q16_t p_eff, q16_t l_dem, q16_t th_lat,
-			   const struct pg_cpu_cfg *cfg,
-			   const struct pg_cpu_eff *eff,
-			   const struct pg_cpu_lim *lim);
+PURE q16_t cpu_calc_latency(q16_t pressure, q16_t demand, q16_t therm_lat,
+			    const struct cpu_param *param,
+			    const struct cpu_efficiency *efficiency,
+			    const struct cpu_limit *limit);
 
-PURE q16_t pg_cpu_calc_gran(q16_t lat, const struct pg_cpu_cfg *cfg,
-			    const struct pg_cpu_lim *lim);
+PURE q16_t cpu_calc_granularity(q16_t latency, const struct cpu_param *param,
+				const struct cpu_limit *limit);
 
-PURE q16_t pg_cpu_calc_wakeup(q16_t p_eff, const struct pg_cpu_eff *eff,
-			      const struct pg_cpu_lim *lim);
+PURE q16_t cpu_calc_wakeup(q16_t pressure,
+			   const struct cpu_efficiency *efficiency,
+			   const struct cpu_limit *limit);
 
-PURE q16_t pg_cpu_calc_migration(q16_t vel, q16_t p_eff,
-				 const struct pg_cpu_lim *lim);
+PURE q16_t cpu_calc_migration(q16_t velocity, q16_t pressure,
+			      const struct cpu_limit *limit);
 
-PURE q16_t pg_cpu_calc_walt(q16_t press, const struct pg_cpu_lim *lim);
+PURE q16_t cpu_calc_walt(q16_t pressure, const struct cpu_limit *limit);
 
-PURE q16_t pg_cpu_calc_uclamp(q16_t press, q16_t th_scl,
-			      const struct pg_cpu_cfg *cfg,
-			      const struct pg_cpu_eff *eff,
-			      const struct pg_cpu_lim *lim);
+PURE q16_t cpu_calc_uclamp_min(q16_t pressure, q16_t therm_scale,
+			       const struct cpu_param *param,
+			       const struct cpu_efficiency *efficiency,
+			       const struct cpu_limit *limit);
 
-PURE q16_t pg_cpu_calc_uclamp_max(q16_t th_scl, q16_t bat_lvl,
-				  const struct pg_cpu_lim *lim);
+PURE q16_t cpu_calc_uclamp_max(q16_t therm_scale, q16_t bat_level,
+			       const struct cpu_limit *limit);
 
 #endif // PGOV_CPU_H
