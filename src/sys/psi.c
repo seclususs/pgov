@@ -20,7 +20,7 @@ bool psi_available(void)
 
 int psi_trigger_open(const char *path, int32_t threshold_us, int32_t window_us)
 {
-	ssize_t bytes_written;
+	ssize_t res;
 	char payload[64];
 	size_t pos;
 	int fd;
@@ -50,10 +50,10 @@ int psi_trigger_open(const char *path, int32_t threshold_us, int32_t window_us)
 	payload[pos++] = '\n';
 
 	do {
-		bytes_written = write(fd, payload, pos);
-	} while (bytes_written < 0 && errno == EINTR);
+		res = write(fd, payload, pos);
+	} while (res < 0 && errno == EINTR);
 
-	if (bytes_written < 0) {
+	if (res < 0) {
 		err = errno;
 		LOGE("psi: failed to write trigger config err=%d", err);
 		goto out_err;
@@ -233,7 +233,7 @@ int psi_read(struct psi_state *state, struct psi_sample *sample,
 	     const struct timespec *now)
 {
 	struct psi_metrics metrics = { 0 };
-	ssize_t bytes_read;
+	ssize_t res;
 	uint64_t cur_total;
 	q16_t dt_sec;
 	size_t len;
@@ -249,11 +249,10 @@ int psi_read(struct psi_state *state, struct psi_sample *sample,
 	}
 
 	do {
-		bytes_read =
-			pread(state->fd, state->buf, sizeof(state->buf), 0);
-	} while (bytes_read < 0 && errno == EINTR);
+		res = pread(state->fd, state->buf, sizeof(state->buf), 0);
+	} while (res < 0 && errno == EINTR);
 
-	if (bytes_read <= 0) {
+	if (res <= 0) {
 		LOGE("psi: read failed or empty err=%d", errno);
 		return -EIO;
 	}
@@ -267,7 +266,7 @@ int psi_read(struct psi_state *state, struct psi_sample *sample,
 	}
 
 	cur_total = state->last_total;
-	len = (size_t)bytes_read;
+	len = (size_t)res;
 
 	while (pos < len) {
 		if (pos + 5 <= len &&
@@ -301,7 +300,7 @@ int psi_read(struct psi_state *state, struct psi_sample *sample,
 int psi_read_avg10(const char *path, q16_t *avg10)
 {
 	uint8_t buf[256];
-	ssize_t bytes_read;
+	ssize_t res;
 	size_t next_pos;
 	size_t len;
 	size_t pos = 0;
@@ -315,15 +314,15 @@ int psi_read_avg10(const char *path, q16_t *avg10)
 		return -errno;
 
 	do {
-		bytes_read = read(fd, buf, sizeof(buf));
-	} while (bytes_read < 0 && errno == EINTR);
+		res = read(fd, buf, sizeof(buf));
+	} while (res < 0 && errno == EINTR);
 
 	close(fd);
 
-	if (bytes_read <= 0)
+	if (res <= 0)
 		return -EIO;
 
-	len = (size_t)bytes_read;
+	len = (size_t)res;
 	while (pos + 6 <= len) {
 		if (match_token(&buf[pos], "avg10=", 6)) {
 			*avg10 = pg_parse_q16(buf, len, pos + 6, &next_pos);

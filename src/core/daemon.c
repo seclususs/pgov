@@ -106,7 +106,7 @@ static size_t rs_cnt;
 
 static void restore_snapshot(const struct pg_context *ctx)
 {
-	const struct pg_node_cache *const c[NR_SINKS] = {
+	const struct node_cache *const c[NR_SINKS] = {
 		&ctx->sched_lat,     &ctx->sched_gran, &ctx->sched_wake,
 		&ctx->sched_mig,     &ctx->sched_walt, &ctx->sched_ucl,
 		&ctx->sched_ucl_max,
@@ -135,13 +135,13 @@ static void crash_restore(void)
 
 static void restore_all(struct pg_context *ctx)
 {
-	pg_node_restore(&ctx->sched_lat);
-	pg_node_restore(&ctx->sched_gran);
-	pg_node_restore(&ctx->sched_wake);
-	pg_node_restore(&ctx->sched_mig);
-	pg_node_restore(&ctx->sched_walt);
-	pg_node_restore(&ctx->sched_ucl);
-	pg_node_restore(&ctx->sched_ucl_max);
+	node_restore(&ctx->sched_lat);
+	node_restore(&ctx->sched_gran);
+	node_restore(&ctx->sched_wake);
+	node_restore(&ctx->sched_mig);
+	node_restore(&ctx->sched_walt);
+	node_restore(&ctx->sched_ucl);
+	node_restore(&ctx->sched_ucl_max);
 	rs_cnt = 0;
 }
 
@@ -206,13 +206,13 @@ static int init_node_caches(struct pg_context *ctx)
 {
 	int n = 0;
 
-	n += pg_node_cache_init(&ctx->sched_lat, CAND_LAT);
-	n += pg_node_cache_init(&ctx->sched_gran, CAND_GRAN);
-	n += pg_node_cache_init(&ctx->sched_wake, CAND_WAKE);
-	n += pg_node_cache_init(&ctx->sched_mig, CAND_MIG);
-	n += pg_node_cache_init(&ctx->sched_walt, CAND_WALT);
-	n += pg_node_cache_init(&ctx->sched_ucl, CAND_UCL);
-	n += pg_node_cache_init(&ctx->sched_ucl_max, CAND_UCL_MAX);
+	n += node_cache_init(&ctx->sched_lat, CAND_LAT);
+	n += node_cache_init(&ctx->sched_gran, CAND_GRAN);
+	n += node_cache_init(&ctx->sched_wake, CAND_WAKE);
+	n += node_cache_init(&ctx->sched_mig, CAND_MIG);
+	n += node_cache_init(&ctx->sched_walt, CAND_WALT);
+	n += node_cache_init(&ctx->sched_ucl, CAND_UCL);
+	n += node_cache_init(&ctx->sched_ucl_max, CAND_UCL_MAX);
 
 	return n;
 }
@@ -274,13 +274,13 @@ static void cleanup_context(struct pg_context *ctx)
 	sensor_close_temp(&ctx->bat_temp_sensor);
 	sensor_close_battery(&ctx->bat_cap_sensor);
 	sensor_close_backlight(&ctx->bl_sensor);
-	pg_node_cache_cleanup(&ctx->sched_lat);
-	pg_node_cache_cleanup(&ctx->sched_gran);
-	pg_node_cache_cleanup(&ctx->sched_wake);
-	pg_node_cache_cleanup(&ctx->sched_mig);
-	pg_node_cache_cleanup(&ctx->sched_walt);
-	pg_node_cache_cleanup(&ctx->sched_ucl);
-	pg_node_cache_cleanup(&ctx->sched_ucl_max);
+	node_cache_cleanup(&ctx->sched_lat);
+	node_cache_cleanup(&ctx->sched_gran);
+	node_cache_cleanup(&ctx->sched_wake);
+	node_cache_cleanup(&ctx->sched_mig);
+	node_cache_cleanup(&ctx->sched_walt);
+	node_cache_cleanup(&ctx->sched_ucl);
+	node_cache_cleanup(&ctx->sched_ucl_max);
 }
 
 int pg_daemon_init(void)

@@ -173,7 +173,7 @@ int task_set_uclamp(uint32_t util_max)
 
 int task_protect_oom(void)
 {
-	ssize_t bytes_written;
+	ssize_t res;
 	int err;
 	int fd;
 
@@ -185,13 +185,12 @@ int task_protect_oom(void)
 	}
 
 	do {
-		bytes_written =
-			write(fd, OOM_SCORE_MIN, sizeof(OOM_SCORE_MIN) - 1);
-	} while (bytes_written < 0 && errno == EINTR);
+		res = write(fd, OOM_SCORE_MIN, sizeof(OOM_SCORE_MIN) - 1);
+	} while (res < 0 && errno == EINTR);
 
 	close(fd);
 
-	if (bytes_written < 0) {
+	if (res < 0) {
 		err = errno;
 		LOGE("task: failed to write oom protection score err=%d", err);
 		return -err;

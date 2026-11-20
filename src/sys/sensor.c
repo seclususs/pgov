@@ -100,7 +100,7 @@ static inline bool check_thermal_valid(const char *name)
 
 static ssize_t read_sysfs_string(const char *path, char *buf, size_t len)
 {
-	ssize_t bytes_read;
+	ssize_t res;
 	int fd;
 
 	if (UNLIKELY(!path || !buf || len == 0))
@@ -111,24 +111,24 @@ static ssize_t read_sysfs_string(const char *path, char *buf, size_t len)
 		return -1;
 
 	do {
-		bytes_read = read(fd, buf, len - 1);
-	} while (bytes_read < 0 && errno == EINTR);
+		res = read(fd, buf, len - 1);
+	} while (res < 0 && errno == EINTR);
 
 	close(fd);
 
-	if (bytes_read <= 0)
+	if (res <= 0)
 		return -1;
 
-	buf[bytes_read] = '\0';
-	for (ssize_t i = 0; i < bytes_read; ++i) {
+	buf[res] = '\0';
+	for (ssize_t i = 0; i < res; ++i) {
 		if (buf[i] == '\n' || buf[i] == '\r') {
 			buf[i] = '\0';
-			bytes_read = i;
+			res = i;
 			break;
 		}
 	}
 
-	return bytes_read;
+	return res;
 }
 
 static bool check_thermal_type(const char *name)
@@ -309,7 +309,7 @@ static int find_best_trip_point(const char *name, char *path, size_t len)
 	int best_score = 0;
 
 	for (size_t i = 0; i <= 9; ++i) {
-		ssize_t bytes_read;
+		ssize_t res;
 		int32_t cur_temp;
 		bool valid;
 		int score = 0;
@@ -337,13 +337,13 @@ static int find_best_trip_point(const char *name, char *path, size_t len)
 		pg_str_build_path(node_path, sizeof(node_path), THERMAL, name,
 				  file);
 
-		bytes_read = read_sysfs_string(node_path, buf, sizeof(buf));
-		if (bytes_read <= 0)
+		res = read_sysfs_string(node_path, buf, sizeof(buf));
+		if (res <= 0)
 			continue;
 
 		valid = false;
-		cur_temp = pg_parse_i32((const uint8_t *)buf,
-					(size_t)bytes_read, &valid);
+		cur_temp =
+			pg_parse_i32((const uint8_t *)buf, (size_t)res, &valid);
 
 		if (!valid || cur_temp < 40000)
 			continue;
@@ -533,7 +533,7 @@ void sensor_close_backlight(struct sensor_backlight *sensor)
 static inline int read_temperature(struct sensor_temp *sensor, q16_t *temp,
 				   q16_t fallback)
 {
-	ssize_t bytes_read;
+	ssize_t res;
 	q32_t raw_q32;
 	int32_t val;
 	bool valid;
@@ -547,16 +547,15 @@ static inline int read_temperature(struct sensor_temp *sensor, q16_t *temp,
 	}
 
 	do {
-		bytes_read =
-			pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
-	} while (bytes_read < 0 && errno == EINTR);
+		res = pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
+	} while (res < 0 && errno == EINTR);
 
-	if (bytes_read <= 0) {
+	if (res <= 0) {
 		*temp = fallback;
 		return -EIO;
 	}
 
-	val = pg_parse_i32(sensor->buf, (size_t)bytes_read, &valid);
+	val = pg_parse_i32(sensor->buf, (size_t)res, &valid);
 	if (!valid) {
 		*temp = fallback;
 		return -EINVAL;
@@ -600,7 +599,7 @@ int sensor_read_battery_temp(struct sensor_temp *sensor, q16_t *temp)
 
 int sensor_read_battery_capacity(struct sensor_battery *sensor, q16_t *capacity)
 {
-	ssize_t bytes_read;
+	ssize_t res;
 	int32_t val;
 	bool valid;
 
@@ -613,16 +612,15 @@ int sensor_read_battery_capacity(struct sensor_battery *sensor, q16_t *capacity)
 	}
 
 	do {
-		bytes_read =
-			pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
-	} while (bytes_read < 0 && errno == EINTR);
+		res = pread(sensor->fd, sensor->buf, sizeof(sensor->buf), 0);
+	} while (res < 0 && errno == EINTR);
 
-	if (bytes_read <= 0) {
+	if (res <= 0) {
 		*capacity = FALLBACK_BATTERY_CAPACITY;
 		return -EIO;
 	}
 
-	val = pg_parse_i32(sensor->buf, (size_t)bytes_read, &valid);
+	val = pg_parse_i32(sensor->buf, (size_t)res, &valid);
 	if (UNLIKELY(!valid || val < 0 || val > 100)) {
 		*capacity = FALLBACK_BATTERY_CAPACITY;
 		return -EINVAL;
@@ -646,19 +644,19 @@ int sensor_read_backlight(struct sensor_backlight *sensor, int32_t *brightness)
 	}
 
 	for (uint8_t i = 0; i < sensor->count; i++) {
-		ssize_t bytes_read;
+		ssize_t res;
 		int32_t val;
 		bool valid;
 
 		do {
-			bytes_read = pread(sensor->fd[i], sensor->buf,
-					   sizeof(sensor->buf), 0);
-		} while (bytes_read < 0 && errno == EINTR);
+			res = pread(sensor->fd[i], sensor->buf,
+				    sizeof(sensor->buf), 0);
+		} while (res < 0 && errno == EINTR);
 
-		if (bytes_read <= 0)
+		if (res <= 0)
 			continue;
 
-		val = pg_parse_i32(sensor->buf, (size_t)bytes_read, &valid);
+		val = pg_parse_i32(sensor->buf, (size_t)res, &valid);
 		if (UNLIKELY(!valid))
 			continue;
 
@@ -680,7 +678,7 @@ q16_t sensor_get_trip_temp(q16_t fallback)
 	if (scan_trip_point_node(path, sizeof(path)) != 0)
 		return fallback;
 
-	if (pg_node_read_i32(path, &val) != 0)
+	if (node_read_i32(path, &val) != 0)
 		return fallback;
 
 	temp = (q16_t)(((q32_t)val * Q16_ONE) / 1000);

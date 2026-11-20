@@ -9,21 +9,26 @@
 #include <time.h>
 #include <unistd.h>
 
-#define NODE_FAIL_MAX 7
-#define NODE_BACKOFF_BASE_MS 1000U
-#define NODE_BACKOFF_MAX_MS 60000U
+#define FAIL_MAX 7
+#define BACKOFF_BASE_MS 1000U
+#define BACKOFF_MAX_MS 60000U
 
-static inline uint32_t mono_ms(void)
+static inline uint32_t get_monotonic_ms(void)
 {
 	struct timespec ts;
+
 	clock_gettime(CLOCK_MONOTONIC, &ts);
 	return (uint32_t)(((uint64_t)ts.tv_sec * 1000U) +
 			  ((uint64_t)ts.tv_nsec / 1000000U));
 }
 
-int pg_node_cache_init(struct pg_node_cache *RESTRICT cache,
-		       const char *const *RESTRICT paths)
+int node_cache_init(struct node_cache *RESTRICT cache,
+		    const char *const *RESTRICT paths)
 {
+	int32_t cur;
+	size_t i;
+	int fd;
+
 	if (UNLIKELY(!cache || !paths))
 		return -EINVAL;
 
@@ -35,16 +40,16 @@ int pg_node_cache_init(struct pg_node_cache *RESTRICT cache,
 	cache->base = 0;
 	cache->fd = -1;
 
-	for (size_t i = 0; paths[i] != NULL; i++) {
-		int fd = open(paths[i], O_WRONLY | O_CLOEXEC);
+	for (i = 0; paths[i] != NULL; i++) {
+		fd = open(paths[i], O_WRONLY | O_CLOEXEC);
 		if (fd < 0)
 			continue;
 
-		int32_t cur = -1;
+		cur = -1;
 		cache->fd = fd;
 		cache->active = true;
 
-		if (pg_node_read_i32(paths[i], &cur) == 0 && cur >= 0) {
+		if (node_read_i32(paths[i], &cur) == 0 && cur >= 0) {
 			cache->base = (uint32_t)cur;
 			cache->has_base = true;
 		}
@@ -57,7 +62,7 @@ int pg_node_cache_init(struct pg_node_cache *RESTRICT cache,
 	return 0;
 }
 
-void pg_node_restore(struct pg_node_cache *cache)
+void node_restore(struct node_cache *cache)
 {
 	if (UNLIKELY(!cache))
 		return;
@@ -66,11 +71,11 @@ void pg_node_restore(struct pg_node_cache *cache)
 	    cache->last == cache->base)
 		return;
 
-	if (pg_node_write_strm(cache->fd, cache->base) == 0)
+	if (node_write_stream(cache->fd, cache->base) == 0)
 		cache->last = cache->base;
 }
 
-void pg_node_cache_cleanup(struct pg_node_cache *cache)
+void node_cache_cleanup(struct node_cache *cache)
 {
 	if (UNLIKELY(!cache))
 		return;
@@ -83,34 +88,37 @@ void pg_node_cache_cleanup(struct pg_node_cache *cache)
 	cache->active = false;
 }
 
-int pg_node_read_i32(const char *path, int32_t *out_val)
+int node_read_i32(const char *path, int32_t *out_val)
 {
+	char buf[32];
+	ssize_t res;
+	int32_t val;
+	bool valid;
 	int ret = 0;
+	int fd;
+	int err;
 
 	if (UNLIKELY(!path || !out_val))
 		return -EINVAL;
 
-	int fd = open(path, O_RDONLY | O_CLOEXEC);
+	fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
-		int err = errno;
+		err = errno;
 		LOGE("node: failed to open read %s err=%d", path, err);
 		return -err;
 	}
 
-	char buf[32];
-	ssize_t bytes;
 	do {
-		bytes = read(fd, buf, sizeof(buf));
-	} while (bytes < 0 && errno == EINTR);
+		res = read(fd, buf, sizeof(buf));
+	} while (res < 0 && errno == EINTR);
 
-	if (bytes <= 0) {
-		ret = (bytes < 0) ? -errno : -ENODATA;
+	if (res <= 0) {
+		ret = (res < 0) ? -errno : -ENODATA;
 		LOGE("node: failed to read data %s err=%d", path, -ret);
 		goto out;
 	}
 
-	bool valid;
-	int32_t val = pg_parse_i32((const uint8_t *)buf, (size_t)bytes, &valid);
+	val = pg_parse_i32((const uint8_t *)buf, (size_t)res, &valid);
 	if (!valid) {
 		ret = -EINVAL;
 		LOGE("node: failed to parse valid i32 from %s", path);
@@ -124,67 +132,72 @@ out:
 	return ret;
 }
 
-int pg_node_write_strm(int fd, uint64_t value)
+int node_write_stream(int fd, uint64_t val)
 {
+	char buf[32];
+	size_t len;
 	ssize_t res;
+	int err;
 
 	if (fd < 0)
 		return -EBADF;
 
-	char buf[32];
-	size_t len = pg_fmt_u64(value, buf);
+	len = pg_fmt_u64(val, buf);
 
 	do {
 		res = pwrite(fd, buf, len, 0);
 	} while (res < 0 && errno == EINTR);
 
 	if (res < 0) {
-		int err = errno;
-		LOGE("node: failed to write strm fd=%d err=%d", fd, err);
+		err = errno;
+		LOGE("node: failed to write stream fd=%d err=%d", fd, err);
 		return -err;
 	}
 
 	if ((size_t)res != len) {
-		LOGE("node: incomplete strm write fd=%d", fd);
+		LOGE("node: incomplete stream write fd=%d", fd);
 		return -EIO;
 	}
 
 	return 0;
 }
 
-int pg_node_write(const char *path, const char *val)
+int node_write(const char *path, const char *val)
 {
+	char buf[64];
+	const char *data;
+	size_t len = 0;
+	size_t i;
 	ssize_t res;
 	int ret = 0;
+	int fd;
+	int err;
 
 	if (UNLIKELY(!path || !val))
 		return -EINVAL;
 
-	int fd = open(path, O_WRONLY | O_CLOEXEC);
+	fd = open(path, O_WRONLY | O_CLOEXEC);
 	if (fd < 0) {
-		int err = errno;
+		err = errno;
 		LOGE("node: failed to open write %s err=%d", path, err);
 		return -err;
 	}
 
-	size_t len = 0;
 	while (val[len] != '\0')
 		len++;
 
-	char buf[64];
-	const char *w_val = val;
-
+	data = val;
 	if (len > 0 && val[len - 1] != '\n' && len < sizeof(buf) - 1) {
-		for (size_t i = 0; i < len; i++)
+		for (i = 0; i < len; i++)
 			buf[i] = val[i];
 
 		buf[len] = '\n';
 		len++;
-		w_val = buf;
+		data = buf;
 	}
 
 	do {
-		res = pwrite(fd, w_val, len, 0);
+		res = pwrite(fd, data, len, 0);
 	} while (res < 0 && errno == EINTR);
 
 	if (res < 0) {
@@ -204,61 +217,71 @@ out:
 	return ret;
 }
 
-static inline bool absolute(uint64_t cur, uint64_t tgt, uint64_t thresh)
+static inline bool check_absolute(uint64_t cur, uint64_t target,
+				  uint64_t thresh)
 {
+	uint64_t diff;
+
 	if (UNLIKELY(cur == UINT64_MAX))
 		return true;
 
-	if (cur == tgt)
+	if (cur == target)
 		return false;
 
-	uint64_t diff = (cur > tgt) ? (cur - tgt) : (tgt - cur);
+	diff = (cur > target) ? (cur - target) : (target - cur);
 	return diff >= thresh;
 }
 
-static inline bool relative(uint64_t cur, uint64_t tgt, uint64_t tol)
+static inline bool check_relative(uint64_t cur, uint64_t target,
+				  uint64_t thresh)
 {
+	uint64_t diff;
+
 	if (UNLIKELY(cur == UINT64_MAX))
 		return true;
 
-	if (cur == tgt)
+	if (cur == target)
 		return false;
 
 	if (cur == 0)
-		return tgt != 0;
+		return target != 0;
 
-	uint64_t diff = (cur > tgt) ? (cur - tgt) : (tgt - cur);
-	return (diff * (uint64_t)1000) >= (cur * tol);
+	diff = (cur > target) ? (cur - target) : (target - cur);
+	return (diff * (uint64_t)1000) >= (cur * thresh);
 }
 
-void pg_node_update(struct pg_node_cache *cache, uint64_t value, bool force,
-		    const struct pg_node_chk *strat)
+void node_update(struct node_cache *cache, uint64_t val, bool force,
+		 const struct node_check *check)
 {
+	uint32_t now_ms;
+	uint32_t delay;
+	bool update = false;
+
 	if (UNLIKELY(!cache))
 		return;
 
 	if (!cache->active)
 		return;
 
-	bool update = false;
-
 	if (force) {
 		update = true;
 	} else {
-		if (UNLIKELY(!strat))
+		if (UNLIKELY(!check))
 			return;
 
-		switch (strat->type) {
-		case CHK_ABS:
-			update = absolute(cache->last, value, strat->thresh);
+		switch (check->type) {
+		case NODE_CHECK_ABSOLUTE:
+			update =
+				check_absolute(cache->last, val, check->thresh);
 			break;
 
-		case CHK_REL:
-			update = relative(cache->last, value, strat->thresh);
+		case NODE_CHECK_RELATIVE:
+			update =
+				check_relative(cache->last, val, check->thresh);
 			break;
 
-		case CHK_STRICT:
-			update = (cache->last != value);
+		case NODE_CHECK_STRICT:
+			update = (cache->last != val);
 			break;
 		}
 	}
@@ -266,22 +289,23 @@ void pg_node_update(struct pg_node_cache *cache, uint64_t value, bool force,
 	if (!update)
 		return;
 
+	now_ms = get_monotonic_ms();
 	if (UNLIKELY(cache->fails != 0) &&
-	    (int32_t)(mono_ms() - cache->retry_ms) < 0)
+	    (int32_t)(now_ms - cache->retry_ms) < 0)
 		return;
 
-	if (pg_node_write_strm(cache->fd, value) == 0) {
-		cache->last = value;
+	if (node_write_stream(cache->fd, val) == 0) {
+		cache->last = val;
 		cache->fails = 0;
 		return;
 	}
 
-	if (cache->fails < NODE_FAIL_MAX)
+	if (cache->fails < FAIL_MAX)
 		cache->fails++;
 
-	uint32_t delay = NODE_BACKOFF_BASE_MS << (cache->fails - 1);
-	if (delay > NODE_BACKOFF_MAX_MS)
-		delay = NODE_BACKOFF_MAX_MS;
+	delay = BACKOFF_BASE_MS << (cache->fails - 1);
+	if (delay > BACKOFF_MAX_MS)
+		delay = BACKOFF_MAX_MS;
 
-	cache->retry_ms = mono_ms() + delay;
+	cache->retry_ms = now_ms + delay;
 }

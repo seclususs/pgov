@@ -34,13 +34,40 @@
 #define SWEEP_IVL_SEC 600
 #endif
 
-static const struct pg_node_chk CHK_LAT = { CHK_REL, CHECK_LAT };
-static const struct pg_node_chk CHK_GRAN = { CHK_REL, CHECK_GRAN };
-static const struct pg_node_chk CHK_WAKE = { CHK_REL, CHECK_WAKE };
-static const struct pg_node_chk CHK_MIG = { CHK_ABS, CHECK_MIG };
-static const struct pg_node_chk CHK_WALT = { CHK_ABS, CHECK_WALT };
-static const struct pg_node_chk CHK_UCL = { CHK_ABS, CHECK_UCL };
-static const struct pg_node_chk CHK_UCL_MAX = { CHK_ABS, CHECK_UCL };
+static const struct node_check check_lat = {
+	NODE_CHECK_RELATIVE,
+	CHECK_LAT,
+};
+
+static const struct node_check check_gran = {
+	NODE_CHECK_RELATIVE,
+	CHECK_GRAN,
+};
+
+static const struct node_check check_wake = {
+	NODE_CHECK_RELATIVE,
+	CHECK_WAKE,
+};
+
+static const struct node_check check_mig = {
+	NODE_CHECK_ABSOLUTE,
+	CHECK_MIG,
+};
+
+static const struct node_check check_walt = {
+	NODE_CHECK_ABSOLUTE,
+	CHECK_WALT,
+};
+
+static const struct node_check check_ucl = {
+	NODE_CHECK_ABSOLUTE,
+	CHECK_UCL,
+};
+
+static const struct node_check check_ucl_max = {
+	NODE_CHECK_ABSOLUTE,
+	CHECK_UCL,
+};
 
 int pg_gov_init(struct pg_context *ctx)
 {
@@ -57,48 +84,48 @@ static inline void relax_sched_tunables(struct pg_context *ctx)
 	const uint64_t q_ns = QUANT_NS;
 
 	if (ctx->sched_ucl.active && ctx->sched_ucl.last != 0)
-		pg_node_update(&ctx->sched_ucl, 0, true, NULL);
+		node_update(&ctx->sched_ucl, 0, true, NULL);
 
 	if (ctx->sched_ucl_max.active) {
 		uint64_t v_ucl = pg_math_san_u64(
 			l->susp_ucl_max, (uint64_t)Q16_TO_INT(l->susp_ucl_max));
 		if (ctx->sched_ucl_max.last != v_ucl)
-			pg_node_update(&ctx->sched_ucl_max, v_ucl, true, NULL);
+			node_update(&ctx->sched_ucl_max, v_ucl, true, NULL);
 	}
 
 	if (ctx->sched_lat.active) {
 		uint64_t v_lat =
 			pg_math_san_quant_u64(l->max_lat, l->max_lat, q_ns);
 		if (ctx->sched_lat.last != v_lat)
-			pg_node_update(&ctx->sched_lat, v_lat, true, NULL);
+			node_update(&ctx->sched_lat, v_lat, true, NULL);
 	}
 
 	if (ctx->sched_gran.active) {
 		uint64_t v_gran =
 			pg_math_san_quant_u64(l->max_gran, l->max_gran, q_ns);
 		if (ctx->sched_gran.last != v_gran)
-			pg_node_update(&ctx->sched_gran, v_gran, true, NULL);
+			node_update(&ctx->sched_gran, v_gran, true, NULL);
 	}
 
 	if (ctx->sched_wake.active) {
 		uint64_t v_wake =
 			pg_math_san_quant_u64(l->max_wake, l->max_wake, q_ns);
 		if (ctx->sched_wake.last != v_wake)
-			pg_node_update(&ctx->sched_wake, v_wake, true, NULL);
+			node_update(&ctx->sched_wake, v_wake, true, NULL);
 	}
 
 	if (ctx->sched_mig.active) {
 		uint64_t v_mig =
 			pg_math_san_quant_u64(l->max_mig, l->min_mig, q_ns);
 		if (ctx->sched_mig.last != v_mig)
-			pg_node_update(&ctx->sched_mig, v_mig, true, NULL);
+			node_update(&ctx->sched_mig, v_mig, true, NULL);
 	}
 
 	if (ctx->sched_walt.active) {
 		uint64_t v_wlt = pg_math_san_u64(
 			l->min_walt, (uint64_t)Q16_TO_INT(l->min_walt));
 		if (ctx->sched_walt.last != v_wlt)
-			pg_node_update(&ctx->sched_walt, v_wlt, true, NULL);
+			node_update(&ctx->sched_walt, v_wlt, true, NULL);
 	}
 }
 
@@ -383,13 +410,13 @@ static inline void apply_mapping(struct pg_context *ctx,
 	     (unsigned long long)v_wlt, (unsigned long long)v_ucl,
 	     (unsigned long long)v_ucl_max, ctx->next_wake);
 
-	pg_node_update(&ctx->sched_lat, v_lat, false, &CHK_LAT);
-	pg_node_update(&ctx->sched_gran, v_gran, false, &CHK_GRAN);
-	pg_node_update(&ctx->sched_wake, v_wake, false, &CHK_WAKE);
-	pg_node_update(&ctx->sched_mig, v_mig, false, &CHK_MIG);
-	pg_node_update(&ctx->sched_walt, v_wlt, false, &CHK_WALT);
-	pg_node_update(&ctx->sched_ucl, v_ucl, false, &CHK_UCL);
-	pg_node_update(&ctx->sched_ucl_max, v_ucl_max, false, &CHK_UCL_MAX);
+	node_update(&ctx->sched_lat, v_lat, false, &check_lat);
+	node_update(&ctx->sched_gran, v_gran, false, &check_gran);
+	node_update(&ctx->sched_wake, v_wake, false, &check_wake);
+	node_update(&ctx->sched_mig, v_mig, false, &check_mig);
+	node_update(&ctx->sched_walt, v_wlt, false, &check_walt);
+	node_update(&ctx->sched_ucl, v_ucl, false, &check_ucl);
+	node_update(&ctx->sched_ucl_max, v_ucl_max, false, &check_ucl_max);
 }
 
 static inline void exec_gov_logic(struct pg_context *ctx,

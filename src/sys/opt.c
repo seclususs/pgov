@@ -43,7 +43,7 @@ static int parse_cb(const char *key, const char *val)
 
 	if (pg_str_has_prefix(key, "node.")) {
 		path = key + 5;
-		int ret = pg_node_write(path, val);
+		int ret = node_write(path, val);
 		if (ret != 0)
 			LOGW("opt: failed write node %s err=%d", path, ret);
 
