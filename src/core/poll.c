@@ -97,7 +97,7 @@ uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
 		return MIN_POLL_MS;
 	}
 
-	q16_t pred = cur_press + q16_mul(press_vel, Q16_HALF);
+	q16_t pred = cur_press + math_mul_q16(press_vel, Q16_HALF);
 	uint64_t nxt_ivl = state->cur_ivl;
 
 	if (pred > INT_TO_Q16(5) || press_vel > INT_TO_Q16(2))

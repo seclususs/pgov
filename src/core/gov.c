@@ -87,7 +87,7 @@ static inline void relax_sched_tunables(struct pg_context *ctx)
 		node_update(&ctx->sched_ucl, 0, true, NULL);
 
 	if (ctx->sched_ucl_max.active) {
-		uint64_t v_ucl = pg_math_san_u64(
+		uint64_t v_ucl = math_sanitize_u64(
 			l->susp_ucl_max, (uint64_t)Q16_TO_INT(l->susp_ucl_max));
 		if (ctx->sched_ucl_max.last != v_ucl)
 			node_update(&ctx->sched_ucl_max, v_ucl, true, NULL);
@@ -95,34 +95,34 @@ static inline void relax_sched_tunables(struct pg_context *ctx)
 
 	if (ctx->sched_lat.active) {
 		uint64_t v_lat =
-			pg_math_san_quant_u64(l->max_lat, l->max_lat, q_ns);
+			math_quantize_u64(l->max_lat, l->max_lat, q_ns);
 		if (ctx->sched_lat.last != v_lat)
 			node_update(&ctx->sched_lat, v_lat, true, NULL);
 	}
 
 	if (ctx->sched_gran.active) {
 		uint64_t v_gran =
-			pg_math_san_quant_u64(l->max_gran, l->max_gran, q_ns);
+			math_quantize_u64(l->max_gran, l->max_gran, q_ns);
 		if (ctx->sched_gran.last != v_gran)
 			node_update(&ctx->sched_gran, v_gran, true, NULL);
 	}
 
 	if (ctx->sched_wake.active) {
 		uint64_t v_wake =
-			pg_math_san_quant_u64(l->max_wake, l->max_wake, q_ns);
+			math_quantize_u64(l->max_wake, l->max_wake, q_ns);
 		if (ctx->sched_wake.last != v_wake)
 			node_update(&ctx->sched_wake, v_wake, true, NULL);
 	}
 
 	if (ctx->sched_mig.active) {
 		uint64_t v_mig =
-			pg_math_san_quant_u64(l->max_mig, l->min_mig, q_ns);
+			math_quantize_u64(l->max_mig, l->min_mig, q_ns);
 		if (ctx->sched_mig.last != v_mig)
 			node_update(&ctx->sched_mig, v_mig, true, NULL);
 	}
 
 	if (ctx->sched_walt.active) {
-		uint64_t v_wlt = pg_math_san_u64(
+		uint64_t v_wlt = math_sanitize_u64(
 			l->min_walt, (uint64_t)Q16_TO_INT(l->min_walt));
 		if (ctx->sched_walt.last != v_wlt)
 			node_update(&ctx->sched_walt, v_wlt, true, NULL);
@@ -287,7 +287,7 @@ static inline void calc_demand(struct pg_context *ctx,
 	pg_cpu_upd_eff(eff, ctx->bat_lvl, *th_scl, sample->some.avg300);
 
 	q16_t dt_real = pg_dt_sec(&ctx->last_tick, now);
-	q16_t dt_safe = pg_math_clamp(dt_real, 1, FLOAT_TO_Q16(0.1F));
+	q16_t dt_safe = math_clamp(dt_real, 1, FLOAT_TO_Q16(0.1F));
 	ctx->last_tick = *now;
 
 	q16_t i;
@@ -369,37 +369,40 @@ static inline void apply_mapping(struct pg_context *ctx,
 		lat = pg_cpu_calc_lat(p_eff, l_dem, th, c, eff, l);
 
 		if (ctx->sched_lat.active)
-			v_lat = pg_math_san_quant_u64(lat, l->max_lat, q_ns);
+			v_lat = math_quantize_u64(lat, l->max_lat, q_ns);
 	}
 
 	if (ctx->sched_gran.active) {
 		gran = pg_cpu_calc_gran(lat, c, l);
-		v_gran = pg_math_san_quant_u64(gran, l->max_gran, q_ns);
+		v_gran = math_quantize_u64(gran, l->max_gran, q_ns);
 	}
 
 	if (ctx->sched_wake.active) {
 		wake = pg_cpu_calc_wakeup(p_eff, eff, l);
-		v_wake = pg_math_san_quant_u64(wake, l->max_wake, q_ns);
+		v_wake = math_quantize_u64(wake, l->max_wake, q_ns);
 	}
 
 	if (ctx->sched_mig.active) {
 		mig = pg_cpu_calc_migration(sample->some.velocity, p_eff, l);
-		v_mig = pg_math_san_quant_u64(mig, l->min_mig, q_ns);
+		v_mig = math_quantize_u64(mig, l->min_mig, q_ns);
 	}
 
 	if (ctx->sched_walt.active) {
 		wlt = pg_cpu_calc_walt(p_eff, l);
-		v_wlt = pg_math_san_u64(wlt, (uint64_t)Q16_TO_INT(l->min_walt));
+		v_wlt = math_sanitize_u64(wlt,
+					  (uint64_t)Q16_TO_INT(l->min_walt));
 	}
 
 	if (ctx->sched_ucl_max.active) {
 		ucl_max = pg_cpu_calc_uclamp_max(th_scl, ctx->bat_lvl, l);
-		v_ucl_max = pg_math_san_u64(ucl_max, (uint64_t)UCL_MAX_CEILING);
+		v_ucl_max =
+			math_sanitize_u64(ucl_max, (uint64_t)UCL_MAX_CEILING);
 	}
 
 	if (ctx->sched_ucl.active) {
 		ucl = pg_cpu_calc_uclamp(p_eff, th_scl, c, eff, l);
-		v_ucl = pg_math_san_u64(ucl, (uint64_t)Q16_TO_INT(l->min_ucl));
+		v_ucl = math_sanitize_u64(ucl,
+					  (uint64_t)Q16_TO_INT(l->min_ucl));
 		if (ctx->sched_ucl_max.active && v_ucl > v_ucl_max)
 			v_ucl = v_ucl_max;
 	}
