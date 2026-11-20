@@ -8,7 +8,7 @@
 
 #include "pgov/state.h"
 
-void pg_sweep_run(struct pg_context *ctx);
+void pg_sweep_run(struct context *ctx);
 
 #endif // PGOV_SWEEP_H
 

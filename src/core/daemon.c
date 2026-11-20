@@ -39,7 +39,7 @@
 #define PATH_LOG "/data/vendor/pgovd/pgovd.log"
 #endif
 
-static struct pg_context context;
+static struct context dctx;
 
 static const char *const CAND_LAT[] = {
 	"/proc/sys/kernel/sched_latency_ns",
@@ -104,12 +104,12 @@ static struct {
 
 static size_t rs_cnt;
 
-static void restore_snapshot(const struct pg_context *ctx)
+static void restore_snapshot(const struct context *ctx)
 {
 	const struct node_cache *const c[NR_SINKS] = {
-		&ctx->sched_lat,     &ctx->sched_gran, &ctx->sched_wake,
-		&ctx->sched_mig,     &ctx->sched_walt, &ctx->sched_ucl,
-		&ctx->sched_ucl_max,
+		&ctx->sched_lat,    &ctx->sched_gran, &ctx->sched_wake,
+		&ctx->sched_mig,    &ctx->sched_walt, &ctx->sched_uclmin,
+		&ctx->sched_uclmax,
 	};
 
 	rs_cnt = 0;
@@ -133,15 +133,15 @@ static void crash_restore(void)
 	}
 }
 
-static void restore_all(struct pg_context *ctx)
+static void restore_all(struct context *ctx)
 {
 	node_restore(&ctx->sched_lat);
 	node_restore(&ctx->sched_gran);
 	node_restore(&ctx->sched_wake);
 	node_restore(&ctx->sched_mig);
 	node_restore(&ctx->sched_walt);
-	node_restore(&ctx->sched_ucl);
-	node_restore(&ctx->sched_ucl_max);
+	node_restore(&ctx->sched_uclmin);
+	node_restore(&ctx->sched_uclmax);
 	rs_cnt = 0;
 }
 
@@ -167,42 +167,42 @@ static void init_os_environment(void)
 	task_set_io_priority(IOPRIO_CLASS, IOPRIO_DATA);
 }
 
-static inline void init_context_defaults(struct pg_context *ctx)
+static inline void init_context_defaults(struct context *ctx)
 {
 	ctx->shutdown_req = false;
 	ctx->next_wake = POLL_MIN_MS;
-	ctx->disp_state = DISP_UNKNOWN;
-	ctx->cached_th_scl = Q16_ONE;
-	ctx->load_state.first_run = true;
-	ctx->load_state.psi_val = 0;
-	ctx->load_state.rate = 0;
-	ctx->load_state.prev_integral = 0;
-	ctx->epoll_fd = -1;
-	ctx->sig_fd = -1;
-	ctx->trg_fd = -1;
-	ctx->lock_fd = -1;
-	ctx->psi.fd = -1;
-	ctx->cpu_temp_sensor.fd = -1;
-	ctx->bat_temp_sensor.fd = -1;
-	ctx->bat_cap_sensor.fd = -1;
+	ctx->display_state = DISP_UNKNOWN;
+	ctx->therm_scale = Q16_ONE;
+	ctx->cpu_state.first_run = true;
+	ctx->cpu_state.psi_val = 0;
+	ctx->cpu_state.rate = 0;
+	ctx->cpu_state.prev_integral = 0;
+	ctx->efd = -1;
+	ctx->sfd = -1;
+	ctx->tfd = -1;
+	ctx->lfd = -1;
+	ctx->psi_state.fd = -1;
+	ctx->cpu_temp.fd = -1;
+	ctx->bat_temp.fd = -1;
+	ctx->battery.fd = -1;
 
-	ctx->bl_sensor.count = 0;
+	ctx->backlight.count = 0;
 	for (size_t i = 0; i < SENSOR_BACKLIGHT_MAX; i++)
-		ctx->bl_sensor.fd[i] = -1;
+		ctx->backlight.fd[i] = -1;
 
 	ctx->sched_lat.fd = -1;
 	ctx->sched_gran.fd = -1;
 	ctx->sched_wake.fd = -1;
 	ctx->sched_mig.fd = -1;
 	ctx->sched_walt.fd = -1;
-	ctx->sched_ucl.fd = -1;
-	ctx->sched_ucl_max.fd = -1;
-	ctx->remap_due = true;
+	ctx->sched_uclmin.fd = -1;
+	ctx->sched_uclmax.fd = -1;
+	ctx->remap_pending = true;
 	ctx->on_trigger = NULL;
 	ctx->on_timeout = NULL;
 }
 
-static int init_node_caches(struct pg_context *ctx)
+static int init_node_caches(struct context *ctx)
 {
 	int n = 0;
 
@@ -211,50 +211,50 @@ static int init_node_caches(struct pg_context *ctx)
 	n += node_cache_init(&ctx->sched_wake, CAND_WAKE);
 	n += node_cache_init(&ctx->sched_mig, CAND_MIG);
 	n += node_cache_init(&ctx->sched_walt, CAND_WALT);
-	n += node_cache_init(&ctx->sched_ucl, CAND_UCL);
-	n += node_cache_init(&ctx->sched_ucl_max, CAND_UCL_MAX);
+	n += node_cache_init(&ctx->sched_uclmin, CAND_UCL);
+	n += node_cache_init(&ctx->sched_uclmax, CAND_UCL_MAX);
 
 	return n;
 }
 
-static int init_sensors_and_triggers(struct pg_context *ctx)
+static int init_sensors_and_triggers(struct context *ctx)
 {
 	char t_path[SENSOR_PATH_LEN];
 	sensor_scan_thermal_zone(t_path, sizeof(t_path));
 	LOGD("daemon: cpu thermal sensor mapped to %s", t_path);
-	sensor_init_cpu_temp(&ctx->cpu_temp_sensor, t_path);
+	sensor_init_cpu_temp(&ctx->cpu_temp, t_path);
 
-	sensor_init_battery_temp(&ctx->bat_temp_sensor, CAND_BAT_TEMP);
-	sensor_init_battery(&ctx->bat_cap_sensor, CAND_BAT_CAP);
+	sensor_init_battery_temp(&ctx->bat_temp, CAND_BAT_TEMP);
+	sensor_init_battery(&ctx->battery, CAND_BAT_CAP);
 
 	if (!ctx->dormant) {
-		ctx->trg_fd = psi_trigger_open(PSI_CPU_PATH, PSI_THRESHOLD_US,
-					       PSI_WINDOW_US);
+		ctx->tfd = psi_trigger_open(PSI_CPU_PATH, PSI_THRESHOLD_US,
+					    PSI_WINDOW_US);
 
-		if (ctx->trg_fd < 0) {
-			LOGE("daemon: failed inject err=%d", ctx->trg_fd);
-			return ctx->trg_fd;
+		if (ctx->tfd < 0) {
+			LOGE("daemon: failed inject err=%d", ctx->tfd);
+			return ctx->tfd;
 		}
 	}
 
-	psi_init(&ctx->psi, PSI_CPU_PATH);
+	psi_init(&ctx->psi_state, PSI_CPU_PATH);
 
-	ctx->sig_fd = pg_signal_init();
-	if (ctx->sig_fd < 0)
-		return ctx->sig_fd;
+	ctx->sfd = pg_signal_init();
+	if (ctx->sfd < 0)
+		return ctx->sfd;
 
-	thermal_init(&ctx->thermal_state);
+	thermal_init(&ctx->therm_state);
 	poll_init(&ctx->poll_state);
 
 	char b_path[SENSOR_BACKLIGHT_MAX][SENSOR_PATH_LEN];
 	int n_bl = sensor_scan_backlight(b_path, SENSOR_BACKLIGHT_MAX);
 	for (int i = 0; i < n_bl; i++)
-		sensor_init_backlight(&ctx->bl_sensor, b_path[i]);
+		sensor_init_backlight(&ctx->backlight, b_path[i]);
 
 	return 0;
 }
 
-static void cleanup_context(struct pg_context *ctx)
+static void cleanup_context(struct context *ctx)
 {
 	restore_all(ctx);
 
@@ -262,38 +262,38 @@ static void cleanup_context(struct pg_context *ctx)
 	pg_opt_exit();
 #endif // NDK_BUILD
 
-	if (ctx->trg_fd >= 0)
-		psi_trigger_close(ctx->trg_fd);
+	if (ctx->tfd >= 0)
+		psi_trigger_close(ctx->tfd);
 
-	if (ctx->sig_fd >= 0)
-		pg_signal_close(ctx->sig_fd);
+	if (ctx->sfd >= 0)
+		pg_signal_close(ctx->sfd);
 
-	pg_lockfile_close(ctx->lock_fd);
-	psi_cleanup(&ctx->psi);
-	sensor_close_temp(&ctx->cpu_temp_sensor);
-	sensor_close_temp(&ctx->bat_temp_sensor);
-	sensor_close_battery(&ctx->bat_cap_sensor);
-	sensor_close_backlight(&ctx->bl_sensor);
+	pg_lockfile_close(ctx->lfd);
+	psi_cleanup(&ctx->psi_state);
+	sensor_close_temp(&ctx->cpu_temp);
+	sensor_close_temp(&ctx->bat_temp);
+	sensor_close_battery(&ctx->battery);
+	sensor_close_backlight(&ctx->backlight);
 	node_cache_cleanup(&ctx->sched_lat);
 	node_cache_cleanup(&ctx->sched_gran);
 	node_cache_cleanup(&ctx->sched_wake);
 	node_cache_cleanup(&ctx->sched_mig);
 	node_cache_cleanup(&ctx->sched_walt);
-	node_cache_cleanup(&ctx->sched_ucl);
-	node_cache_cleanup(&ctx->sched_ucl_max);
+	node_cache_cleanup(&ctx->sched_uclmin);
+	node_cache_cleanup(&ctx->sched_uclmax);
 }
 
 int pg_daemon_init(void)
 {
 	int ret = 0;
 
-	init_context_defaults(&context);
+	init_context_defaults(&dctx);
 	init_os_environment();
 	LOGI("daemon: initiating daemon sequence");
 
-	context.lock_fd = pg_lockfile_init(PATH_LOCK);
-	if (context.lock_fd < 0) {
-		ret = context.lock_fd;
+	dctx.lfd = pg_lockfile_init(PATH_LOCK);
+	if (dctx.lfd < 0) {
+		ret = dctx.lfd;
 		goto cleanup;
 	}
 
@@ -304,11 +304,11 @@ int pg_daemon_init(void)
 	}
 
 	LOGD("daemon: mapping cache nodes");
-	if (init_node_caches(&context) == 0) {
+	if (init_node_caches(&dctx) == 0) {
 		LOGW("daemon: no node is writable on this kernel, gov goes dormant");
-		context.dormant = true;
+		dctx.dormant = true;
 	}
-	restore_snapshot(&context);
+	restore_snapshot(&dctx);
 
 	if (!psi_available()) {
 		ret = -ENODEV;
@@ -319,7 +319,7 @@ int pg_daemon_init(void)
 	pg_tune_limits();
 	pg_tune_configs();
 
-	ret = init_sensors_and_triggers(&context);
+	ret = init_sensors_and_triggers(&dctx);
 	if (ret != 0)
 		goto cleanup;
 
@@ -327,25 +327,25 @@ int pg_daemon_init(void)
 	pg_opt_init();
 #endif // NDK_BUILD
 
-	clock_gettime(CLOCK_MONOTONIC, &context.last_bat);
-	clock_gettime(CLOCK_MONOTONIC, &context.last_therm);
+	clock_gettime(CLOCK_MONOTONIC, &dctx.last_bat);
+	clock_gettime(CLOCK_MONOTONIC, &dctx.last_therm);
 
 #ifdef NDK_BUILD
-	clock_gettime(CLOCK_MONOTONIC, &context.last_sweep);
+	clock_gettime(CLOCK_MONOTONIC, &dctx.last_sweep);
 #endif // NDK_BUILD
 
-	sensor_read_battery_capacity(&context.bat_cap_sensor, &context.bat_lvl);
-	sensor_read_battery_temp(&context.bat_temp_sensor, &context.bat_temp);
+	sensor_read_battery_capacity(&dctx.battery, &dctx.level_bat);
+	sensor_read_battery_temp(&dctx.bat_temp, &dctx.temp_bat);
 
-	pg_gov_init(&context);
-	context.on_trigger = pg_gov_process;
-	context.on_timeout = pg_gov_process;
+	pg_gov_init(&dctx);
+	dctx.on_trigger = pg_gov_process;
+	dctx.on_timeout = pg_gov_process;
 	LOGI("daemon: entering epoll reactor loop");
-	ret = pg_epoll_run(&context);
+	ret = pg_epoll_run(&dctx);
 
 	LOGI("daemon: reactor shutdown cleanly status=%d", ret);
 
 cleanup:
-	cleanup_context(&context);
+	cleanup_context(&dctx);
 	return ret;
 }

@@ -15,7 +15,7 @@
 
 #define MAX_EVENTS 16
 
-static inline void epoll_error(struct pg_context *ctx,
+static inline void epoll_error(struct context *ctx,
 			       const struct timespec *wait_start)
 {
 	if (errno == EINTR) {
@@ -37,89 +37,89 @@ static inline void epoll_error(struct pg_context *ctx,
 	}
 }
 
-static inline void handle_signal_event(struct pg_context *ctx)
+static inline void handle_signal_event(struct context *ctx)
 {
 	struct signalfd_siginfo s_info;
 	ssize_t s;
 
 	do {
-		s = read(ctx->sig_fd, &s_info, sizeof(s_info));
+		s = read(ctx->sfd, &s_info, sizeof(s_info));
 	} while (s < 0 && errno == EINTR);
 
 	if (s == sizeof(s_info))
 		ctx->shutdown_req = true;
 }
 
-static inline void handle_trigger_event(struct pg_context *ctx)
+static inline void handle_trigger_event(struct context *ctx)
 {
 	if (LIKELY(ctx->on_trigger != NULL && !ctx->shutdown_req))
 		ctx->on_trigger(ctx);
 }
 
-static inline void epoll_events(struct pg_context *ctx,
-				struct epoll_event *events, int nfds)
+static inline void epoll_events(struct context *ctx, struct epoll_event *events,
+				int nfds)
 {
 	for (int i = 0; i < nfds; ++i) {
 		int ev_fd = events[i].data.fd;
 
-		if (ev_fd == ctx->sig_fd)
+		if (ev_fd == ctx->sfd)
 			handle_signal_event(ctx);
 
-		else if (ev_fd == ctx->trg_fd)
+		else if (ev_fd == ctx->tfd)
 			handle_trigger_event(ctx);
 	}
 }
 
-int pg_epoll_add_trg(struct pg_context *ctx)
+int pg_epoll_add_trg(struct context *ctx)
 {
 	if (UNLIKELY(!ctx))
 		return -EINVAL;
 
-	if (ctx->trg_fd < 0 || ctx->epoll_fd < 0)
+	if (ctx->tfd < 0 || ctx->efd < 0)
 		return -EBADF;
 
 	struct epoll_event ev_trg = { 0 };
 	ev_trg.events = EPOLLPRI | EPOLLERR | EPOLLET;
-	ev_trg.data.fd = ctx->trg_fd;
+	ev_trg.data.fd = ctx->tfd;
 
-	if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->trg_fd, &ev_trg) < 0)
+	if (epoll_ctl(ctx->efd, EPOLL_CTL_ADD, ctx->tfd, &ev_trg) < 0)
 		return -errno;
 
 	return 0;
 }
 
-void pg_epoll_rm_trg(struct pg_context *ctx)
+void pg_epoll_rm_trg(struct context *ctx)
 {
 	if (UNLIKELY(!ctx))
 		return;
 
-	if (ctx->trg_fd >= 0 && ctx->epoll_fd >= 0)
-		epoll_ctl(ctx->epoll_fd, EPOLL_CTL_DEL, ctx->trg_fd, NULL);
+	if (ctx->tfd >= 0 && ctx->efd >= 0)
+		epoll_ctl(ctx->efd, EPOLL_CTL_DEL, ctx->tfd, NULL);
 }
 
-static int epoll_setup(struct pg_context *ctx)
+static int epoll_setup(struct context *ctx)
 {
-	ctx->epoll_fd = epoll_create1(EPOLL_CLOEXEC);
-	if (ctx->epoll_fd < 0)
+	ctx->efd = epoll_create1(EPOLL_CLOEXEC);
+	if (ctx->efd < 0)
 		return -errno;
 
 	struct epoll_event ev_sig = { 0 };
 	ev_sig.events = EPOLLIN | EPOLLERR;
-	ev_sig.data.fd = ctx->sig_fd;
-	if (epoll_ctl(ctx->epoll_fd, EPOLL_CTL_ADD, ctx->sig_fd, &ev_sig) < 0) {
+	ev_sig.data.fd = ctx->sfd;
+	if (epoll_ctl(ctx->efd, EPOLL_CTL_ADD, ctx->sfd, &ev_sig) < 0) {
 		int ret = -errno;
-		LOGE("epoll: failed to register sig_fd err=%d", -ret);
-		close(ctx->epoll_fd);
-		ctx->epoll_fd = -1;
+		LOGE("epoll: failed to register sfd err=%d", -ret);
+		close(ctx->efd);
+		ctx->efd = -1;
 		return ret;
 	}
 
-	if (ctx->trg_fd >= 0) {
+	if (ctx->tfd >= 0) {
 		int ret = pg_epoll_add_trg(ctx);
 		if (ret < 0) {
-			LOGE("epoll: failed to register trg_fd err=%d", -ret);
-			close(ctx->epoll_fd);
-			ctx->epoll_fd = -1;
+			LOGE("epoll: failed to register tfd err=%d", -ret);
+			close(ctx->efd);
+			ctx->efd = -1;
 			return ret;
 		}
 	}
@@ -127,7 +127,7 @@ static int epoll_setup(struct pg_context *ctx)
 	return 0;
 }
 
-int pg_epoll_run(struct pg_context *ctx)
+int pg_epoll_run(struct context *ctx)
 {
 	if (UNLIKELY(!ctx))
 		return -EINVAL;
@@ -142,7 +142,7 @@ int pg_epoll_run(struct pg_context *ctx)
 		struct timespec wait_start;
 		clock_gettime(CLOCK_MONOTONIC, &wait_start);
 
-		int nfds = epoll_wait(ctx->epoll_fd, events, MAX_EVENTS,
+		int nfds = epoll_wait(ctx->efd, events, MAX_EVENTS,
 				      ctx->next_wake);
 
 		if (UNLIKELY(nfds < 0)) {
@@ -160,7 +160,7 @@ int pg_epoll_run(struct pg_context *ctx)
 		epoll_events(ctx, events, nfds);
 	}
 
-	close(ctx->epoll_fd);
-	ctx->epoll_fd = -1;
+	close(ctx->efd);
+	ctx->efd = -1;
 	return 0;
 }

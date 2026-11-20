@@ -6,8 +6,8 @@
 
 #include "pgov/state.h"
 
-int pg_epoll_add_trg(struct pg_context *ctx);
-void pg_epoll_rm_trg(struct pg_context *ctx);
+int pg_epoll_add_trg(struct context *ctx);
+void pg_epoll_rm_trg(struct context *ctx);
 
 /**
  * @brief Starts the blocking event reactor loop, dispatching events to context callbacks.
@@ -24,6 +24,6 @@ void pg_epoll_rm_trg(struct pg_context *ctx);
  *
  * @return 0 on a clean shutdown, or a negative POSIX error code if epoll creation fails.
  */
-int pg_epoll_run(struct pg_context *ctx);
+int pg_epoll_run(struct context *ctx);
 
 #endif // PGOV_EPOLL_H

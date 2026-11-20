@@ -14,10 +14,10 @@
 #include <stdbool.h>
 #include <time.h>
 
-struct pg_context;
-typedef void (*pg_event_cb)(struct pg_context *ctx);
+struct context;
+typedef void (*event_callback)(struct context *ctx);
 
-enum pg_disp_state {
+enum display_state {
 	DISP_UNKNOWN = 0,
 	DISP_ON,
 	DISP_GRACE,
@@ -36,54 +36,54 @@ enum pg_disp_state {
  *       - The lifecycle of this object spans the entire daemon execution; it must remain 
  *         valid and strictly mutated by a single event-reactor thread.
  */
-struct ALIGNED(64) pg_context {
-	struct psi_state psi;
-	struct sensor_temp cpu_temp_sensor;
-	struct sensor_temp bat_temp_sensor;
-	struct sensor_battery bat_cap_sensor;
-	struct sensor_backlight bl_sensor;
+struct ALIGNED(64) context {
+	struct psi_state psi_state;
+	struct cpu_state cpu_state;
+	struct poll_state poll_state;
+	struct thermal_state therm_state;
+	struct sensor_temp cpu_temp;
+	struct sensor_temp bat_temp;
+	struct sensor_battery battery;
+	struct sensor_backlight backlight;
 	struct node_cache sched_lat;
 	struct node_cache sched_gran;
 	struct node_cache sched_wake;
 	struct node_cache sched_mig;
 	struct node_cache sched_walt;
-	struct node_cache sched_ucl;
-	struct node_cache sched_ucl_max;
-	struct thermal_state thermal_state;
-	struct cpu_state load_state;
-	struct poll_state poll_state;
+	struct node_cache sched_uclmin;
+	struct node_cache sched_uclmax;
 
-	enum pg_disp_state disp_state;
+	enum display_state display_state;
 
-	q16_t bat_lvl;
-	q16_t bat_temp;
-	q16_t cached_th_scl;
+	q16_t level_bat;
+	q16_t temp_bat;
+	q16_t therm_scale;
 
 	struct timespec last_bat;
 	struct timespec last_therm;
 	struct timespec last_tick;
-	struct timespec last_dispoff;
+	struct timespec last_off;
 	struct timespec last_disp;
 
 #ifdef NDK_BUILD
 	struct timespec last_sweep;
 #endif // NDK_BUILD
 
-	int epoll_fd;
-	int sig_fd;
-	int trg_fd;
-	int lock_fd;
+	int efd;
+	int sfd;
+	int tfd;
+	int lfd;
 	int next_wake;
 
 	uint8_t psi_fails;
 	uint8_t temp_fails;
 
-	bool remap_due;
+	bool remap_pending;
 	bool dormant;
 	volatile bool shutdown_req;
 
-	pg_event_cb on_trigger;
-	pg_event_cb on_timeout;
+	event_callback on_trigger;
+	event_callback on_timeout;
 };
 
 #endif // PGOV_STATE_H

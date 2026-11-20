@@ -20,7 +20,7 @@
 #include <unistd.h>
 
 struct sweep_ctx {
-	struct pg_context *pg_ctx;
+	struct context *ctx;
 	uint64_t now_sec;
 	int nr_files;
 	bool intr;
@@ -79,7 +79,7 @@ static bool sweep_chk_intr(struct sweep_ctx *sctx)
 		return false;
 
 	int32_t bl = 0;
-	sensor_read_backlight(&sctx->pg_ctx->bl_sensor, &bl);
+	sensor_read_backlight(&sctx->ctx->backlight, &bl);
 	if (bl > 0) {
 		sctx->intr = true;
 		return true;
@@ -200,10 +200,10 @@ static void sweep_app_data(int root_fd, struct sweep_ctx *sctx)
 	}
 }
 
-void pg_sweep_run(struct pg_context *ctx)
+void pg_sweep_run(struct context *ctx)
 {
 	struct sweep_ctx sctx = { 0 };
-	sctx.pg_ctx = ctx;
+	sctx.ctx = ctx;
 	sctx.intr = false;
 	sctx.nr_files = INTR_MASK;
 

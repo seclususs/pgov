@@ -6,13 +6,13 @@
 
 #include "pgov/state.h"
 
-int pg_gov_init(struct pg_context *ctx);
+int pg_gov_init(struct context *ctx);
 
 /**
  * @brief Executes a single iteration of the governor's control loop.
  *
  * @pre The context `ctx` must have been successfully initialized via pg_gov_init().
- *      The PSI trigger descriptor (`ctx->trg_fd`) may be absent: a dormant governor
+ *      The PSI trigger descriptor (`ctx->trigger_fd`) may be absent: a dormant governor
  *      never registers one, and an active governor re-arms a lost one on its own.
  *
  * @param ctx Mutable reference to the global governor state machine.
@@ -30,6 +30,6 @@ int pg_gov_init(struct pg_context *ctx);
  * @warning This function is strictly designed for a single-threaded execution context.
  *          Concurrent invocation leads to undefined behavior and race conditions.
  */
-void pg_gov_process(struct pg_context *ctx);
+void pg_gov_process(struct context *ctx);
 
 #endif // PGOV_GOV_H
