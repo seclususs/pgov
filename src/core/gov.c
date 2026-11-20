@@ -2,7 +2,7 @@
 // Copyright (C) 2026 seclususs
 
 #include "pgov/gov.h"
-#include "pgov/config.h"
+#include "pgov/param.h"
 #include "pgov/log.h"
 #include "pgov/epoll.h"
 #include "pgov/compiler.h"
@@ -53,7 +53,7 @@ int pg_gov_init(struct pg_context *ctx)
 
 static inline void relax_sched_tunables(struct pg_context *ctx)
 {
-	const struct pg_cpu_lim *l = &LIM_CPU;
+	const struct pg_cpu_lim *l = &param_sched;
 	const uint64_t q_ns = QUANT_NS;
 
 	if (ctx->sched_ucl.active && ctx->sched_ucl.last != 0)
@@ -239,7 +239,7 @@ static inline void poll_thermal_metrics(struct pg_context *ctx,
 	if (LIKELY(!hold))
 		ctx->cached_th_scl = pg_thermal_update(&ctx->thermal_state,
 						       cpu_temp, ctx->bat_temp,
-						       &CFG_THERMAL, now);
+						       &param_thermal, now);
 
 	ctx->last_therm = *now;
 	ctx->remap_due = true;
@@ -280,14 +280,14 @@ static inline void calc_demand(struct pg_context *ctx,
 		.struct_break = s_break,
 	};
 
-	*l_dem = pg_cpu_calc_load_demand(&ctx->load_state, &d_in, &CFG_CPU);
+	*l_dem = pg_cpu_calc_load_demand(&ctx->load_state, &d_in, &param_cpu);
 	*p_eff = pg_cpu_calc_eff_press(*l_dem, t_fact, eff);
 }
 
 static inline bool gov_gate(struct pg_context *ctx,
 			    const struct psi_sample *sample, q16_t p_eff)
 {
-	const struct pg_cpu_cfg *c = &CFG_CPU;
+	const struct pg_cpu_cfg *c = &param_cpu;
 	int32_t n_poll;
 	int32_t t_poll;
 
@@ -315,8 +315,8 @@ static inline void apply_mapping(struct pg_context *ctx,
 				 const struct psi_sample *sample, q16_t th_scl,
 				 q16_t l_dem, q16_t p_eff)
 {
-	const struct pg_cpu_cfg *c = &CFG_CPU;
-	const struct pg_cpu_lim *l = &LIM_CPU;
+	const struct pg_cpu_cfg *c = &param_cpu;
+	const struct pg_cpu_lim *l = &param_sched;
 	const uint64_t q_ns = QUANT_NS;
 	struct pg_cpu_eff *eff = &ctx->load_state.eff;
 

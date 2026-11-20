@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: GPL-3.0-only
 // Copyright (C) 2026 seclususs
 
-#include "pgov/config.h"
+#include "pgov/param.h"
 #include "pgov/math.h"
 
-struct pg_cpu_lim LIM_CPU = {
+struct pg_cpu_lim param_sched = {
 	.min_lat = FLOAT_TO_Q16(8.0F),
 	.max_lat = FLOAT_TO_Q16(20.0F),
 	.min_gran = FLOAT_TO_Q16(2.5F),
@@ -21,7 +21,7 @@ struct pg_cpu_lim LIM_CPU = {
 	.susp_ucl_max = FLOAT_TO_Q16(384.0F),
 };
 
-struct pg_cpu_cfg CFG_CPU = {
+struct pg_cpu_cfg param_cpu = {
 	.lat_gran_rat = FLOAT_TO_Q16(0.34F),
 	.uclamp_k = FLOAT_TO_Q16(0.185F),
 	.sigmoid_k = FLOAT_TO_Q16(0.072F),
@@ -31,7 +31,7 @@ struct pg_cpu_cfg CFG_CPU = {
 	.trans_poll = INT_TO_Q16(50),
 };
 
-struct pg_thermal_cfg CFG_THERMAL = {
+struct pg_thermal_cfg param_thermal = {
 	.limit_cpu = FLOAT_TO_Q16(52.5F),
 	.limit_bat = FLOAT_TO_Q16(40.5F),
 	.kp_base = FLOAT_TO_Q16(0.61F),

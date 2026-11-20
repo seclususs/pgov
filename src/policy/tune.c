@@ -2,7 +2,7 @@
 // Copyright (C) 2026 seclususs
 
 #include "pgov/tune.h"
-#include "pgov/config.h"
+#include "pgov/param.h"
 #include "pgov/topo.h"
 #include "pgov/sensor.h"
 
@@ -32,47 +32,47 @@ void pg_tune_limits(void)
 	q16_t val;
 
 	val = pg_math_lerp(FLOAT_TO_Q16(384.0F), FLOAT_TO_Q16(1024.0F), cap);
-	LIM_CPU.max_ucl =
+	param_sched.max_ucl =
 		pg_math_clamp(val, FLOAT_TO_Q16(384.0F), FLOAT_TO_Q16(1024.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(448.0F), FLOAT_TO_Q16(640.0F), cap);
-	LIM_CPU.min_ucl_max =
+	param_sched.min_ucl_max =
 		pg_math_clamp(val, FLOAT_TO_Q16(448.0F), FLOAT_TO_Q16(640.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(320.0F), FLOAT_TO_Q16(448.0F), cap);
-	LIM_CPU.susp_ucl_max =
+	param_sched.susp_ucl_max =
 		pg_math_clamp(val, FLOAT_TO_Q16(320.0F), FLOAT_TO_Q16(448.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(20.0F), FLOAT_TO_Q16(4.0F), cap);
-	LIM_CPU.min_lat =
+	param_sched.min_lat =
 		pg_math_clamp(val, FLOAT_TO_Q16(4.0F), FLOAT_TO_Q16(20.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(25.0F), FLOAT_TO_Q16(12.0F), cap);
-	LIM_CPU.max_lat =
+	param_sched.max_lat =
 		pg_math_clamp(val, FLOAT_TO_Q16(12.0F), FLOAT_TO_Q16(25.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(6.5F), FLOAT_TO_Q16(1.5F), cap);
-	LIM_CPU.min_gran =
+	param_sched.min_gran =
 		pg_math_clamp(val, FLOAT_TO_Q16(1.5F), FLOAT_TO_Q16(6.5F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(10.0F), FLOAT_TO_Q16(4.0F), cap);
-	LIM_CPU.max_gran =
+	param_sched.max_gran =
 		pg_math_clamp(val, FLOAT_TO_Q16(4.0F), FLOAT_TO_Q16(10.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(3.0F), FLOAT_TO_Q16(1.0F), cap);
-	LIM_CPU.min_wake =
+	param_sched.min_wake =
 		pg_math_clamp(val, FLOAT_TO_Q16(1.0F), FLOAT_TO_Q16(3.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(8.0F), FLOAT_TO_Q16(4.0F), cap);
-	LIM_CPU.max_wake =
+	param_sched.max_wake =
 		pg_math_clamp(val, FLOAT_TO_Q16(4.0F), FLOAT_TO_Q16(8.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.6F), FLOAT_TO_Q16(0.2F), cap);
-	LIM_CPU.min_mig =
+	param_sched.min_mig =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.2F), FLOAT_TO_Q16(0.6F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(1.2F), FLOAT_TO_Q16(0.6F), cap);
-	LIM_CPU.max_mig =
+	param_sched.max_mig =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.6F), FLOAT_TO_Q16(1.2F));
 }
 
@@ -114,27 +114,27 @@ static void tune_cpu_configs(q16_t rel, q16_t rat)
 	q16_t val;
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.50F), FLOAT_TO_Q16(0.20F), rel);
-	CFG_CPU.lat_gran_rat =
+	param_cpu.lat_gran_rat =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.20F), FLOAT_TO_Q16(0.50F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.12F), FLOAT_TO_Q16(0.25F), rat);
-	CFG_CPU.uclamp_k =
+	param_cpu.uclamp_k =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.12F), FLOAT_TO_Q16(0.25F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.04F), FLOAT_TO_Q16(0.12F), rat);
-	CFG_CPU.sigmoid_k =
+	param_cpu.sigmoid_k =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.04F), FLOAT_TO_Q16(0.12F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(12.0F), FLOAT_TO_Q16(25.0F), rel);
-	CFG_CPU.surge_thresh =
+	param_cpu.surge_thresh =
 		pg_math_clamp(val, FLOAT_TO_Q16(12.0F), FLOAT_TO_Q16(25.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.08F), FLOAT_TO_Q16(0.20F), rel);
-	CFG_CPU.trans_rate =
+	param_cpu.trans_rate =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.08F), FLOAT_TO_Q16(0.20F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.40F), FLOAT_TO_Q16(0.90F), rel);
-	CFG_CPU.trans_diff =
+	param_cpu.trans_diff =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.40F), FLOAT_TO_Q16(0.90F));
 }
 
@@ -142,23 +142,23 @@ static void tune_thermal_configs(q16_t therm)
 {
 	q16_t trip = sensor_get_trip_temp(FLOAT_TO_Q16(57.5F));
 	q16_t val = trip - INT_TO_Q16(5);
-	CFG_THERMAL.limit_cpu =
+	param_thermal.limit_cpu =
 		pg_math_clamp(val, FLOAT_TO_Q16(45.0F), FLOAT_TO_Q16(90.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(42.0F), FLOAT_TO_Q16(38.0F), therm);
-	CFG_THERMAL.limit_bat =
+	param_thermal.limit_bat =
 		pg_math_clamp(val, FLOAT_TO_Q16(38.0F), FLOAT_TO_Q16(42.0F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.005F), FLOAT_TO_Q16(0.015F), therm);
-	CFG_THERMAL.ki_base =
+	param_thermal.ki_base =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.005F), FLOAT_TO_Q16(0.015F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.45F), FLOAT_TO_Q16(0.90F), therm);
-	CFG_THERMAL.kp_base =
+	param_thermal.kp_base =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.45F), FLOAT_TO_Q16(0.90F));
 
 	val = pg_math_lerp(FLOAT_TO_Q16(0.60F), FLOAT_TO_Q16(1.30F), therm);
-	CFG_THERMAL.kd_base =
+	param_thermal.kd_base =
 		pg_math_clamp(val, FLOAT_TO_Q16(0.60F), FLOAT_TO_Q16(1.30F));
 }
 
