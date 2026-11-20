@@ -31,7 +31,7 @@ struct cpu_param param_cpu = {
 	.trans_poll = INT_TO_Q16(50),
 };
 
-struct pg_thermal_cfg param_thermal = {
+struct thermal_param param_thermal = {
 	.limit_cpu = FLOAT_TO_Q16(52.5F),
 	.limit_bat = FLOAT_TO_Q16(40.5F),
 	.kp_base = FLOAT_TO_Q16(0.61F),

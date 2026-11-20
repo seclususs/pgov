@@ -9,6 +9,6 @@
 
 extern struct cpu_limit param_sched;
 extern struct cpu_param param_cpu;
-extern struct pg_thermal_cfg param_thermal;
+extern struct thermal_param param_thermal;
 
 #endif // PGOV_PARAM_H

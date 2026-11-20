@@ -4,68 +4,95 @@
 #include "pgov/thermal.h"
 #include "pgov/time.h"
 
-#define THERM_STALE_SEC 30
+#define STALE_SEC 30
 
-static void thermal_filter_reset(struct pg_thermal_state *state)
+static void reset_filter(struct thermal_state *state)
 {
 	pg_kalman_init(&state->filter);
 	state->filter.q_vel = FLOAT_TO_Q16(0.01F);
 }
 
-void pg_thermal_init(struct pg_thermal_state *state)
+void thermal_init(struct thermal_state *state)
 {
+	if (UNLIKELY(!state))
+		return;
+
 	clock_gettime(CLOCK_MONOTONIC, &state->last_tick);
-	state->integ = 0;
+	state->integral = 0;
 	state->prev_sat = 0;
 	state->sat_count = 0;
-	thermal_filter_reset(state);
+	reset_filter(state);
 }
 
-q16_t pg_thermal_update(struct pg_thermal_state *state, q16_t cpu_temp,
-			q16_t bat_temp, const struct pg_thermal_cfg *cfg,
-			const struct timespec *now)
+q16_t thermal_update(struct thermal_state *state, q16_t cpu_temp,
+		     q16_t bat_temp, const struct thermal_param *param,
+		     const struct timespec *now)
 {
-	q16_t dt = pg_dt_sec(&state->last_tick, now);
-	q16_t dt_s = math_clamp(dt, FLOAT_TO_Q16(0.01F), Q16_ONE);
+	q16_t aw_boost;
+	q16_t aw_gain;
+	q16_t bat_margin;
+	q16_t cpu_margin;
+	q16_t dist;
+	q16_t drain;
+	q16_t dt;
+	q16_t dt_safe;
+	q16_t err;
+	q16_t excess;
+	q16_t kd;
+	q16_t kd_boost;
+	q16_t ki;
+	q16_t kp;
+	q16_t scale;
+	q16_t setpoint;
+	q16_t temp;
+	q16_t u_raw;
+	q16_t u_sat;
+	q16_t vel;
+
+	if (UNLIKELY(!state || !param || !now))
+		return Q16_ONE;
+
+	dt = pg_dt_sec(&state->last_tick, now);
+	dt_safe = math_clamp(dt, FLOAT_TO_Q16(0.01F), Q16_ONE);
 	state->last_tick = *now;
 
-	q16_t b_marg = cfg->limit_bat - bat_temp;
-	if (b_marg < 0)
-		b_marg = 0;
+	bat_margin = param->limit_bat - bat_temp;
+	if (bat_margin < 0)
+		bat_margin = 0;
 
-	q16_t c_marg = (b_marg < INT_TO_Q16(5)) ? (INT_TO_Q16(5) - b_marg) : 0;
-	q16_t sp = cfg->limit_cpu - c_marg;
+	cpu_margin =
+		(bat_margin < INT_TO_Q16(5)) ? (INT_TO_Q16(5) - bat_margin) : 0;
+	setpoint = param->limit_cpu - cpu_margin;
 
-	if (UNLIKELY(dt > INT_TO_Q16(THERM_STALE_SEC))) {
-		thermal_filter_reset(state);
+	if (UNLIKELY(dt > INT_TO_Q16(STALE_SEC))) {
+		reset_filter(state);
 
 		state->prev_sat = 0;
 		state->sat_count = 0;
 
-		if (cpu_temp < sp)
-			state->integ = 0;
+		if (cpu_temp < setpoint)
+			state->integral = 0;
 	}
 
-	q16_t tmp = pg_kalman_update(&state->filter, cpu_temp, dt_s);
-	q16_t vel = state->filter.x_vel;
-	q16_t err = tmp - sp;
+	temp = pg_kalman_update(&state->filter, cpu_temp, dt_safe);
+	vel = state->filter.x_vel;
+	err = temp - setpoint;
 
-	q16_t t_dist = sp - tmp;
-	if (t_dist < FLOAT_TO_Q16(0.1F))
-		t_dist = FLOAT_TO_Q16(0.1F);
+	dist = setpoint - temp;
+	if (dist < FLOAT_TO_Q16(0.1F))
+		dist = FLOAT_TO_Q16(0.1F);
 
-	q16_t k_p = cfg->kp_base + math_div_q16(cfg->kp_base, t_dist);
-	q16_t k_i = cfg->ki_base + math_div_q16(cfg->ki_base, t_dist);
-	q16_t v_bst = (vel > 0) ? math_mul_q16(FLOAT_TO_Q16(2.0F), vel) : 0;
-	q16_t k_d = cfg->kd_base + v_bst;
+	kp = param->kp_base + math_div_q16(param->kp_base, dist);
+	ki = param->ki_base + math_div_q16(param->ki_base, dist);
+	kd_boost = (vel > 0) ? math_mul_q16(FLOAT_TO_Q16(2.0F), vel) : 0;
+	kd = param->kd_base + kd_boost;
 
-	state->integ += math_mul_q16(math_mul_q16(k_i, err), dt_s);
-	state->integ =
-		math_clamp(state->integ, INT_TO_Q16(-50), INT_TO_Q16(50));
+	state->integral += math_mul_q16(math_mul_q16(ki, err), dt_safe);
+	state->integral =
+		math_clamp(state->integral, INT_TO_Q16(-50), INT_TO_Q16(50));
 
-	q16_t u_raw =
-		math_mul_q16(k_p, err) + state->integ + math_mul_q16(k_d, vel);
-	q16_t u_sat = math_clamp(u_raw, 0, INT_TO_Q16(100));
+	u_raw = math_mul_q16(kp, err) + state->integral + math_mul_q16(kd, vel);
+	u_sat = math_clamp(u_raw, 0, INT_TO_Q16(100));
 
 	if (state->prev_sat >= INT_TO_Q16(100)) {
 		if (state->sat_count < 50)
@@ -74,30 +101,31 @@ q16_t pg_thermal_update(struct pg_thermal_state *state, q16_t cpu_temp,
 		state->sat_count = 0;
 	}
 
-	q16_t aw_k = FLOAT_TO_Q16(1.95F);
+	aw_gain = FLOAT_TO_Q16(1.95F);
 	if (state->sat_count > 0) {
-		q16_t aw_bst = math_mul_q16(FLOAT_TO_Q16(0.1F),
-					    INT_TO_Q16(state->sat_count));
-		aw_k += aw_bst;
+		aw_boost = math_mul_q16(FLOAT_TO_Q16(0.1F),
+					INT_TO_Q16(state->sat_count));
+
+		aw_gain += aw_boost;
 	}
 
 	if (math_abs_q16(u_raw - u_sat) > 65) {
-		q16_t exc = u_raw - u_sat;
-		q16_t drain = math_mul_q16(math_mul_q16(exc, aw_k), dt_s);
+		excess = u_raw - u_sat;
+		drain = math_mul_q16(math_mul_q16(excess, aw_gain), dt_safe);
 
-		if ((state->integ > 0 && drain > state->integ) ||
-		    (state->integ < 0 && drain < state->integ))
-			state->integ = 0;
+		if ((state->integral > 0 && drain > state->integral) ||
+		    (state->integral < 0 && drain < state->integral))
+			state->integral = 0;
 		else
-			state->integ -= drain;
+			state->integral -= drain;
 	}
 
 	state->prev_sat = u_sat;
-	q16_t fscale = Q16_ONE - math_div_q16(u_sat, INT_TO_Q16(100));
+	scale = Q16_ONE - math_div_q16(u_sat, INT_TO_Q16(100));
 
-	if (UNLIKELY(bat_temp >= cfg->limit_bat))
-		return math_clamp(fscale, FLOAT_TO_Q16(0.1F),
+	if (UNLIKELY(bat_temp >= param->limit_bat))
+		return math_clamp(scale, FLOAT_TO_Q16(0.1F),
 				  FLOAT_TO_Q16(0.2F));
 
-	return math_clamp(fscale, FLOAT_TO_Q16(0.1F), Q16_ONE);
+	return math_clamp(scale, FLOAT_TO_Q16(0.1F), Q16_ONE);
 }

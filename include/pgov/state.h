@@ -49,7 +49,7 @@ struct ALIGNED(64) pg_context {
 	struct node_cache sched_walt;
 	struct node_cache sched_ucl;
 	struct node_cache sched_ucl_max;
-	struct pg_thermal_state thermal_state;
+	struct thermal_state thermal_state;
 	struct cpu_state load_state;
 	struct pg_poll_state poll_state;
 

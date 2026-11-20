@@ -264,9 +264,9 @@ static inline void poll_thermal_metrics(struct pg_context *ctx,
 	}
 
 	if (LIKELY(!hold))
-		ctx->cached_th_scl = pg_thermal_update(&ctx->thermal_state,
-						       cpu_temp, ctx->bat_temp,
-						       &param_thermal, now);
+		ctx->cached_th_scl = thermal_update(&ctx->thermal_state,
+						    cpu_temp, ctx->bat_temp,
+						    &param_thermal, now);
 
 	ctx->last_therm = *now;
 	ctx->remap_due = true;

@@ -139,7 +139,7 @@ static void tune_cpu_params(q16_t rel, q16_t rat)
 		math_clamp(val, FLOAT_TO_Q16(0.40F), FLOAT_TO_Q16(0.90F));
 }
 
-static void tune_thermal_configs(q16_t therm)
+static void tune_thermal_params(q16_t therm)
 {
 	q16_t trip = sensor_get_trip_temp(FLOAT_TO_Q16(57.5F));
 	q16_t val = trip - INT_TO_Q16(5);
@@ -171,5 +171,5 @@ void pg_tune_configs(void)
 
 	calc_topo_metrics(&rat, &rel, &therm);
 	tune_cpu_params(rel, rat);
-	tune_thermal_configs(therm);
+	tune_thermal_params(therm);
 }

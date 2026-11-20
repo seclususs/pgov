@@ -243,7 +243,7 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	if (ctx->sig_fd < 0)
 		return ctx->sig_fd;
 
-	pg_thermal_init(&ctx->thermal_state);
+	thermal_init(&ctx->thermal_state);
 	pg_poll_init(&ctx->poll_state);
 
 	char b_path[SENSOR_BACKLIGHT_MAX][SENSOR_PATH_LEN];

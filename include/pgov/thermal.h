@@ -10,7 +10,7 @@
 #include <stddef.h>
 #include <time.h>
 
-struct pg_thermal_cfg {
+struct thermal_param {
 	q16_t limit_cpu;
 	q16_t limit_bat;
 	q16_t kp_base;
@@ -18,18 +18,18 @@ struct pg_thermal_cfg {
 	q16_t kd_base;
 };
 
-struct pg_thermal_state {
+struct thermal_state {
 	struct timespec last_tick;
-	q16_t integ;
+	q16_t integral;
 	q16_t prev_sat;
 	int32_t sat_count;
 	struct pg_kalman_state filter;
 };
 
-void pg_thermal_init(struct pg_thermal_state *state);
+void thermal_init(struct thermal_state *state);
 
-q16_t pg_thermal_update(struct pg_thermal_state *state, q16_t cpu_temp,
-			q16_t bat_temp, const struct pg_thermal_cfg *cfg,
-			const struct timespec *now);
+q16_t thermal_update(struct thermal_state *state, q16_t cpu_temp,
+		     q16_t bat_temp, const struct thermal_param *param,
+		     const struct timespec *now);
 
 #endif // PGOV_THERMAL_H
