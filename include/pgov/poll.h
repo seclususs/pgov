@@ -8,19 +8,19 @@
 #include <stdint.h>
 #include <time.h>
 
-#define MIN_POLL_MS 100
-#define MAX_POLL_MS 10000
+#define POLL_MIN_MS 100
+#define POLL_MAX_MS 10000
 
-struct pg_poll_state {
-	uint32_t cur_ivl;
+struct poll_state {
+	uint32_t cur_interval;
 	uint32_t last_wait;
 	struct timespec last_tick;
-	uint64_t rng_state;
+	uint64_t range;
 };
 
-void pg_poll_init(struct pg_poll_state *state);
+void poll_init(struct poll_state *state);
 
-uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
-			   q16_t avg300, q16_t press_vel);
+uint64_t poll_calc_next(struct poll_state *state, q16_t cur_pressure,
+			q16_t avg300, q16_t pressure_velocity);
 
 #endif // PGOV_POLL_H

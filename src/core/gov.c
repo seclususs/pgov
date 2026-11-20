@@ -319,9 +319,9 @@ static inline bool gov_gate(struct pg_context *ctx,
 	int32_t n_poll;
 	int32_t t_poll;
 
-	n_poll = (int32_t)pg_poll_calc_next(&ctx->poll_state, p_eff,
-					    sample->some.avg300,
-					    sample->some.velocity);
+	n_poll = (int32_t)poll_calc_next(&ctx->poll_state, p_eff,
+					 sample->some.avg300,
+					 sample->some.velocity);
 	ctx->next_wake = n_poll;
 
 	bool moving = cpu_transient(&ctx->load_state, c);
@@ -447,7 +447,7 @@ static void dormant_tick(struct pg_context *ctx)
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 	if (!update_disp(ctx, &now))
-		ctx->next_wake = MAX_POLL_MS;
+		ctx->next_wake = POLL_MAX_MS;
 #else
 	ctx->next_wake = -1;
 #endif // NDK_BUILD

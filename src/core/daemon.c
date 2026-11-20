@@ -170,7 +170,7 @@ static void init_os_environment(void)
 static inline void init_context_defaults(struct pg_context *ctx)
 {
 	ctx->shutdown_req = false;
-	ctx->next_wake = MIN_POLL_MS;
+	ctx->next_wake = POLL_MIN_MS;
 	ctx->disp_state = DISP_UNKNOWN;
 	ctx->cached_th_scl = Q16_ONE;
 	ctx->load_state.first_run = true;
@@ -244,7 +244,7 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 		return ctx->sig_fd;
 
 	thermal_init(&ctx->thermal_state);
-	pg_poll_init(&ctx->poll_state);
+	poll_init(&ctx->poll_state);
 
 	char b_path[SENSOR_BACKLIGHT_MAX][SENSOR_PATH_LEN];
 	int n_bl = sensor_scan_backlight(b_path, SENSOR_BACKLIGHT_MAX);
