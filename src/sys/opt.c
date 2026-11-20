@@ -41,7 +41,7 @@ static int parse_cb(const char *key, const char *val)
 	const char *path;
 	const char *name;
 
-	if (pg_str_has_prefix(key, "node.")) {
+	if (str_has_prefix(key, "node.")) {
 		path = key + 5;
 		int ret = node_write(path, val);
 		if (ret != 0)
@@ -50,7 +50,7 @@ static int parse_cb(const char *key, const char *val)
 		return 0;
 	}
 
-	if (pg_str_has_prefix(key, "prop.")) {
+	if (str_has_prefix(key, "prop.")) {
 		name = key + 5;
 		add_prop(name, val);
 		return 0;

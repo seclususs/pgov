@@ -8,11 +8,18 @@
 #include "pgov/math.h"
 #include <time.h>
 
-static ALWAYS_INLINE q16_t pg_dt_sec(const struct timespec *prev,
-				     const struct timespec *now)
+static ALWAYS_INLINE q16_t time_dt_sec(const struct timespec *prev,
+				       const struct timespec *now)
 {
-	int64_t sec = (int64_t)(now->tv_sec - prev->tv_sec);
-	int64_t nsec = (int64_t)(now->tv_nsec - prev->tv_nsec);
+	int64_t nsec;
+	int64_t sec;
+	q16_t nsec_q16;
+
+	if (UNLIKELY(!prev || !now))
+		return 0;
+
+	sec = (int64_t)(now->tv_sec - prev->tv_sec);
+	nsec = (int64_t)(now->tv_nsec - prev->tv_nsec);
 
 	if (UNLIKELY(sec > 32000))
 		sec = 32000;
@@ -20,7 +27,7 @@ static ALWAYS_INLINE q16_t pg_dt_sec(const struct timespec *prev,
 	if (UNLIKELY(sec < -32000))
 		sec = -32000;
 
-	q16_t nsec_q16 = (q16_t)((nsec * Q16_ONE) / 1000000000LL);
+	nsec_q16 = (q16_t)((nsec * Q16_ONE) / 1000000000LL);
 	return (q16_t)(sec * Q16_ONE) + nsec_q16;
 }
 

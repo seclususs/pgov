@@ -25,7 +25,7 @@ static inline void epoll_error(struct pg_context *ctx,
 		struct timespec wait_end;
 		clock_gettime(CLOCK_MONOTONIC, &wait_end);
 
-		q16_t dt = pg_dt_sec(wait_start, &wait_end);
+		q16_t dt = time_dt_sec(wait_start, &wait_end);
 		int elapsed = (int)((((q32_t)dt) * 1000) >> Q16_SHIFT);
 
 		ctx->next_wake -= elapsed;

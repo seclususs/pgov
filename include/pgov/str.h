@@ -8,25 +8,33 @@
 #include <stdbool.h>
 #include <stddef.h>
 
-static inline bool pg_str_has_prefix(const char *str, const char *prefix)
+static inline bool str_has_prefix(const char *str, const char *prefix)
 {
-	while (*prefix)
+	if (UNLIKELY(!str || !prefix))
+		return false;
+
+	while (*prefix) {
 		if (*prefix++ != *str++)
 			return false;
+	}
 
 	return true;
 }
 
-static inline bool pg_str_contains(const char *str, const char *substr)
+static inline bool str_contains(const char *str, const char *substr)
 {
-	if (!*substr)
-		return true;
-
+	const char *adv;
 	const char *p1;
 	const char *p2;
 
-	for (const char *p1_adv = str; *p1_adv; ++p1_adv) {
-		p1 = p1_adv;
+	if (UNLIKELY(!str || !substr))
+		return false;
+
+	if (!*substr)
+		return true;
+
+	for (adv = str; *adv; ++adv) {
+		p1 = adv;
 		p2 = substr;
 
 		while (*p1 && *p2 && *p1 == *p2) {
@@ -41,22 +49,26 @@ static inline bool pg_str_contains(const char *str, const char *substr)
 	return false;
 }
 
-static inline void pg_str_to_lower(char *str)
+static inline void str_to_lower(char *str)
 {
-	for (; *str; ++str)
-		if (*str >= 'A' && *str <= 'Z')
-			*str += 32;
-}
-
-static inline void pg_str_build_path(char *RESTRICT out, size_t len,
-				     const char *RESTRICT dir,
-				     const char *RESTRICT sub,
-				     const char *RESTRICT file)
-{
-	if (UNLIKELY(len == 0))
+	if (UNLIKELY(!str))
 		return;
 
+	for (; *str; ++str) {
+		if (*str >= 'A' && *str <= 'Z')
+			*str += 32;
+	}
+}
+
+static inline void str_build_path(char *RESTRICT out, size_t len,
+				  const char *RESTRICT dir,
+				  const char *RESTRICT sub,
+				  const char *RESTRICT file)
+{
 	size_t i = 0;
+
+	if (UNLIKELY(!out || len == 0))
+		return;
 
 	while (*dir && i + 1 < len)
 		out[i++] = *dir++;

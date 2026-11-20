@@ -80,18 +80,18 @@ static inline bool check_thermal_valid(const char *name)
 
 	strncpy(lower_name, name, sizeof(lower_name) - 1);
 	lower_name[sizeof(lower_name) - 1] = '\0';
-	pg_str_to_lower(lower_name);
+	str_to_lower(lower_name);
 
-	cpu_match = (pg_str_contains(lower_name, "cpu") ||
-		     pg_str_contains(lower_name, "soc") ||
-		     pg_str_contains(lower_name, "cluster") ||
-		     pg_str_contains(lower_name, "ap")) != 0;
+	cpu_match = (str_contains(lower_name, "cpu") ||
+		     str_contains(lower_name, "soc") ||
+		     str_contains(lower_name, "cluster") ||
+		     str_contains(lower_name, "ap")) != 0;
 
 	if (!cpu_match)
 		return false;
 
 	for (size_t i = 0; i < ARRAY_SIZE(THERMAL_BLACKLIST); ++i) {
-		if (pg_str_contains(lower_name, THERMAL_BLACKLIST[i]))
+		if (str_contains(lower_name, THERMAL_BLACKLIST[i]))
 			return false;
 	}
 
@@ -136,7 +136,7 @@ static bool check_thermal_type(const char *name)
 	char type_path[256];
 	char buf[64];
 
-	pg_str_build_path(type_path, sizeof(type_path), THERMAL, name, "type");
+	str_build_path(type_path, sizeof(type_path), THERMAL, name, "type");
 
 	if (read_sysfs_string(type_path, buf, sizeof(buf)) <= 0)
 		return false;
@@ -155,8 +155,8 @@ static inline int find_priority_zone(const struct thermal_zone_info *zones,
 	for (size_t i = 0; i < ARRAY_SIZE(THERMAL_PRIORITY); ++i) {
 		for (size_t z = 0; z < zone_count; ++z) {
 			if (strcmp(zones[z].name, THERMAL_PRIORITY[i]) == 0) {
-				pg_str_build_path(path, len, THERMAL,
-						  zones[z].folder, "temp");
+				str_build_path(path, len, THERMAL,
+					       zones[z].folder, "temp");
 				return 0;
 			}
 		}
@@ -170,8 +170,8 @@ static inline int find_heuristic_zone(const struct thermal_zone_info *zones,
 {
 	for (size_t z = 0; z < zone_count; ++z) {
 		if (check_thermal_valid(zones[z].name)) {
-			pg_str_build_path(path, len, THERMAL, zones[z].folder,
-					  "temp");
+			str_build_path(path, len, THERMAL, zones[z].folder,
+				       "temp");
 			return 0;
 		}
 	}
@@ -198,11 +198,11 @@ int sensor_scan_thermal_zone(char *path, size_t len)
 	}
 
 	while ((entry = readdir(dir)) != NULL && zone_count < 256) {
-		if (!pg_str_has_prefix(entry->d_name, "thermal_zone"))
+		if (!str_has_prefix(entry->d_name, "thermal_zone"))
 			continue;
 
-		pg_str_build_path(type_path, sizeof(type_path), THERMAL,
-				  entry->d_name, "type");
+		str_build_path(type_path, sizeof(type_path), THERMAL,
+			       entry->d_name, "type");
 
 		if (read_sysfs_string(type_path, buf, sizeof(buf)) <= 0)
 			continue;
@@ -244,11 +244,11 @@ static void scan_brightness_nodes(const char *base, const char *sub_filter,
 		if (entry->d_name[0] == '.')
 			continue;
 
-		if (sub_filter && !pg_str_contains(entry->d_name, sub_filter))
+		if (sub_filter && !str_contains(entry->d_name, sub_filter))
 			continue;
 
-		pg_str_build_path(paths[*count], SENSOR_PATH_LEN, base,
-				  entry->d_name, "brightness");
+		str_build_path(paths[*count], SENSOR_PATH_LEN, base,
+			       entry->d_name, "brightness");
 
 		fd = open(paths[*count], O_RDONLY | O_CLOEXEC);
 		if (fd < 0)
@@ -315,27 +315,27 @@ static int find_best_trip_point(const char *name, char *path, size_t len)
 		int score = 0;
 
 		format_trip_node_path(file, i, "type");
-		pg_str_build_path(node_path, sizeof(node_path), THERMAL, name,
-				  file);
+		str_build_path(node_path, sizeof(node_path), THERMAL, name,
+			       file);
 
 		if (read_sysfs_string(node_path, buf, sizeof(buf)) <= 0)
 			continue;
 
-		if (pg_str_contains(buf, "passive"))
+		if (str_contains(buf, "passive"))
 			score = 3;
 
-		else if (pg_str_contains(buf, "active"))
+		else if (str_contains(buf, "active"))
 			score = 2;
 
-		else if (pg_str_contains(buf, "critical"))
+		else if (str_contains(buf, "critical"))
 			score = 1;
 
 		if (score == 0)
 			continue;
 
 		format_trip_node_path(file, i, "temp");
-		pg_str_build_path(node_path, sizeof(node_path), THERMAL, name,
-				  file);
+		str_build_path(node_path, sizeof(node_path), THERMAL, name,
+			       file);
 
 		res = read_sysfs_string(node_path, buf, sizeof(buf));
 		if (res <= 0)
@@ -382,7 +382,7 @@ static int scan_trip_point_node(char *path, size_t len)
 	}
 
 	while ((entry = readdir(dir)) != NULL) {
-		if (!pg_str_has_prefix(entry->d_name, "thermal_zone"))
+		if (!str_has_prefix(entry->d_name, "thermal_zone"))
 			continue;
 
 		if (!check_thermal_type(entry->d_name))

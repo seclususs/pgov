@@ -52,7 +52,7 @@ q16_t thermal_update(struct thermal_state *state, q16_t cpu_temp,
 	if (UNLIKELY(!state || !param || !now))
 		return Q16_ONE;
 
-	dt = pg_dt_sec(&state->last_tick, now);
+	dt = time_dt_sec(&state->last_tick, now);
 	dt_safe = math_clamp(dt, FLOAT_TO_Q16(0.01F), Q16_ONE);
 	state->last_tick = *now;
 

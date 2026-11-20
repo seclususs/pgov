@@ -133,7 +133,7 @@ static inline bool update_disp(struct pg_context *ctx,
 			       const struct timespec *now)
 {
 	if (LIKELY(ctx->disp_state == DISP_ON) &&
-	    pg_dt_sec(&ctx->last_disp, now) < INT_TO_Q16(DISP_CHK_SEC))
+	    time_dt_sec(&ctx->last_disp, now) < INT_TO_Q16(DISP_CHK_SEC))
 		return false;
 
 	ctx->last_disp = *now;
@@ -153,7 +153,7 @@ static inline bool update_disp(struct pg_context *ctx,
 		ctx->disp_state = DISP_GRACE;
 		ctx->last_dispoff = *now;
 	} else if (!on && ctx->disp_state == DISP_GRACE) {
-		if (pg_dt_sec(&ctx->last_dispoff, now) > INT_TO_Q16(10))
+		if (time_dt_sec(&ctx->last_dispoff, now) > INT_TO_Q16(10))
 			ctx->disp_state = DISP_SUSPEND;
 	}
 
@@ -164,7 +164,7 @@ static inline bool update_disp(struct pg_context *ctx,
 		ctx->last_tick = *now;
 
 #ifdef NDK_BUILD
-		q16_t sweep_elaps = pg_dt_sec(&ctx->last_sweep, now);
+		q16_t sweep_elaps = time_dt_sec(&ctx->last_sweep, now);
 		if (sweep_elaps > INT_TO_Q16(SWEEP_IVL_SEC)) {
 			pg_sweep_run(ctx);
 			clock_gettime(CLOCK_MONOTONIC, &ctx->last_sweep);
@@ -229,7 +229,7 @@ static inline bool read_psi(struct pg_context *ctx, const struct timespec *now,
 static inline void poll_battery_metrics(struct pg_context *ctx,
 					const struct timespec *now)
 {
-	q16_t elaps_bat = pg_dt_sec(&ctx->last_bat, now);
+	q16_t elaps_bat = time_dt_sec(&ctx->last_bat, now);
 	if (elaps_bat < INT_TO_Q16(BAT_CHK_SEC))
 		return;
 
@@ -244,7 +244,7 @@ static inline void poll_battery_metrics(struct pg_context *ctx,
 static inline void poll_thermal_metrics(struct pg_context *ctx,
 					const struct timespec *now)
 {
-	q16_t elaps_therm = pg_dt_sec(&ctx->last_therm, now);
+	q16_t elaps_therm = time_dt_sec(&ctx->last_therm, now);
 	if (elaps_therm < INT_TO_Q16(THERM_CHK_SEC))
 		return;
 
@@ -287,7 +287,7 @@ static inline void calc_demand(struct pg_context *ctx,
 	cpu_update_efficiency(eff, ctx->bat_lvl, *therm_scale,
 			      sample->some.avg300);
 
-	q16_t dt_real = pg_dt_sec(&ctx->last_tick, now);
+	q16_t dt_real = time_dt_sec(&ctx->last_tick, now);
 	q16_t dt_safe = math_clamp(dt_real, 1, FLOAT_TO_Q16(0.1F));
 	ctx->last_tick = *now;
 
@@ -469,7 +469,7 @@ void pg_gov_process(struct pg_context *ctx)
 	exec_gov_logic(ctx, &now);
 	clock_gettime(CLOCK_MONOTONIC, &end_calc);
 
-	q16_t calc_s = pg_dt_sec(&now, &end_calc);
+	q16_t calc_s = time_dt_sec(&now, &end_calc);
 	int calc_ms = (int)((((q32_t)calc_s) * 1000) >> Q16_SHIFT);
 	int adj_wake = ctx->next_wake - calc_ms;
 	ctx->next_wake = (adj_wake > 0) ? adj_wake : 1;

@@ -258,7 +258,7 @@ int psi_read(struct psi_state *state, struct psi_sample *sample,
 	if (state->initial) {
 		dt_sec = Q16_ONE;
 	} else {
-		dt_sec = pg_dt_sec(&state->last_read_time, now);
+		dt_sec = time_dt_sec(&state->last_read_time, now);
 		if (dt_sec < FLOAT_TO_Q16(0.001F))
 			dt_sec = FLOAT_TO_Q16(0.001F);
 	}

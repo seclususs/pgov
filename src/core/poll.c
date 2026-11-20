@@ -85,7 +85,7 @@ uint64_t pg_poll_calc_next(struct pg_poll_state *state, q16_t cur_press,
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
 
-	q16_t elapsed = pg_dt_sec(&state->last_tick, &now);
+	q16_t elapsed = time_dt_sec(&state->last_tick, &now);
 	if (UNLIKELY(elapsed < 0))
 		elapsed = 0;
 
