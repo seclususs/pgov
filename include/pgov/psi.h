@@ -32,7 +32,7 @@ struct psi_state {
 	struct timespec last_read_time;
 	uint64_t last_total;
 	bool initial;
-	struct pg_kalman_state filter;
+	struct kalman_state filter;
 };
 
 bool psi_available(void);

@@ -87,7 +87,7 @@ int psi_recover(struct psi_state *state, const char *path)
 	if (state->fd < 0)
 		return -errno;
 
-	pg_kalman_reset(&state->filter);
+	kalman_reset(&state->filter);
 	state->initial = true;
 	return 0;
 }
@@ -104,7 +104,7 @@ void psi_init(struct psi_state *state, const char *path)
 	clock_gettime(CLOCK_MONOTONIC, &state->last_read_time);
 	state->last_total = 0;
 	state->initial = true;
-	pg_kalman_init(&state->filter);
+	kalman_init(&state->filter);
 }
 
 void psi_cleanup(struct psi_state *state)
@@ -201,8 +201,8 @@ static inline void update_filter(struct psi_state *state,
 		metrics->stall_rate = metrics->avg10;
 		metrics->velocity = 0;
 
-		pg_kalman_reset(&state->filter);
-		pg_kalman_update(&state->filter, metrics->avg10, Q16_ONE);
+		kalman_reset(&state->filter);
+		kalman_update(&state->filter, metrics->avg10, Q16_ONE);
 		state->initial = false;
 		return;
 	}
@@ -222,9 +222,7 @@ static inline void update_filter(struct psi_state *state,
 			stall_rate = (q16_t)instant_rate;
 	}
 
-	metrics->stall_rate =
-		pg_kalman_update(&state->filter, stall_rate, dt_sec);
-
+	metrics->stall_rate = kalman_update(&state->filter, stall_rate, dt_sec);
 	metrics->velocity = state->filter.x_vel;
 	metrics->nis = state->filter.nis;
 }

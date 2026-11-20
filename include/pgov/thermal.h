@@ -23,7 +23,7 @@ struct thermal_state {
 	q16_t integral;
 	q16_t prev_sat;
 	int32_t sat_count;
-	struct pg_kalman_state filter;
+	struct kalman_state filter;
 };
 
 void thermal_init(struct thermal_state *state);

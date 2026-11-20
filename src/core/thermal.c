@@ -8,7 +8,7 @@
 
 static void reset_filter(struct thermal_state *state)
 {
-	pg_kalman_init(&state->filter);
+	kalman_init(&state->filter);
 	state->filter.q_vel = FLOAT_TO_Q16(0.01F);
 }
 
@@ -74,7 +74,7 @@ q16_t thermal_update(struct thermal_state *state, q16_t cpu_temp,
 			state->integral = 0;
 	}
 
-	temp = pg_kalman_update(&state->filter, cpu_temp, dt_safe);
+	temp = kalman_update(&state->filter, cpu_temp, dt_safe);
 	vel = state->filter.x_vel;
 	err = temp - setpoint;
 

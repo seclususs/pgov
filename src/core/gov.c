@@ -144,7 +144,7 @@ static inline bool update_disp(struct pg_context *ctx,
 
 	if (on && UNLIKELY(ctx->disp_state != DISP_ON)) {
 		ctx->load_state.first_run = true;
-		pg_kalman_reset(&ctx->psi.filter);
+		kalman_reset(&ctx->psi.filter);
 		ctx->psi.initial = true;
 		ctx->disp_state = DISP_ON;
 		ctx->remap_due = true;

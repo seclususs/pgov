@@ -23,7 +23,7 @@
  *         workload shifts (e.g., app launches) and snap their own state to the
  *         measurement.
  */
-struct pg_kalman_state {
+struct kalman_state {
 	q16_t x_pos;
 	q16_t x_vel;
 	q32_t p00;
@@ -37,22 +37,21 @@ struct pg_kalman_state {
 	bool first_run;
 };
 
-void pg_kalman_init(struct pg_kalman_state *state);
+void kalman_init(struct kalman_state *state);
 
-void pg_kalman_reset(struct pg_kalman_state *state);
+void kalman_reset(struct kalman_state *state);
 
 /**
  * @brief Injects new raw measurements and advances the filter prediction by dt_sec.
  *
  * @param state  The filter state matrix. Borrowed for mutation.
- * @param z_meas The raw, noisy measurement (e.g., PSI stall percentage or CPU
+ * @param meas   The raw, noisy measurement (e.g., PSI stall percentage or CPU
  *               temperature in degrees Celsius), clamped to [0, 500].
  * @param dt_sec Delta time in Q16 fixed-point format since the last measurement.
  *
  * @return The smoothed position estimate (`x_pos`) after the measurement update,
  *         floored at zero.
  */
-q16_t pg_kalman_update(struct pg_kalman_state *state, q16_t z_meas,
-		       q16_t dt_sec);
+q16_t kalman_update(struct kalman_state *state, q16_t meas, q16_t dt_sec);
 
 #endif // PGOV_KALMAN_H
