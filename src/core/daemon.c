@@ -11,7 +11,6 @@
 #include "pgov/memory.h"
 #include "pgov/parser.h"
 #include "pgov/prop.h"
-#include "pgov/scan.h"
 #include "pgov/signal.h"
 #include "pgov/tune.h"
 #include "pgov/state.h"
@@ -187,8 +186,8 @@ static inline void init_context_defaults(struct pg_context *ctx)
 	ctx->bat_temp_sensor.fd = -1;
 	ctx->bat_cap_sensor.fd = -1;
 
-	ctx->bl_sensor.n = 0;
-	for (size_t i = 0; i < BACKLIGHT_MAX; i++)
+	ctx->bl_sensor.count = 0;
+	for (size_t i = 0; i < SENSOR_BACKLIGHT_MAX; i++)
 		ctx->bl_sensor.fd[i] = -1;
 
 	ctx->sched_lat.fd = -1;
@@ -220,13 +219,13 @@ static int init_node_caches(struct pg_context *ctx)
 
 static int init_sensors_and_triggers(struct pg_context *ctx)
 {
-	char t_path[256];
-	pg_scan_thermal_zone(t_path, sizeof(t_path));
+	char t_path[SENSOR_PATH_LEN];
+	sensor_scan_thermal_zone(t_path, sizeof(t_path));
 	LOGD("daemon: cpu thermal sensor mapped to %s", t_path);
-	pg_sensor_init_cpu_temp(&ctx->cpu_temp_sensor, t_path);
+	sensor_init_cpu_temp(&ctx->cpu_temp_sensor, t_path);
 
-	pg_sensor_init_bat_temp(&ctx->bat_temp_sensor, CAND_BAT_TEMP);
-	pg_sensor_init_bat_cap(&ctx->bat_cap_sensor, CAND_BAT_CAP);
+	sensor_init_battery_temp(&ctx->bat_temp_sensor, CAND_BAT_TEMP);
+	sensor_init_battery(&ctx->bat_cap_sensor, CAND_BAT_CAP);
 
 	if (!ctx->dormant) {
 		ctx->trg_fd = psi_trigger_open(PSI_CPU_PATH, PSI_THRESHOLD_US,
@@ -247,10 +246,10 @@ static int init_sensors_and_triggers(struct pg_context *ctx)
 	pg_thermal_init(&ctx->thermal_state);
 	pg_poll_init(&ctx->poll_state);
 
-	char b_path[BACKLIGHT_MAX][BL_PATH_LEN];
-	int n_bl = pg_scan_backlight(b_path, BACKLIGHT_MAX);
+	char b_path[SENSOR_BACKLIGHT_MAX][SENSOR_PATH_LEN];
+	int n_bl = sensor_scan_backlight(b_path, SENSOR_BACKLIGHT_MAX);
 	for (int i = 0; i < n_bl; i++)
-		pg_sensor_init_bl(&ctx->bl_sensor, b_path[i]);
+		sensor_init_backlight(&ctx->bl_sensor, b_path[i]);
 
 	return 0;
 }
@@ -271,10 +270,10 @@ static void cleanup_context(struct pg_context *ctx)
 
 	pg_lockfile_close(ctx->lock_fd);
 	psi_cleanup(&ctx->psi);
-	pg_sensor_temp_close(&ctx->cpu_temp_sensor);
-	pg_sensor_temp_close(&ctx->bat_temp_sensor);
-	pg_sensor_bat_close(&ctx->bat_cap_sensor);
-	pg_sensor_bl_close(&ctx->bl_sensor);
+	sensor_close_temp(&ctx->cpu_temp_sensor);
+	sensor_close_temp(&ctx->bat_temp_sensor);
+	sensor_close_battery(&ctx->bat_cap_sensor);
+	sensor_close_backlight(&ctx->bl_sensor);
 	pg_node_cache_cleanup(&ctx->sched_lat);
 	pg_node_cache_cleanup(&ctx->sched_gran);
 	pg_node_cache_cleanup(&ctx->sched_wake);
@@ -335,8 +334,8 @@ int pg_daemon_init(void)
 	clock_gettime(CLOCK_MONOTONIC, &context.last_sweep);
 #endif // NDK_BUILD
 
-	pg_sensor_read_bat_cap(&context.bat_cap_sensor, &context.bat_lvl);
-	pg_sensor_read_bat_temp(&context.bat_temp_sensor, &context.bat_temp);
+	sensor_read_battery_capacity(&context.bat_cap_sensor, &context.bat_lvl);
+	sensor_read_battery_temp(&context.bat_temp_sensor, &context.bat_temp);
 
 	pg_gov_init(&context);
 	context.on_trigger = pg_gov_process;

@@ -112,7 +112,7 @@ static inline bool update_disp(struct pg_context *ctx,
 	ctx->last_disp = *now;
 
 	int32_t bl = 0;
-	int ret = pg_sensor_read_bl(&ctx->bl_sensor, &bl);
+	int ret = sensor_read_backlight(&ctx->bl_sensor, &bl);
 	bool on = ((ret < 0) ? true : (bl > 0)) != 0;
 
 	if (on && UNLIKELY(ctx->disp_state != DISP_ON)) {
@@ -206,8 +206,8 @@ static inline void poll_battery_metrics(struct pg_context *ctx,
 	if (elaps_bat < INT_TO_Q16(BAT_CHK_SEC))
 		return;
 
-	pg_sensor_read_bat_cap(&ctx->bat_cap_sensor, &ctx->bat_lvl);
-	pg_sensor_read_bat_temp(&ctx->bat_temp_sensor, &ctx->bat_temp);
+	sensor_read_battery_capacity(&ctx->bat_cap_sensor, &ctx->bat_lvl);
+	sensor_read_battery_temp(&ctx->bat_temp_sensor, &ctx->bat_temp);
 	ctx->last_bat = *now;
 
 	if (UNLIKELY(ctx->trg_fd < 0))
@@ -225,7 +225,7 @@ static inline void poll_thermal_metrics(struct pg_context *ctx,
 	bool hold = false;
 
 	if (LIKELY(ctx->cpu_temp_sensor.fd >= 0)) {
-		if (pg_sensor_read_cpu_temp(&ctx->cpu_temp_sensor, &cpu_temp) ==
+		if (sensor_read_cpu_temp(&ctx->cpu_temp_sensor, &cpu_temp) ==
 		    0) {
 			ctx->temp_fails = 0;
 		} else if (ctx->temp_fails < TEMP_FAIL_MAX) {

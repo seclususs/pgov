@@ -79,7 +79,7 @@ static bool sweep_chk_intr(struct sweep_ctx *sctx)
 		return false;
 
 	int32_t bl = 0;
-	pg_sensor_read_bl(&sctx->pg_ctx->bl_sensor, &bl);
+	sensor_read_backlight(&sctx->pg_ctx->bl_sensor, &bl);
 	if (bl > 0) {
 		sctx->intr = true;
 		return true;

@@ -38,10 +38,10 @@ enum pg_disp_state {
  */
 struct ALIGNED(64) pg_context {
 	struct psi_state psi;
-	struct pg_temp_sensor cpu_temp_sensor;
-	struct pg_temp_sensor bat_temp_sensor;
-	struct pg_bat_sensor bat_cap_sensor;
-	struct pg_bl_sensor bl_sensor;
+	struct sensor_temp cpu_temp_sensor;
+	struct sensor_temp bat_temp_sensor;
+	struct sensor_battery bat_cap_sensor;
+	struct sensor_backlight bl_sensor;
 	struct pg_node_cache sched_lat;
 	struct pg_node_cache sched_gran;
 	struct pg_node_cache sched_wake;

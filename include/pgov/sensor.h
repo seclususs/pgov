@@ -5,51 +5,58 @@
 #define PGOV_SENSOR_H
 
 #include "pgov/math.h"
+#include <stddef.h>
 #include <stdint.h>
 
-#define BACKLIGHT_MAX 4
+#define SENSOR_BACKLIGHT_MAX 4
+#define SENSOR_PATH_LEN 128
 
-struct pg_temp_sensor {
+struct sensor_temp {
 	int fd;
 	q16_t scale;
 	uint8_t buf[16];
 };
 
-struct pg_bat_sensor {
+struct sensor_battery {
 	int fd;
 	uint8_t buf[16];
 };
 
-struct pg_bl_sensor {
-	int fd[BACKLIGHT_MAX];
-	uint8_t n;
+struct sensor_backlight {
+	int fd[SENSOR_BACKLIGHT_MAX];
+	uint8_t count;
 	uint8_t buf[16];
 };
 
-void pg_sensor_init_cpu_temp(struct pg_temp_sensor *sensor, const char *path);
+int sensor_scan_thermal_zone(char *path, size_t len);
 
-void pg_sensor_init_bat_temp(struct pg_temp_sensor *sensor,
-			     const char *const *paths);
+int sensor_scan_backlight(char (*paths)[SENSOR_PATH_LEN], size_t max);
 
-void pg_sensor_temp_close(struct pg_temp_sensor *sensor);
+void sensor_init_cpu_temp(struct sensor_temp *sensor, const char *path);
 
-void pg_sensor_init_bat_cap(struct pg_bat_sensor *sensor,
-			    const char *const *paths);
+void sensor_init_battery_temp(struct sensor_temp *sensor,
+			      const char *const *paths);
 
-void pg_sensor_bat_close(struct pg_bat_sensor *sensor);
+void sensor_close_temp(struct sensor_temp *sensor);
 
-void pg_sensor_init_bl(struct pg_bl_sensor *sensor, const char *path);
+void sensor_init_battery(struct sensor_battery *sensor,
+			 const char *const *paths);
 
-void pg_sensor_bl_close(struct pg_bl_sensor *sensor);
+void sensor_close_battery(struct sensor_battery *sensor);
 
-int pg_sensor_read_cpu_temp(struct pg_temp_sensor *sensor, q16_t *temp);
+void sensor_init_backlight(struct sensor_backlight *sensor, const char *path);
 
-int pg_sensor_read_bat_temp(struct pg_temp_sensor *sensor, q16_t *temp);
+void sensor_close_backlight(struct sensor_backlight *sensor);
 
-int pg_sensor_read_bat_cap(struct pg_bat_sensor *sensor, q16_t *cap);
+int sensor_read_cpu_temp(struct sensor_temp *sensor, q16_t *temp);
 
-int pg_sensor_read_bl(struct pg_bl_sensor *sensor, int32_t *brightness);
+int sensor_read_battery_temp(struct sensor_temp *sensor, q16_t *temp);
 
-q16_t pg_sensor_get_trip_temp(q16_t fallback);
+int sensor_read_battery_capacity(struct sensor_battery *sensor,
+				 q16_t *capacity);
+
+int sensor_read_backlight(struct sensor_backlight *sensor, int32_t *brightness);
+
+q16_t sensor_get_trip_temp(q16_t fallback);
 
 #endif // PGOV_SENSOR_H

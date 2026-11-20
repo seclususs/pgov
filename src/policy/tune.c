@@ -140,7 +140,7 @@ static void tune_cpu_configs(q16_t rel, q16_t rat)
 
 static void tune_thermal_configs(q16_t therm)
 {
-	q16_t trip = pg_sensor_get_trip_temp(FLOAT_TO_Q16(57.5F));
+	q16_t trip = sensor_get_trip_temp(FLOAT_TO_Q16(57.5F));
 	q16_t val = trip - INT_TO_Q16(5);
 	CFG_THERMAL.limit_cpu =
 		pg_math_clamp(val, FLOAT_TO_Q16(45.0F), FLOAT_TO_Q16(90.0F));
