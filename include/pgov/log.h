@@ -10,15 +10,15 @@
 #define LOG_TAG "PGOV"
 #endif
 
-void pg_log_err(const char *tag, const char *fmt, ...)
+void log_err(const char *tag, const char *fmt, ...)
 	__attribute__((format(printf, 2, 3)));
 
-void pg_log_msg(int prio, const char *tag, const char *fmt, ...)
+void log_msg(int prio, const char *tag, const char *fmt, ...)
 	__attribute__((format(printf, 3, 4)));
 
-#define LOGE(...) pg_log_err(LOG_TAG, __VA_ARGS__)
-#define LOGW(...) pg_log_msg(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
-#define LOGI(...) pg_log_msg(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
+#define LOGE(...) log_err(LOG_TAG, __VA_ARGS__)
+#define LOGW(...) log_msg(ANDROID_LOG_WARN, LOG_TAG, __VA_ARGS__)
+#define LOGI(...) log_msg(ANDROID_LOG_INFO, LOG_TAG, __VA_ARGS__)
 
 #if defined(NDEBUG) && !defined(ENABLE_VERBOSE_LOGS)
 #define LOGD(...) \

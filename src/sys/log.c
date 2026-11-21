@@ -10,82 +10,87 @@
 #include <time.h>
 #include <unistd.h>
 
-#define LOG_BURST 128U
-#define LOG_REFILL_MS 10000ULL
-#define LOG_CREDIT_MAX ((uint64_t)LOG_BURST * LOG_REFILL_MS)
+#define BURST_LIMIT 128U
+#define REFILL_MS 10000ULL
+#define CREDIT_MAX ((uint64_t)BURST_LIMIT * REFILL_MS)
+#define STDERR_FMT "[%s] [%s] [%s] %s\n"
 
-static bool should_rate_limit(uint32_t *dropped_count)
+static bool check_rate_limit(uint32_t *out_dropped)
 {
-	static uint64_t credit_ms = LOG_CREDIT_MAX;
+	static uint64_t credit_ms = CREDIT_MAX;
 	static uint64_t last_ms;
 	static uint32_t dropped;
-
 	struct timespec mono;
+	uint64_t now_ms;
 
 	clock_gettime(CLOCK_MONOTONIC, &mono);
 
-	uint64_t now_ms = ((uint64_t)mono.tv_sec * 1000U) +
-			  ((uint64_t)mono.tv_nsec / 1000000U);
+	now_ms = ((uint64_t)mono.tv_sec * 1000U) +
+		 ((uint64_t)mono.tv_nsec / 1000000U);
 
 	if (last_ms != 0) {
 		credit_ms += now_ms - last_ms;
-		if (credit_ms > LOG_CREDIT_MAX)
-			credit_ms = LOG_CREDIT_MAX;
+		if (credit_ms > CREDIT_MAX)
+			credit_ms = CREDIT_MAX;
 	}
 	last_ms = now_ms;
 
-	if (credit_ms < LOG_REFILL_MS) {
+	if (credit_ms < REFILL_MS) {
 		dropped++;
 		return true;
 	}
-	credit_ms -= LOG_REFILL_MS;
+	credit_ms -= REFILL_MS;
 
-	*dropped_count = dropped;
+	*out_dropped = dropped;
 	dropped = 0;
 	return false;
 }
 
-static void log_write_stderr(const char *tag, const char *level_str,
-			     const char *msg)
+static void write_stderr(const char *tag, const char *level, const char *msg)
 {
-	time_t now = time(NULL);
-	struct tm tm;
+	char out[300];
 	char ts[24] = { 0 };
+	struct tm tm;
+	time_t now;
+	size_t len;
+	size_t max;
+	ssize_t res;
+	int ret;
 
+	now = time(NULL);
 	if (localtime_r(&now, &tm))
 		(void)strftime(ts, sizeof(ts), "%Y-%m-%d %H:%M:%S", &tm);
 
-	char out[300];
-	int n = snprintf(out, sizeof(out), "[%s] [%s] [%s] %s\n", ts, tag,
-			 level_str, msg);
-	if (n > 0) {
-		size_t max = sizeof(out) - 1;
-		size_t w = (size_t)n < max ? (size_t)n : max;
-		ssize_t unused = write(STDERR_FILENO, out, w);
-		UNUSED(unused);
+	ret = snprintf(out, sizeof(out), STDERR_FMT, ts, tag, level, msg);
+	if (ret > 0) {
+		max = sizeof(out) - 1;
+		len = (size_t)ret < max ? (size_t)ret : max;
+		res = write(STDERR_FILENO, out, len);
+		UNUSED(res);
 	}
 }
 
-void pg_log_err(const char *tag, const char *fmt, ...)
+void log_err(const char *tag, const char *fmt, ...)
 {
+	char msg[256];
+	va_list args;
+	size_t len = 0;
+	uint32_t dropped = 0;
+	int ret;
+
 	if (UNLIKELY(!tag || !fmt))
 		return;
 
-	uint32_t dropped = 0;
-	if (should_rate_limit(&dropped))
+	if (check_rate_limit(&dropped))
 		return;
 
-	char msg[256];
-	va_list args;
-
 	va_start(args, fmt);
-	int v_len = vsnprintf(msg, sizeof(msg), fmt, args);
+	ret = vsnprintf(msg, sizeof(msg), fmt, args);
 	va_end(args);
 
 	if (dropped != 0) {
-		size_t len = 0;
-		if (v_len > 0) {
-			len = (size_t)v_len;
+		if (ret > 0) {
+			len = (size_t)ret;
 			if (len >= sizeof(msg))
 				len = sizeof(msg) - 1;
 		}
@@ -96,26 +101,28 @@ void pg_log_err(const char *tag, const char *fmt, ...)
 
 	__android_log_write(ANDROID_LOG_ERROR, tag, msg);
 
-	log_write_stderr(tag, "E", msg);
+	write_stderr(tag, "E", msg);
 }
 
-void pg_log_msg(int prio, const char *tag, const char *fmt, ...)
+void log_msg(int prio, const char *tag, const char *fmt, ...)
 {
+	const char *level;
+	char msg[256];
+	va_list args;
+	int ret;
+
 	if (UNLIKELY(!tag || !fmt))
 		return;
 
-	char msg[256];
-	va_list args;
-
 	va_start(args, fmt);
-	int v_len = vsnprintf(msg, sizeof(msg), fmt, args);
+	ret = vsnprintf(msg, sizeof(msg), fmt, args);
 	va_end(args);
 
-	if (v_len < 0)
+	if (ret < 0)
 		return;
 
 	__android_log_write(prio, tag, msg);
 
-	const char *level_str = (prio == ANDROID_LOG_WARN) ? "W" : "I";
-	log_write_stderr(tag, level_str, msg);
+	level = (prio == ANDROID_LOG_WARN) ? "W" : "I";
+	write_stderr(tag, level, msg);
 }
