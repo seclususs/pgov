@@ -20,13 +20,15 @@ static size_t prop_count = 0;
 
 static int add_prop(const char *name, const char *val)
 {
+	int ret;
+
 	if (UNLIKELY(prop_count >= MAX_PROPS)) {
 		LOGW("opt: limit %d props, ignoring %s", MAX_PROPS, name);
 		return -ENOSPC;
 	}
 
 	pg_prop_state_init(&props[prop_count], name);
-	int ret = pg_prop_set(&props[prop_count], val);
+	ret = pg_prop_set(&props[prop_count], val);
 	if (ret != 0) {
 		LOGW("opt: failed to set prop %s err=%d", name, ret);
 		return ret;
@@ -38,12 +40,13 @@ static int add_prop(const char *name, const char *val)
 
 static int parse_cb(const char *key, const char *val)
 {
-	const char *path;
 	const char *name;
+	const char *path;
+	int ret;
 
 	if (str_has_prefix(key, "node.")) {
 		path = key + 5;
-		int ret = node_write(path, val);
+		ret = node_write(path, val);
 		if (ret != 0)
 			LOGW("opt: failed write node %s err=%d", path, ret);
 
@@ -59,9 +62,11 @@ static int parse_cb(const char *key, const char *val)
 	return 0;
 }
 
-int pg_opt_init(void)
+int opt_init(void)
 {
-	int ret = pg_conf_parse(PATH_CONF, parse_cb);
+	int ret;
+
+	ret = conf_parse(PATH_CONF, parse_cb);
 	if (ret < 0 && ret != -ENOENT) {
 		LOGW("opt: failed to parse conf err=%d", ret);
 		return ret;
@@ -73,7 +78,7 @@ int pg_opt_init(void)
 	return ret;
 }
 
-void pg_opt_exit(void)
+void opt_exit(void)
 {
 	size_t i;
 

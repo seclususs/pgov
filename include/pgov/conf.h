@@ -6,9 +6,9 @@
 #ifndef PGOV_CONF_H
 #define PGOV_CONF_H
 
-typedef int (*pg_conf_cb)(const char *key, const char *val);
+typedef int (*conf_callback)(const char *key, const char *val);
 
-int pg_conf_parse(const char *path, pg_conf_cb cb);
+int conf_parse(const char *path, conf_callback cb);
 
 #endif // PGOV_CONF_H
 

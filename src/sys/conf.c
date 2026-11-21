@@ -11,13 +11,14 @@
 #include <string.h>
 #include <unistd.h>
 
-#define CONF_BUF_SZ 4096
-#define CONF_LINE_SZ 256
+#define BUF_SIZE 4096
+#define LINE_SIZE 256
 
 static inline void trim_trailing(char *str)
 {
-	char *tmp = str;
+	char *tmp;
 
+	tmp = str;
 	while (*tmp != '\0')
 		tmp++;
 
@@ -31,12 +32,13 @@ static inline void trim_trailing(char *str)
 	}
 }
 
-static int parse_line(char *line, pg_conf_cb cb)
+static int parse_line(char *line, conf_callback cb)
 {
-	char *key = line;
-	char *val;
+	char *key;
 	char *tmp;
+	char *val;
 
+	key = line;
 	tmp = strchr(key, '#');
 	if (tmp)
 		*tmp = '\0';
@@ -70,16 +72,16 @@ static int parse_line(char *line, pg_conf_cb cb)
 
 static inline ssize_t refill_buffer(int fd, char *buf, size_t size)
 {
-	ssize_t sz;
+	ssize_t res;
 
 	do {
-		sz = read(fd, buf, size);
-	} while (sz < 0 && errno == EINTR);
+		res = read(fd, buf, size);
+	} while (res < 0 && errno == EINTR);
 
-	return sz;
+	return res;
 }
 
-static inline int dispatch_line(char *line, size_t len, pg_conf_cb cb)
+static inline int dispatch_line(char *line, size_t len, conf_callback cb)
 {
 	if (len == 0)
 		return 0;
@@ -88,15 +90,16 @@ static inline int dispatch_line(char *line, size_t len, pg_conf_cb cb)
 	return parse_line(line, cb);
 }
 
-int pg_conf_parse(const char *path, pg_conf_cb cb)
+int conf_parse(const char *path, conf_callback cb)
 {
-	char buf[CONF_BUF_SZ];
-	char line[CONF_LINE_SZ];
-	size_t l_pos = 0;
+	char buf[BUF_SIZE];
+	char line[LINE_SIZE];
+	char c;
 	size_t i = 0;
-	ssize_t sz = 0;
-	int ret = 0;
+	size_t len = 0;
+	ssize_t res = 0;
 	int fd;
+	int ret = 0;
 	bool skip = false;
 
 	if (UNLIKELY(!path || !cb))
@@ -107,24 +110,24 @@ int pg_conf_parse(const char *path, pg_conf_cb cb)
 		return -errno;
 
 	for (;;) {
-		if (i >= (size_t)sz) {
-			sz = refill_buffer(fd, buf, sizeof(buf));
-			if (sz <= 0)
+		if (i >= (size_t)res) {
+			res = refill_buffer(fd, buf, sizeof(buf));
+			if (res <= 0)
 				break;
 			i = 0;
 		}
 
-		char c = buf[i++];
+		c = buf[i++];
 
 		if (c == '\n') {
 			if (UNLIKELY(skip)) {
 				skip = false;
-				l_pos = 0;
+				len = 0;
 				continue;
 			}
 
-			ret = dispatch_line(line, l_pos, cb);
-			l_pos = 0;
+			ret = dispatch_line(line, len, cb);
+			len = 0;
 			if (ret < 0)
 				goto out;
 
@@ -134,21 +137,21 @@ int pg_conf_parse(const char *path, pg_conf_cb cb)
 		if (UNLIKELY(skip))
 			continue;
 
-		if (UNLIKELY(l_pos >= sizeof(line) - 1)) {
+		if (UNLIKELY(len >= sizeof(line) - 1)) {
 			skip = true;
 			continue;
 		}
 
-		line[l_pos++] = c;
+		line[len++] = c;
 	}
 
-	if (sz < 0) {
+	if (res < 0) {
 		ret = -errno;
 		goto out;
 	}
 
 	if (!skip)
-		ret = dispatch_line(line, l_pos, cb);
+		ret = dispatch_line(line, len, cb);
 
 out:
 	close(fd);

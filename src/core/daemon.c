@@ -270,7 +270,7 @@ static void cleanup_context(struct context *ctx)
 	restore_all(ctx);
 
 #ifdef NDK_BUILD
-	pg_opt_exit();
+	opt_exit();
 #endif // NDK_BUILD
 
 	if (ctx->tfd >= 0)
@@ -335,7 +335,7 @@ int daemon_init(void)
 		goto cleanup;
 
 #ifdef NDK_BUILD
-	pg_opt_init();
+	opt_init();
 #endif // NDK_BUILD
 
 	clock_gettime(CLOCK_MONOTONIC, &dctx.last_bat);
