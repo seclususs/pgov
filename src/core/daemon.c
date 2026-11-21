@@ -309,7 +309,7 @@ int daemon_init(void)
 	}
 
 	LOGD("daemon: waiting for android subsystem");
-	if (!pg_prop_wait_boot()) {
+	if (!prop_wait_boot()) {
 		ret = -ETIMEDOUT;
 		goto cleanup;
 	}

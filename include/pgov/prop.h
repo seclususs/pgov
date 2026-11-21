@@ -10,23 +10,22 @@
 
 #if defined(NDK_BUILD)
 
-struct pg_prop_state {
+struct prop_state {
 	char name[PROP_NAME_MAX];
 	char val[PROP_VALUE_MAX];
 	bool modified;
 };
 
-void pg_prop_state_init(struct pg_prop_state *RESTRICT state,
-			const char *RESTRICT name);
+void prop_init(struct prop_state *RESTRICT state, const char *RESTRICT name);
 
-int pg_prop_set(struct pg_prop_state *RESTRICT state, const char *RESTRICT val);
+int prop_set(struct prop_state *RESTRICT state, const char *RESTRICT val);
 
-int pg_prop_reset(struct pg_prop_state *state);
+int prop_reset(struct prop_state *state);
 
-void pg_prop_cleanup(struct pg_prop_state *state);
+void prop_cleanup(struct prop_state *state);
 
 #endif // NDK_BUILD
 
-bool pg_prop_wait_boot(void);
+bool prop_wait_boot(void);
 
 #endif // PGOV_PROP_H

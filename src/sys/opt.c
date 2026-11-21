@@ -15,7 +15,7 @@
 #define PATH_CONF "/data/adb/modules/pgovd/system/etc/pgovd.conf"
 #define MAX_PROPS 64
 
-static struct pg_prop_state props[MAX_PROPS];
+static struct prop_state state[MAX_PROPS];
 static size_t prop_count = 0;
 
 static int add_prop(const char *name, const char *val)
@@ -27,8 +27,8 @@ static int add_prop(const char *name, const char *val)
 		return -ENOSPC;
 	}
 
-	pg_prop_state_init(&props[prop_count], name);
-	ret = pg_prop_set(&props[prop_count], val);
+	prop_init(&state[prop_count], name);
+	ret = prop_set(&state[prop_count], val);
 	if (ret != 0) {
 		LOGW("opt: failed to set prop %s err=%d", name, ret);
 		return ret;
@@ -83,7 +83,7 @@ void opt_exit(void)
 	size_t i;
 
 	for (i = prop_count; i > 0; --i)
-		pg_prop_cleanup(&props[i - 1]);
+		prop_cleanup(&state[i - 1]);
 
 	prop_count = 0;
 }

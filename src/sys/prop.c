@@ -12,21 +12,24 @@
 #define BOOT_RETRY_MAX 300
 #define BOOT_POLL_SEC 1
 
-static inline void maybe_delay_stabilization(void)
+static inline void delay_stabilization(void)
 {
 	struct timespec ts;
+
 	if (clock_gettime(CLOCK_BOOTTIME, &ts) == 0 && ts.tv_sec < 60)
 		sleep(STAB_DELAY_SEC);
 }
 
-bool pg_prop_wait_boot(void)
+bool prop_wait_boot(void)
 {
 	char val[PROP_VALUE_MAX];
+	unsigned int retries;
+	int len;
 
-	for (unsigned int retries = 0; retries <= BOOT_RETRY_MAX; retries++) {
-		int len = __system_property_get("sys.boot_completed", val);
+	for (retries = 0; retries <= BOOT_RETRY_MAX; retries++) {
+		len = __system_property_get("sys.boot_completed", val);
 		if (len == 1 && val[0] == '1') {
-			maybe_delay_stabilization();
+			delay_stabilization();
 			return true;
 		}
 
@@ -39,8 +42,7 @@ bool pg_prop_wait_boot(void)
 
 #ifdef NDK_BUILD
 
-void pg_prop_state_init(struct pg_prop_state *RESTRICT state,
-			const char *RESTRICT name)
+void prop_init(struct prop_state *RESTRICT state, const char *RESTRICT name)
 {
 	if (UNLIKELY(!state || !name))
 		return;
@@ -51,22 +53,23 @@ void pg_prop_state_init(struct pg_prop_state *RESTRICT state,
 	state->modified = false;
 }
 
-int pg_prop_set(struct pg_prop_state *RESTRICT state, const char *RESTRICT val)
+int prop_set(struct prop_state *RESTRICT state, const char *RESTRICT val)
 {
 	char os_val[PROP_VALUE_MAX];
+	int len;
+	bool was_mod;
 
 	if (UNLIKELY(!state || !val))
 		return -EINVAL;
 
-	int len = __system_property_get(state->name, os_val);
+	len = __system_property_get(state->name, os_val);
 	if (len <= 0)
 		os_val[0] = '\0';
 
 	if (strncmp(os_val, val, PROP_VALUE_MAX) == 0)
 		return 0;
 
-	bool was_mod = state->modified;
-
+	was_mod = state->modified;
 	if (!state->modified) {
 		strncpy(state->val, os_val, PROP_VALUE_MAX - 1);
 		state->val[PROP_VALUE_MAX - 1] = '\0';
@@ -82,7 +85,7 @@ int pg_prop_set(struct pg_prop_state *RESTRICT state, const char *RESTRICT val)
 	return 0;
 }
 
-int pg_prop_reset(struct pg_prop_state *state)
+int prop_reset(struct prop_state *state)
 {
 	if (UNLIKELY(!state || !state->modified))
 		return 0;
@@ -96,13 +99,13 @@ int pg_prop_reset(struct pg_prop_state *state)
 	return 0;
 }
 
-void pg_prop_cleanup(struct pg_prop_state *state)
+void prop_cleanup(struct prop_state *state)
 {
 	if (UNLIKELY(!state))
 		return;
 
 	if (state->modified)
-		pg_prop_reset(state);
+		prop_reset(state);
 
 	state->name[0] = '\0';
 	state->val[0] = '\0';
