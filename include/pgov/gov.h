@@ -18,7 +18,7 @@
  *       - In cases of system pressure read failure, it may automatically close and reopen
  *         epoll triggers for PSI recovery.
  *       - On `NDK_BUILD`, while the display is suspended and the sweep interval has elapsed,
- *         it may invoke `pg_sweep_run()`, which deletes stale files from application cache
+ *         it may invoke `sweep_run()`, which deletes stale files from application cache
  *         directories.
  *
  * @warning This function is strictly designed for a single-threaded execution context.

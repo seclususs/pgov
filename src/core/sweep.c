@@ -5,13 +5,14 @@
 
 #define _GNU_SOURCE
 #include "pgov/sweep.h"
+#include "pgov/compiler.h"
 #include "pgov/fs.h"
 #include "pgov/log.h"
-#include "pgov/task.h"
-#include "pgov/sensor.h"
-#include "pgov/compiler.h"
 #include "pgov/psi.h"
+#include "pgov/sensor.h"
+#include "pgov/task.h"
 #include <dirent.h>
+#include <errno.h>
 #include <fcntl.h>
 #include <string.h>
 #include <sys/stat.h>
@@ -19,11 +20,11 @@
 #include <time.h>
 #include <unistd.h>
 
-struct sweep_ctx {
+struct sweep_context {
 	struct context *ctx;
 	uint64_t now_sec;
-	int nr_files;
-	bool intr;
+	int files_count;
+	bool interrupted;
 };
 
 #define AGE_LIMIT 43200
@@ -45,50 +46,69 @@ static const char *const APP_ROOTS[] = {
 	"/data/media/0/Android/data",
 };
 
-static const char *const SUB_CACHE_DIRS[] = {
+static const char *const CACHE_DIRS[] = {
 	"cache",
 	"files/cache",
 	"files/disk_cache",
 };
 
-static bool sweep_database_file(const char *name)
-{
-	static const char *const DB_EXTS[] = {
-		".db",	   ".db-wal",	  ".db-shm",	 ".db-journal",
-		".sqlite", ".sqlite-wal", ".sqlite-shm", ".sqlite-journal",
-		".wal",	   ".shm",	  ".journal",
-	};
+static const char *const DB_EXTS[] = {
+	".db",
+	".shm",
+	".wal",
+	".db-shm",
+	".db-wal",
+	".sqlite",
+	".journal",
+	".db-journal",
+	".sqlite-shm",
+	".sqlite-wal",
+	".sqlite-journal",
+};
 
-	size_t len = strlen(name);
-	for (size_t i = 0; i < ARRAY_SIZE(DB_EXTS); ++i) {
-		size_t elen = strlen(DB_EXTS[i]);
-		if (len >= elen &&
-		    memcmp(name + len - elen, DB_EXTS[i], elen) == 0)
+static bool check_database_file(const char *name)
+{
+	size_t ext_len;
+	size_t i;
+	size_t len;
+
+	if (UNLIKELY(!name))
+		return false;
+
+	len = strlen(name);
+	for (i = 0; i < ARRAY_SIZE(DB_EXTS); ++i) {
+		ext_len = strlen(DB_EXTS[i]);
+		if (len >= ext_len &&
+		    memcmp(name + len - ext_len, DB_EXTS[i], ext_len) == 0)
 			return true;
 	}
 
 	return false;
 }
 
-static bool sweep_chk_intr(struct sweep_ctx *sctx)
+static bool check_interrupted(struct sweep_context *sctx)
 {
-	if (UNLIKELY(sctx->intr))
+	int32_t backlight = 0;
+	q16_t avg10 = 0;
+
+	if (UNLIKELY(!sctx))
 		return true;
 
-	if ((++sctx->nr_files & INTR_MASK) != 0)
+	if (UNLIKELY(sctx->interrupted))
+		return true;
+
+	if ((++sctx->files_count & INTR_MASK) != 0)
 		return false;
 
-	int32_t bl = 0;
-	sensor_read_backlight(&sctx->ctx->backlight, &bl);
-	if (bl > 0) {
-		sctx->intr = true;
+	sensor_read_backlight(&sctx->ctx->backlight, &backlight);
+	if (backlight > 0) {
+		sctx->interrupted = true;
 		return true;
 	}
 
-	q16_t avg10 = 0;
 	if (psi_read_avg10(PSI_CPU_PATH, &avg10) == 0) {
 		if (avg10 > INT_TO_Q16(MAX_PSI)) {
-			sctx->intr = true;
+			sctx->interrupted = true;
 			return true;
 		}
 	}
@@ -96,150 +116,164 @@ static bool sweep_chk_intr(struct sweep_ctx *sctx)
 	return false;
 }
 
-static enum pg_fs_act sweep_cb(int dfd, const char *name, uint8_t type,
-			       int depth, void *user)
+static enum pg_fs_act process_entry(int dfd, const char *name, uint8_t type,
+				    int depth, void *user)
 {
-	UNUSED(depth);
-	struct sweep_ctx *sctx = user;
+	struct sweep_context *sctx = user;
 	struct stat st;
+	uint64_t age;
+	uint64_t mtime;
 
-	if (sweep_chk_intr(sctx))
+	UNUSED(depth);
+
+	if (check_interrupted(sctx))
 		return FS_STOP;
 
 	if (type == DT_DIR)
 		return FS_KEEP;
 
-	if (sweep_database_file(name))
+	if (check_database_file(name))
 		return FS_KEEP;
 
 	if (fstatat(dfd, name, &st, AT_SYMLINK_NOFOLLOW) != 0)
 		return FS_KEEP;
 
-	uint64_t s_mtime = (st.st_mtime < 0) ? 0 : (uint64_t)st.st_mtime;
-	if (!S_ISREG(st.st_mode) || sctx->now_sec <= s_mtime)
+	mtime = (st.st_mtime < 0) ? 0 : (uint64_t)st.st_mtime;
+	if (!S_ISREG(st.st_mode) || sctx->now_sec <= mtime)
 		return FS_KEEP;
 
-	uint64_t age = sctx->now_sec - s_mtime;
+	age = sctx->now_sec - mtime;
 	if (age > AGE_LIMIT)
 		return FS_DELETE;
 
 	return FS_KEEP;
 }
 
-static void sweep_package(int root_fd, const char *pkg_name,
-			  struct sweep_ctx *sctx)
+static void clean_package(int rfd, const char *pkg_name,
+			  struct sweep_context *sctx)
 {
-	int pkg_fd = openat(root_fd, pkg_name, DIR_FLAGS);
-	if (pkg_fd < 0)
+	int cfd;
+	int pfd;
+	size_t i;
+
+	pfd = openat(rfd, pkg_name, DIR_FLAGS);
+	if (pfd < 0)
 		return;
 
-	for (size_t i = 0; i < ARRAY_SIZE(SUB_CACHE_DIRS); ++i) {
-		if (sctx->intr)
+	for (i = 0; i < ARRAY_SIZE(CACHE_DIRS); ++i) {
+		if (sctx->interrupted)
 			break;
 
-		int cache_fd = openat(pkg_fd, SUB_CACHE_DIRS[i], DIR_FLAGS);
-		if (cache_fd >= 0) {
-			pg_fs_walk_fd(cache_fd, sweep_cb, sctx, MAX_DEPTH);
-			close(cache_fd);
+		cfd = openat(pfd, CACHE_DIRS[i], DIR_FLAGS);
+		if (cfd >= 0) {
+			pg_fs_walk_fd(cfd, process_entry, sctx, MAX_DEPTH);
+			close(cfd);
 		}
 	}
 
-	close(pkg_fd);
+	close(pfd);
 }
 
-static void sweep_process_dirent(int root_fd, struct linux_dirent64 *d,
-				 struct sweep_ctx *sctx)
+static void process_dirent(int rfd, struct linux_dirent64 *dir,
+			   struct sweep_context *sctx)
 {
-	uint8_t dtype = d->d_type;
+	struct stat st;
+	uint8_t dtype;
+	int ret;
 
-	if (sweep_chk_intr(sctx))
+	if (check_interrupted(sctx))
 		return;
 
-	if (d->d_name[0] == '.')
+	if (dir->d_name[0] == '.')
 		return;
 
+	dtype = dir->d_type;
 	if (UNLIKELY(dtype == DT_UNKNOWN)) {
-		struct stat st;
-		int ret;
-		ret = fstatat(root_fd, d->d_name, &st, AT_SYMLINK_NOFOLLOW);
+		ret = fstatat(rfd, dir->d_name, &st, AT_SYMLINK_NOFOLLOW);
 		if (ret == 0 && S_ISDIR(st.st_mode))
 			dtype = DT_DIR;
 	}
 
 	if (dtype == DT_DIR)
-		sweep_package(root_fd, d->d_name, sctx);
+		clean_package(rfd, dir->d_name, sctx);
 }
 
-static void sweep_app_data(int root_fd, struct sweep_ctx *sctx)
+static void scan_app_data(int rfd, struct sweep_context *sctx)
 {
 	char buf[32768];
-	long nrd;
+	struct linux_dirent64 *dir;
+	long pos;
+	long res;
 
 	for (;;) {
 		do {
-			nrd = syscall(SYS_getdents64, root_fd, buf,
-				      sizeof(buf));
-		} while (nrd < 0 && errno == EINTR);
+			res = syscall(SYS_getdents64, rfd, buf, sizeof(buf));
+		} while (res < 0 && errno == EINTR);
 
-		if (nrd <= 0)
+		if (res <= 0)
 			break;
 
-		long bpos = 0;
+		pos = 0;
+		while (pos < res) {
+			dir = (void *)(buf + pos);
+			pos += dir->d_reclen;
 
-		while (bpos < nrd) {
-			struct linux_dirent64 *d = (void *)(buf + bpos);
-			bpos += d->d_reclen;
-
-			if (UNLIKELY(d->d_reclen == 0))
+			if (UNLIKELY(dir->d_reclen == 0))
 				break;
 
-			sweep_process_dirent(root_fd, d, sctx);
-			if (UNLIKELY(sctx->intr))
+			process_dirent(rfd, dir, sctx);
+			if (UNLIKELY(sctx->interrupted))
 				return;
 		}
 	}
 }
 
-void pg_sweep_run(struct context *ctx)
+void sweep_run(struct context *ctx)
 {
-	struct sweep_ctx sctx = { 0 };
-	sctx.ctx = ctx;
-	sctx.intr = false;
-	sctx.nr_files = INTR_MASK;
-
+	struct sweep_context sctx = { 0 };
 	struct timespec ts;
+	int rfd;
+	size_t i;
+
+	if (UNLIKELY(!ctx))
+		return;
+
+	sctx.ctx = ctx;
+	sctx.interrupted = false;
+	sctx.files_count = INTR_MASK;
+
 	clock_gettime(CLOCK_REALTIME, &ts);
 	sctx.now_sec = (uint64_t)ts.tv_sec;
 	if (sctx.now_sec < 1767225600ULL)
 		return;
 
-	if (sweep_chk_intr(&sctx))
+	if (check_interrupted(&sctx))
 		return;
 
 	task_set_uclamp(UCLAMP_UNRESTRICTED);
 
-	for (size_t i = 0; i < ARRAY_SIZE(APP_ROOTS); ++i) {
-		if (sctx.intr)
+	for (i = 0; i < ARRAY_SIZE(APP_ROOTS); ++i) {
+		if (sctx.interrupted)
 			break;
 
-		int root_fd = open(APP_ROOTS[i], DIR_FLAGS);
-		if (root_fd < 0)
+		rfd = open(APP_ROOTS[i], DIR_FLAGS);
+		if (rfd < 0)
 			continue;
 
-		sweep_app_data(root_fd, &sctx);
-		close(root_fd);
+		scan_app_data(rfd, &sctx);
+		close(rfd);
 	}
 
-	for (size_t i = 0; i < ARRAY_SIZE(TEMP_PATHS); ++i) {
-		if (sctx.intr)
+	for (i = 0; i < ARRAY_SIZE(TEMP_PATHS); ++i) {
+		if (sctx.interrupted)
 			break;
 
-		pg_fs_walk(TEMP_PATHS[i], sweep_cb, &sctx, MAX_DEPTH);
+		pg_fs_walk(TEMP_PATHS[i], process_entry, &sctx, MAX_DEPTH);
 	}
 
 	task_set_uclamp(TASK_UCLAMP_MAX);
 
-	if (sctx.intr)
+	if (sctx.interrupted)
 		LOGD("sweep: cycle preempted, intr=1");
 }
 

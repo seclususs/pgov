@@ -167,7 +167,7 @@ static inline bool update_display(struct context *ctx,
 
 		elapsed = time_dt_sec(&ctx->last_sweep, now);
 		if (elapsed > INT_TO_Q16(SWEEP_IVL_SEC)) {
-			pg_sweep_run(ctx);
+			sweep_run(ctx);
 			clock_gettime(CLOCK_MONOTONIC, &ctx->last_sweep);
 		}
 #endif // NDK_BUILD
