@@ -116,7 +116,7 @@ static bool check_interrupted(struct sweep_context *sctx)
 	return false;
 }
 
-static enum pg_fs_act process_entry(int dfd, const char *name, uint8_t type,
+static enum fs_action process_entry(int dfd, const char *name, uint8_t type,
 				    int depth, void *user)
 {
 	struct sweep_context *sctx = user;
@@ -166,7 +166,7 @@ static void clean_package(int rfd, const char *pkg_name,
 
 		cfd = openat(pfd, CACHE_DIRS[i], DIR_FLAGS);
 		if (cfd >= 0) {
-			pg_fs_walk_fd(cfd, process_entry, sctx, MAX_DEPTH);
+			fs_walk_fd(cfd, process_entry, sctx, MAX_DEPTH);
 			close(cfd);
 		}
 	}
@@ -268,7 +268,7 @@ void sweep_run(struct context *ctx)
 		if (sctx.interrupted)
 			break;
 
-		pg_fs_walk(TEMP_PATHS[i], process_entry, &sctx, MAX_DEPTH);
+		fs_walk(TEMP_PATHS[i], process_entry, &sctx, MAX_DEPTH);
 	}
 
 	task_set_uclamp(TASK_UCLAMP_MAX);

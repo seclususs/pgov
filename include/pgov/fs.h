@@ -4,8 +4,8 @@
 #ifndef PGOV_FS_H
 #define PGOV_FS_H
 
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #if defined(NDK_BUILD)
 
@@ -17,14 +17,18 @@ struct linux_dirent64 {
 	char d_name[];
 };
 
-enum pg_fs_act { FS_KEEP = 0, FS_DELETE, FS_STOP };
+enum fs_action {
+	FS_KEEP = 0,
+	FS_DELETE,
+	FS_STOP,
+};
 
-typedef enum pg_fs_act (*pg_fs_cb)(int dfd, const char *name, uint8_t type,
-				   int depth, void *ctx);
+typedef enum fs_action (*fs_callback)(int dfd, const char *name, uint8_t type,
+				      int depth, void *fsctx);
 
-int pg_fs_walk_fd(int dfd, pg_fs_cb cb, void *ctx, int max_depth);
+int fs_walk_fd(int dfd, fs_callback cb, void *fsctx, int max);
 
-int pg_fs_walk(const char *path, pg_fs_cb cb, void *ctx, int max_depth);
+int fs_walk(const char *path, fs_callback cb, void *fsctx, int max);
 
 #endif // NDK_BUILD
 

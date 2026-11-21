@@ -15,112 +15,117 @@
 
 #define DIR_FLAGS (O_RDONLY | O_DIRECTORY | O_NOFOLLOW | O_CLOEXEC | O_NOATIME)
 
-static int walk(int dfd, pg_fs_cb cb, void *ctx, int max_depth, int cur_depth);
+static int walk(int dfd, fs_callback cb, void *fsctx, int max, int depth);
 
-static int dirent(int dfd, struct linux_dirent64 *d, pg_fs_cb cb, void *ctx,
-		  int max_depth, int cur_depth)
+static int process_entry(int dfd, const struct linux_dirent64 *dir,
+			 fs_callback cb, void *fsctx, int max, int depth)
 {
-	uint8_t dtype = d->d_type;
+	struct stat st;
+	enum fs_action action;
+	uint8_t dtype;
+	int flags;
+	int ret;
+	int sfd;
 
-	if (d->d_name[0] == '.' &&
-	    (d->d_name[1] == '\0' ||
-	     (d->d_name[1] == '.' && d->d_name[2] == '\0')))
+	if (dir->d_name[0] == '.' &&
+	    (dir->d_name[1] == '\0' ||
+	     (dir->d_name[1] == '.' && dir->d_name[2] == '\0')))
 		return 0;
 
+	dtype = dir->d_type;
 	if (dtype == DT_LNK)
 		return 0;
 
 	if (UNLIKELY(dtype == DT_UNKNOWN)) {
-		struct stat st;
-		int ret;
-
-		ret = fstatat(dfd, d->d_name, &st, AT_SYMLINK_NOFOLLOW);
+		ret = fstatat(dfd, dir->d_name, &st, AT_SYMLINK_NOFOLLOW);
 		if (ret == 0 && S_ISDIR(st.st_mode))
 			dtype = DT_DIR;
 	}
 
-	enum pg_fs_act act = cb(dfd, d->d_name, dtype, cur_depth, ctx);
-
-	if (act == FS_STOP)
+	action = cb(dfd, dir->d_name, dtype, depth, fsctx);
+	if (action == FS_STOP)
 		return -ECANCELED;
 
-	if (act == FS_DELETE) {
-		int flgs = (dtype == DT_DIR) ? AT_REMOVEDIR : 0;
-		unlinkat(dfd, d->d_name, flgs);
+	if (action == FS_DELETE) {
+		flags = (dtype == DT_DIR) ? AT_REMOVEDIR : 0;
+		unlinkat(dfd, dir->d_name, flags);
 		return 0;
 	}
 
 	if (dtype == DT_DIR) {
-		int sfd = openat(dfd, d->d_name, DIR_FLAGS);
+		sfd = openat(dfd, dir->d_name, DIR_FLAGS);
 		if (sfd < 0)
 			return 0;
 
-		int stop = walk(sfd, cb, ctx, max_depth, cur_depth + 1);
-
+		ret = walk(sfd, cb, fsctx, max, depth + 1);
 		close(sfd);
-
-		if (stop)
-			return stop;
+		if (ret != 0)
+			return ret;
 	}
 
 	return 0;
 }
 
-static int walk(int dfd, pg_fs_cb cb, void *ctx, int max_depth, int cur_depth)
+static int walk(int dfd, fs_callback cb, void *fsctx, int max, int depth)
 {
 	char buf[8192];
-	long nread;
+	const struct linux_dirent64 *dir;
+	long pos;
+	long res;
+	int ret;
 
-	if (cur_depth > max_depth)
+	if (depth > max)
 		return 0;
 
 	for (;;) {
 		do {
-			nread = syscall(SYS_getdents64, dfd, buf, sizeof(buf));
-		} while (nread < 0 && errno == EINTR);
+			res = syscall(SYS_getdents64, dfd, buf, sizeof(buf));
+		} while (res < 0 && errno == EINTR);
 
-		if (nread <= 0)
+		if (res <= 0)
 			break;
 
-		long bpos = 0;
+		pos = 0;
+		while (pos < res) {
+			dir = (void *)(buf + pos);
+			pos += dir->d_reclen;
 
-		while (bpos < nread) {
-			struct linux_dirent64 *d = (void *)(buf + bpos);
-			bpos += d->d_reclen;
-
-			if (UNLIKELY(d->d_reclen == 0))
+			if (UNLIKELY(dir->d_reclen == 0))
 				break;
 
-			int ret = dirent(dfd, d, cb, ctx, max_depth, cur_depth);
-			if (ret)
+			ret = process_entry(dfd, dir, cb, fsctx, max, depth);
+			if (ret != 0)
 				return ret;
 		}
 	}
 
-	return (nread < 0) ? -errno : 0;
+	return (res < 0) ? -errno : 0;
 }
 
-int pg_fs_walk_fd(int dfd, pg_fs_cb cb, void *ctx, int max_depth)
+int fs_walk_fd(int dfd, fs_callback cb, void *fsctx, int max)
 {
 	if (dfd < 0)
 		return -EBADF;
 
-	if (UNLIKELY(!cb || max_depth < 0))
+	if (UNLIKELY(!cb || max < 0))
 		return -EINVAL;
 
-	return walk(dfd, cb, ctx, max_depth, 0);
+	return walk(dfd, cb, fsctx, max, 0);
 }
 
-int pg_fs_walk(const char *path, pg_fs_cb cb, void *ctx, int max_depth)
+int fs_walk(const char *path, fs_callback cb, void *fsctx, int max)
 {
-	if (UNLIKELY(!path || !cb || max_depth < 0))
+	int fd;
+	int ret;
+
+	if (UNLIKELY(!path || !cb || max < 0))
 		return -EINVAL;
 
-	int fd = open(path, DIR_FLAGS);
+	fd = open(path, DIR_FLAGS);
 	if (fd < 0)
 		return -errno;
 
-	int ret = pg_fs_walk_fd(fd, cb, ctx, max_depth);
+	ret = fs_walk_fd(fd, cb, fsctx, max);
 	close(fd);
 
 	return ret;
