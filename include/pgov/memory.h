@@ -16,6 +16,6 @@
  *       - Prioritizes `MCL_ONFAULT` (lazy locking) to minimize initial footprint,
  *         falling back to immediate aggressive locking if the kernel lacks support.
  */
-void pg_memory_lock(void);
+void memory_lock(void);
 
 #endif // PGOV_MEMORY_H

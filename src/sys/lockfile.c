@@ -9,14 +9,15 @@
 #include <sys/file.h>
 #include <unistd.h>
 
-int pg_lockfile_init(const char *path)
+int lockfile_init(const char *path)
 {
 	int err;
+	int fd;
 
 	if (UNLIKELY(!path))
 		return -EINVAL;
 
-	int fd = open(path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
+	fd = open(path, O_CREAT | O_RDWR | O_CLOEXEC, 0600);
 	if (fd < 0) {
 		err = errno;
 		LOGE("lockfile: failed to open lockfile %s err=%d", path, err);
@@ -36,7 +37,7 @@ err_close:
 	return err;
 }
 
-void pg_lockfile_close(int fd)
+void lockfile_close(int fd)
 {
 	if (fd >= 0)
 		close(fd);

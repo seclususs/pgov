@@ -10,7 +10,7 @@
 #define MCL_ONFAULT 4
 #endif
 
-void pg_memory_lock(void)
+void memory_lock(void)
 {
 	if (mlockall(MCL_CURRENT | MCL_FUTURE | MCL_ONFAULT) == 0) {
 		LOGD("memory: smart ram locking enabled");

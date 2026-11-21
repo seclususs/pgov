@@ -4,7 +4,7 @@
 #ifndef PGOV_LOCKFILE_H
 #define PGOV_LOCKFILE_H
 
-int pg_lockfile_init(const char *path);
-void pg_lockfile_close(int fd);
+int lockfile_init(const char *path);
+void lockfile_close(int fd);
 
 #endif // PGOV_LOCKFILE_H

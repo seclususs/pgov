@@ -163,7 +163,7 @@ static void init_os_environment(void)
 
 	pg_signal_catch_crash(crash_restore);
 	task_protect_oom();
-	pg_memory_lock();
+	memory_lock();
 	task_set_max_fd();
 	task_set_stack_limit(STACK_SIZE);
 	task_set_core_affinity();
@@ -279,7 +279,7 @@ static void cleanup_context(struct context *ctx)
 	if (ctx->sfd >= 0)
 		pg_signal_close(ctx->sfd);
 
-	pg_lockfile_close(ctx->lfd);
+	lockfile_close(ctx->lfd);
 	psi_cleanup(&ctx->psi_state);
 	sensor_close_temp(&ctx->cpu_temp);
 	sensor_close_temp(&ctx->bat_temp);
@@ -302,7 +302,7 @@ int daemon_init(void)
 	init_os_environment();
 	LOGI("daemon: initiating daemon sequence");
 
-	dctx.lfd = pg_lockfile_init(PATH_LOCK);
+	dctx.lfd = lockfile_init(PATH_LOCK);
 	if (dctx.lfd < 0) {
 		ret = dctx.lfd;
 		goto cleanup;
