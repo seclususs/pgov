@@ -161,7 +161,7 @@ static void init_os_environment(void)
 		close(fd);
 	}
 
-	pg_signal_catch_crash(crash_restore);
+	signal_catch_crash(crash_restore);
 	task_protect_oom();
 	memory_lock();
 	task_set_max_fd();
@@ -251,7 +251,7 @@ static int init_sensors_and_triggers(struct context *ctx)
 
 	psi_init(&ctx->psi_state, PSI_CPU_PATH);
 
-	ctx->sfd = pg_signal_init();
+	ctx->sfd = signal_init();
 	if (ctx->sfd < 0)
 		return ctx->sfd;
 
@@ -277,7 +277,7 @@ static void cleanup_context(struct context *ctx)
 		psi_trigger_close(ctx->tfd);
 
 	if (ctx->sfd >= 0)
-		pg_signal_close(ctx->sfd);
+		signal_close(ctx->sfd);
 
 	lockfile_close(ctx->lfd);
 	psi_cleanup(&ctx->psi_state);

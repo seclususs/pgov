@@ -18,28 +18,33 @@ static const int CRASH_SIGS[NR_CRASH_SIGS] = {
 	SIGILL,
 };
 
-static struct sigaction prev_act[NR_CRASH_SIGS];
+static struct sigaction prevsa[NR_CRASH_SIGS];
 static void (*crash_hook)(void);
 
-static void crash_handler(int sig, siginfo_t *info, void *context)
+static void crash_handler(int sig, siginfo_t *info, void *sigctx)
 {
 	const char msg[] = "\n[PGOV] fatal: daemon crashed\n";
-	ssize_t unused = write(STDERR_FILENO, msg, sizeof(msg) - 1);
-	UNUSED(unused);
+	const struct sigaction *old;
+	void (*hook)(void);
+	ssize_t res;
+	int i;
 
-	void (*hook)(void) = crash_hook;
+	res = write(STDERR_FILENO, msg, sizeof(msg) - 1);
+	UNUSED(res);
+
+	hook = crash_hook;
 	crash_hook = NULL;
 	if (hook)
 		hook();
 
-	for (int i = 0; i < NR_CRASH_SIGS; i++) {
+	for (i = 0; i < NR_CRASH_SIGS; i++) {
 		if (CRASH_SIGS[i] != sig)
 			continue;
 
-		const struct sigaction *old = &prev_act[i];
+		old = &prevsa[i];
 		if (old->sa_flags & SA_SIGINFO) {
 			if (old->sa_sigaction)
-				old->sa_sigaction(sig, info, context);
+				old->sa_sigaction(sig, info, sigctx);
 
 		} else if (old->sa_handler != SIG_DFL &&
 			   old->sa_handler != SIG_IGN) {
@@ -53,10 +58,11 @@ static void crash_handler(int sig, siginfo_t *info, void *context)
 	(void)raise(sig);
 }
 
-int pg_signal_init(void)
+int signal_init(void)
 {
 	sigset_t mask;
 	int err;
+	int sfd;
 
 	sigemptyset(&mask);
 	sigaddset(&mask, SIGINT);
@@ -69,7 +75,7 @@ int pg_signal_init(void)
 		return -err;
 	}
 
-	int sfd = signalfd(-1, &mask, SFD_CLOEXEC | SFD_NONBLOCK);
+	sfd = signalfd(-1, &mask, SFD_CLOEXEC | SFD_NONBLOCK);
 	if (sfd == -1) {
 		err = errno;
 		LOGE("signal: failed to create signalfd err=%d", err);
@@ -83,20 +89,22 @@ out_unblock:
 	return -err;
 }
 
-void pg_signal_catch_crash(void (*hook)(void))
+void signal_catch_crash(void (*hook)(void))
 {
 	struct sigaction sa = { 0 };
+	int i;
+
 	sa.sa_flags = SA_SIGINFO | SA_RESTART;
 	sa.sa_sigaction = crash_handler;
 	sigemptyset(&sa.sa_mask);
 
 	crash_hook = hook;
 
-	for (int i = 0; i < NR_CRASH_SIGS; i++)
-		sigaction(CRASH_SIGS[i], &sa, &prev_act[i]);
+	for (i = 0; i < NR_CRASH_SIGS; i++)
+		sigaction(CRASH_SIGS[i], &sa, &prevsa[i]);
 }
 
-void pg_signal_close(int fd)
+void signal_close(int fd)
 {
 	if (fd >= 0)
 		close(fd);

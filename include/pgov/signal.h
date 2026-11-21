@@ -16,9 +16,10 @@
  *
  * @return A valid file descriptor (owned by the caller) on success, or -errno on failure.
  */
-int pg_signal_init(void);
+int signal_init(void);
 
-void pg_signal_catch_crash(void (*hook)(void));
-void pg_signal_close(int fd);
+void signal_catch_crash(void (*hook)(void));
+
+void signal_close(int fd);
 
 #endif // PGOV_SIGNAL_H
