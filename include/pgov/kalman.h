@@ -7,21 +7,9 @@
 #include "pgov/math.h"
 #include <stdbool.h>
 
-/**
- * @brief State container for the highly-optimized, fixed-point Kalman Filter.
- *
- * @note MATHEMATICAL CONTRACTS:
- *       - Operates entirely on Q16/Q32 fixed-point arithmetic to bypass FPU latency.
- *       - Tracks the filtered signal (`x_pos`) and its velocity (`x_vel`):
- *         a PSI stall percentage for the PSI monitor, a CPU temperature in
- *         degrees Celsius for the thermal loop.
- *       - Maintains the state covariance matrix (`p00`, `p01`, etc.) and adapts the
- *         measurement and process noise (`r_meas`, `q_vel`) from an EMA of the
- *         innovation covariance (`cov_y`).
- *       - Calculates `nis` (Normalized Innovation Squared) from the raw innovation so
- *         that consumers can detect a structural break during sudden architectural
- *         workload shifts (e.g., app launches) and snap their own state to the
- *         measurement.
+/*
+ * Fixed-point Q16/Q32 Kalman filter tracking position, velocity, and
+ * adaptive innovation noise for PSI pressure and temperature signals
  */
 struct kalman_state {
 	q16_t x_pos;
@@ -41,16 +29,10 @@ void kalman_init(struct kalman_state *state);
 
 void kalman_reset(struct kalman_state *state);
 
-/**
- * @brief Injects new raw measurements and advances the filter prediction by dt_sec.
+/*
+ * Advance filter prediction by dt_sec and update with meas
  *
- * @param state  The filter state matrix. Borrowed for mutation.
- * @param meas   The raw, noisy measurement (e.g., PSI stall percentage or CPU
- *               temperature in degrees Celsius), clamped to [0, 500].
- * @param dt_sec Delta time in Q16 fixed-point format since the last measurement.
- *
- * @return The smoothed position estimate (`x_pos`) after the measurement update,
- *         floored at zero.
+ * Returns the smoothed position estimate floored at zero
  */
 q16_t kalman_update(struct kalman_state *state, q16_t meas, q16_t dt_sec);
 

@@ -26,6 +26,12 @@ enum fs_action {
 typedef enum fs_action (*fs_callback)(int dfd, const char *name, uint8_t type,
 				      int depth, void *fsctx);
 
+/*
+ * Recursively walk directory tree up to max depth, invoking callback on
+ * each entry. The callback returns FS_KEEP, FS_DELETE, or FS_STOP
+ *
+ * Returns 0 on success, or -errno on failure
+ */
 int fs_walk_fd(int dfd, fs_callback cb, void *fsctx, int max);
 
 int fs_walk(const char *path, fs_callback cb, void *fsctx, int max);

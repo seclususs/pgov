@@ -28,8 +28,18 @@ struct sensor_backlight {
 	uint8_t buf[16];
 };
 
+/*
+ * Scan sysfs thermal zones and select the best matching CPU or SoC sensor
+ *
+ * Returns 0 on success, or a negative error code (-EINVAL, -ENOENT, -ENODEV)
+ */
 int sensor_scan_thermal_zone(char *path, size_t len);
 
+/*
+ * Scan backlight and LED brightness nodes, returning the count of usable nodes
+ *
+ * Returns count on success, or a negative error code (-EINVAL, -ENODEV)
+ */
 int sensor_scan_backlight(char (*paths)[SENSOR_PATH_LEN], size_t max);
 
 void sensor_init_cpu_temp(struct sensor_temp *sensor, const char *path);
@@ -57,6 +67,11 @@ int sensor_read_battery_capacity(struct sensor_battery *sensor,
 
 int sensor_read_backlight(struct sensor_backlight *sensor, int32_t *brightness);
 
+/*
+ * Find thermal trip point and return threshold temperature in Q16
+ *
+ * Returns trip temperature on success, or fallback on error
+ */
 q16_t sensor_get_trip_temp(q16_t fallback);
 
 #endif // PGOV_SENSOR_H

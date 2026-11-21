@@ -24,17 +24,9 @@ enum display_state {
 	DISP_SUSPEND,
 };
 
-/**
- * @brief The centralized, cache-aligned state machine container for the daemon.
- *
- * @note MEMORY LAYOUT & ARCHITECTURE:
- *       - Declared with `ALIGNED(64)`, so the object starts on 64-byte cache line boundary.
- *         Any addition or rearrangement of struct members MUST be carefully audited to 
- *         prevent cache line bouncing or unnecessary padding inflation.
- *       - Encapsulates all hardware sensors, node file descriptors, and mathematical 
- *         integrators (PID/Kalman). 
- *       - The lifecycle of this object spans the entire daemon execution; it must remain 
- *         valid and strictly mutated by a single event-reactor thread.
+/*
+ * Central state container, aligned to 64 bytes (cache line).
+ * Mutated exclusively by the single reactor thread
  */
 struct ALIGNED(64) context {
 	struct psi_state psi_state;

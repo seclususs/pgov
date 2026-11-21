@@ -6,23 +6,11 @@
 
 #include "pgov/state.h"
 
-/**
- * @brief Executes a single iteration of the governor's control loop.
+/*
+ * Execute one tick of the governor control loop by polling sensors,
+ * computing demand, updating kernel nodes, and set next wake timeout
  *
- * @param ctx Mutable reference to the global governor state machine.
- *
- * @note SIDE EFFECTS & SYSTEM IMPACT:
- *       - Performs blocking/non-blocking reads on hardware sensors (battery, thermal, backlight).
- *       - Emits pwrite() syscalls directly to kernel nodes if scheduler parameters drift.
- *       - Modifies `ctx->next_wake` to dictate the caller's subsequent sleep/poll duration.
- *       - In cases of system pressure read failure, it may automatically close and reopen
- *         epoll triggers for PSI recovery.
- *       - On `NDK_BUILD`, while the display is suspended and the sweep interval has elapsed,
- *         it may invoke `sweep_run()`, which deletes stale files from application cache
- *         directories.
- *
- * @warning This function is strictly designed for a single-threaded execution context.
- *          Concurrent invocation leads to undefined behavior and race conditions.
+ * Must be called from the single reactor thread
  */
 void gov_run(struct context *ctx);
 

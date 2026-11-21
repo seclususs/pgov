@@ -20,6 +20,10 @@ struct poll_state {
 
 void poll_init(struct poll_state *state);
 
+/*
+ * Calculate adaptive next sleep interval in milliseconds based on current
+ * system pressure, 300s moving average, and pressure trend velocity
+ */
 uint64_t poll_calc_next(struct poll_state *state, q16_t cur_pressure,
 			q16_t avg300, q16_t pressure_velocity);
 

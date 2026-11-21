@@ -30,21 +30,12 @@ struct node_cache {
 	bool active;
 };
 
-/**
- * @brief Acquires a persistent file descriptor from candidate node paths.
+/*
+ * Probe candidate paths sequentially to open a persistent node fd.
+ * If opened, cache->fd takes ownership and must be released via
+ * node_cache_cleanup()
  *
- * @param cache Pointer to an uninitialized cache structure. Owned by caller.
- * @param paths NULL-terminated array of candidate paths. Read-only borrow.
- *
- * @note SIDE EFFECTS & MEMORY OWNERSHIP:
- *       - Probes candidate paths sequentially with O_WRONLY | O_CLOEXEC flags.
- *       - If successful, `cache->fd` takes ownership of the open description.
- *         The caller must eventually release it via node_cache_cleanup().
- *       - Fails gracefully: If no candidate opens, flags `cache->active = false`
- *         and downstream updates become zero-cost no-ops.
- *
- * @return 1 if a candidate node is opened and activated, 0 if none opened,
- *         or a negative POSIX error code (-EINVAL) on invalid arguments.
+ * Returns 1 on success, 0 if no candidate opened, or -EINVAL on bad arguments
  */
 int node_cache_init(struct node_cache *RESTRICT cache,
 		    const char *const *RESTRICT paths);
@@ -53,28 +44,39 @@ void node_restore(struct node_cache *cache);
 
 void node_cache_cleanup(struct node_cache *cache);
 
+/*
+ * Read and parse a 32-bit signed integer from node path
+ *
+ * Returns 0 on success, or -errno on failure
+ */
 int node_read_i32(const char *path, int32_t *out_val);
 
+/*
+ * Read string from path into buf up to len - 1 bytes and strip trailing
+ * newline or carriage return
+ *
+ * Returns number of bytes read on success, or -1 on error
+ */
 ssize_t node_read_str(const char *path, char *buf, size_t len);
 
-/**
- * @brief Flushes a 64-bit unsigned integer to a node using a positional write.
+/*
+ * Format val as ASCII decimal and write via pwrite() at offset 0
  *
- * @param fd  A valid file descriptor opened with at least O_WRONLY. Borrowed (not owned).
- * @param val The raw data to be formatted as an ASCII string and written.
- *
- * @note IMPLICIT CONTRACTS & SYSTEM BEHAVIOR:
- *       - Bypasses user-space buffering; issues a direct `pwrite` syscall at absolute offset 0.
- *       - Tolerates `EINTR` by retrying the syscall loop gracefully.
- *       - String formatting allocates a fixed-size 32-byte buffer on the stack, guaranteeing
- *         zero heap allocations (malloc-free hot path).
- *
- * @return 0 on complete write, or a negative POSIX error code (e.g., -EIO, -EBADF).
+ * Returns 0 on success, or a negative error code (-EBADF, -EIO, -errno)
  */
 int node_write_stream(int fd, uint64_t val);
 
+/*
+ * Write null-terminated string to path with trailing newline if absent
+ *
+ * Returns 0 on success, or a negative error code (-EINVAL, -EIO, -errno)
+ */
 int node_write(const char *path, const char *val);
 
+/*
+ * Update cached node value according to threshold check with exponential
+ * backoff retry on failure
+ */
 void node_update(struct node_cache *cache, uint64_t val, bool force,
 		 const struct node_check *check);
 

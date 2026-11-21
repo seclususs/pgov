@@ -28,6 +28,10 @@ struct thermal_state {
 
 void thermal_init(struct thermal_state *state);
 
+/*
+ * Update thermal PID regulator and Kalman filter based on CPU and battery
+ * temperatures. Returns performance scaling factor in Q16 format [0.1, 1.0]
+ */
 q16_t thermal_update(struct thermal_state *state, q16_t cpu_temp,
 		     q16_t bat_temp, const struct thermal_param *param,
 		     const struct timespec *now);

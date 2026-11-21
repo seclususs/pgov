@@ -7,27 +7,22 @@
 #include "pgov/compiler.h"
 #include <stdint.h>
 
-/**
- * @brief Pins the current calling thread to the efficiency (LITTLE) cores.
+/*
+ * Bind calling thread affinity to efficiency (LITTLE) CPU cores via
+ * sched_setaffinity(). To all cores if little cores cannot be isolated
  *
- * @note SYSTEM SIDE-EFFECTS & CONTRACTS:
- *       - Discovers the hardware topology dynamically by parsing sysfs capacity/frequency
- *         nodes across all logical cores, selecting the cores with the lowest
- *         `cpu_capacity` or, failing that, the lowest `cpuinfo_max_freq`.
- *       - If neither yields a core set that can be applied, it logs a warning and binds
- *         the thread to every core instead, which still counts as success.
- *       - Mutates the thread's scheduling context via the `sched_setaffinity` syscall.
- *       - This function MUST be called during daemon initialization, but BEFORE the
- *         realtime scheduling priorities (e.g., FIFO/RR) are applied.
- *
- * @return 0 on successful affinity binding (including the all-cores fallback), or a
- *         negative POSIX error code (-EINVAL if no cores are reported, otherwise -errno).
+ * Returns 0 on success, or a negative POSIX error code (-EINVAL, -errno)
  */
 int topo_set_little_core(void);
 
 int32_t topo_get_core_count(void);
 int32_t topo_get_maxfrq_khz(void);
 
+/*
+ * Read aggregate and min/max cpu_capacity values across configured cores
+ *
+ * Returns 0 on success, or a negative error code (-EINVAL, -ENODATA)
+ */
 int topo_get_cpu_capacity(int32_t *RESTRICT total,
 			  int32_t *RESTRICT min_capacity,
 			  int32_t *RESTRICT max_capacity);

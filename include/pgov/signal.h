@@ -4,20 +4,16 @@
 #ifndef PGOV_SIGNAL_H
 #define PGOV_SIGNAL_H
 
-/**
- * @brief Hijacks POSIX signals and converts them into a synchronous file descriptor.
+/*
+ * Block termination signals (SIGINT, SIGTERM, SIGHUP) and create a
+ * signal file descriptor for epoll integration.
+ * Caller owns the returned file descriptor
  *
- * @note MEMORY OWNERSHIP & IMPLICIT ARCHITECTURE:
- *       - Issues `sigprocmask(SIG_BLOCK, ...)` globally, disabling standard asynchronous
- *         delivery for SIGINT, SIGTERM, and SIGHUP.
- *       - Transfers the signal delivery mechanism to the returned `signalfd`.
- *       - The caller assumes ownership of the returned file descriptor and MUST
- *         integrate it into the epoll reactor loop.
- *
- * @return A valid file descriptor (owned by the caller) on success, or -errno on failure.
+ * Returns fd on success, or -errno on failure
  */
 int signal_init(void);
 
+/* Register signal crash hook (SIGSEGV, SIGFPE, SIGABRT, SIGILL) */
 void signal_catch_crash(void (*hook)(void));
 
 void signal_close(int fd);

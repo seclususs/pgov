@@ -8,6 +8,10 @@
 
 #include "pgov/state.h"
 
+/*
+ * Traverse and delete stale cache files from application directories
+ * when the display is suspended and the sweep interval has elapsed
+ */
 void sweep_run(struct context *ctx);
 
 #endif // PGOV_SWEEP_H

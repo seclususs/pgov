@@ -4,21 +4,11 @@
 #ifndef PGOV_DAEMON_H
 #define PGOV_DAEMON_H
 
-/**
- * @brief Bootstraps the daemon lifecycle, system OS limits, and the event reactor.
+/*
+ * Bootstrap the daemon process, acquire the single-instance lockfile,
+ * configure system limits, discover topology, and run the event reactor
  *
- * @note ARCHITECTURAL LIFECYCLE & CONTRACTS:
- *       - **Initialization Phase**: Executes a rigid sequence of privilege checks,
- *         single-instance `flock()` lockfile acquisition, OS shielding
- *         (`mlockall`, `rlimit`), and topology discovery.
- *       - **Reactor Phase**: Transfers execution ownership to the `epoll` blocking loop.
- *       - **Teardown Phase**: Features a unified `cleanup:` jump label that guarantees 
- *         deterministic destruction of all acquired file descriptors
- *         (node caches, signalfd, PSI triggers) regardless of exit status.
- *       - Failing to complete initialization aborts safely without leaking allocated resources.
- *
- * @return 0 upon successful, clean daemon shutdown, or a negative POSIX error code
- *         if the bootstrap sequence or reactor encounters an unrecoverable fault.
+ * Returns 0 on clean shutdown, or a negative POSIX error code on failure
  */
 int daemon_init(void);
 

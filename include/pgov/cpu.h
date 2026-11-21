@@ -73,6 +73,10 @@ struct cpu_state {
 PURE bool cpu_transient(const struct cpu_state *state,
 			const struct cpu_param *param);
 
+/*
+ * Update energy-battery tracking integral and derivative terms in Q16 format
+ * for governor PID workload scaling
+ */
 void cpu_update_integral(struct cpu_state *RESTRICT state, q16_t bat_level,
 			 q16_t dt_real, q16_t *RESTRICT integral,
 			 q16_t *RESTRICT integral_dt);
@@ -80,6 +84,10 @@ void cpu_update_integral(struct cpu_state *RESTRICT state, q16_t bat_level,
 void cpu_update_efficiency(struct cpu_efficiency *efficiency, q16_t bat_level,
 			   q16_t therm_scale, q16_t avg300);
 
+/*
+ * Calculate required CPU load demand in Q16 format based on current
+ * system pressure, velocity, thermal scaling, and integral history
+ */
 q16_t cpu_calc_load_demand(struct cpu_state *state,
 			   const struct cpu_demand *demand,
 			   const struct cpu_param *param);

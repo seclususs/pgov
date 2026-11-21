@@ -37,6 +37,12 @@ struct psi_state {
 
 bool psi_available(void);
 
+/*
+ * Open a pressure stall trigger file descriptor for epoll monitoring.
+ * Caller owns the returned file descriptor and must close it
+ *
+ * Returns fd on success, or -errno on failure
+ */
 int psi_trigger_open(const char *path, int32_t threshold_us, int32_t window_us);
 
 void psi_trigger_close(int fd);
@@ -47,24 +53,16 @@ void psi_init(struct psi_state *state, const char *path);
 
 void psi_cleanup(struct psi_state *state);
 
-/**
- * @brief Parses raw Linux PSI strings and feeds the data into the Kalman filter.
+/*
+ * Read and parse pressure stall metrics without dynamic allocation,
+ * then update the internal Kalman filter
  *
- * @param state  Pointer to the initialized PSI state machine. Borrowed for mutation.
- * @param sample Output structure to store the computed PSI metrics.
- * @param now    Current monotonic timestamp for dt (delta time) calculations.
- *
- * @note IMPLICIT CONTRACTS & SYSTEM IMPACT:
- *       - Performs zero-allocation string parsing directly on the state's fixed 512-byte
- *         buffer (`state->buf`) to minimize hot-path latency.
- *       - Implements a resilient `pread` loop to bypass seeking overhead.
- *       - Deeply mutates `state->filter` (Kalman state) by injecting the newly parsed metrics.
- *
- * @return 0 on successful parse and filter update, or a negative POSIX error code.
+ * Returns 0 on success, or -errno on failure
  */
 int psi_read(struct psi_state *state, struct psi_sample *sample,
 	     const struct timespec *now);
 
+/* Read avg10 metric from pressure path. Returns 0 on success, or -errno */
 int psi_read_avg10(const char *path, q16_t *avg10);
 
 #endif // PGOV_PSI_H
