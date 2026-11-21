@@ -329,6 +329,7 @@ int pg_daemon_init(void)
 
 	clock_gettime(CLOCK_MONOTONIC, &dctx.last_bat);
 	clock_gettime(CLOCK_MONOTONIC, &dctx.last_therm);
+	clock_gettime(CLOCK_MONOTONIC, &dctx.last_tick);
 
 #ifdef NDK_BUILD
 	clock_gettime(CLOCK_MONOTONIC, &dctx.last_sweep);
@@ -337,9 +338,8 @@ int pg_daemon_init(void)
 	sensor_read_battery_capacity(&dctx.battery, &dctx.level_bat);
 	sensor_read_battery_temp(&dctx.bat_temp, &dctx.temp_bat);
 
-	pg_gov_init(&dctx);
-	dctx.on_trigger = pg_gov_process;
-	dctx.on_timeout = pg_gov_process;
+	dctx.on_trigger = gov_run;
+	dctx.on_timeout = gov_run;
 	LOGI("daemon: entering epoll reactor loop");
 	ret = epoll_run(&dctx);
 

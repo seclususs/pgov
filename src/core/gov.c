@@ -2,16 +2,16 @@
 // Copyright (C) 2026 seclususs
 
 #include "pgov/gov.h"
-#include "pgov/param.h"
-#include "pgov/log.h"
-#include "pgov/epoll.h"
 #include "pgov/compiler.h"
 #include "pgov/cpu.h"
+#include "pgov/epoll.h"
+#include "pgov/log.h"
 #include "pgov/math.h"
+#include "pgov/node.h"
+#include "pgov/param.h"
 #include "pgov/poll.h"
 #include "pgov/psi.h"
 #include "pgov/sensor.h"
-#include "pgov/node.h"
 #include "pgov/sweep.h"
 #include "pgov/thermal.h"
 #include "pgov/time.h"
@@ -24,9 +24,9 @@
 #define CHECK_MIG 50000
 #define CHECK_WALT 5
 #define CHECK_UCL 32
-#define BAT_CHK_SEC 5
-#define THERM_CHK_SEC 1
-#define DISP_CHK_SEC 1
+#define BAT_CHECK_SEC 5
+#define THERM_CHECK_SEC 1
+#define DISP_CHECK_SEC 1
 #define TEMP_FAIL_MAX 10
 #define PSI_FAIL_MAX 6
 
@@ -64,82 +64,80 @@ static const struct node_check check_ucl = {
 	CHECK_UCL,
 };
 
-static const struct node_check check_ucl_max = {
-	NODE_CHECK_ABSOLUTE,
-	CHECK_UCL,
-};
-
-int pg_gov_init(struct context *ctx)
-{
-	if (UNLIKELY(!ctx))
-		return -EINVAL;
-
-	clock_gettime(CLOCK_MONOTONIC, &ctx->last_tick);
-	return 0;
-}
-
 static inline void relax_sched_tunables(struct context *ctx)
 {
-	const struct cpu_limit *l = &param_sched;
-	const uint64_t q_ns = QUANT_NS;
+	const uint64_t quant = QUANT_NS;
+	uint64_t val;
 
 	if (ctx->sched_uclmin.active && ctx->sched_uclmin.last != 0)
 		node_update(&ctx->sched_uclmin, 0, true, NULL);
 
 	if (ctx->sched_uclmax.active) {
-		uint64_t v_ucl = math_sanitize_u64(
-			l->susp_ucl, (uint64_t)Q16_TO_INT(l->susp_ucl));
-		if (ctx->sched_uclmax.last != v_ucl)
-			node_update(&ctx->sched_uclmax, v_ucl, true, NULL);
+		val = math_sanitize_u64(
+			param_sched.susp_ucl,
+			(uint64_t)Q16_TO_INT(param_sched.susp_ucl));
+
+		if (ctx->sched_uclmax.last != val)
+			node_update(&ctx->sched_uclmax, val, true, NULL);
 	}
 
 	if (ctx->sched_lat.active) {
-		uint64_t v_lat =
-			math_quantize_u64(l->max_lat, l->max_lat, q_ns);
-		if (ctx->sched_lat.last != v_lat)
-			node_update(&ctx->sched_lat, v_lat, true, NULL);
+		val = math_quantize_u64(param_sched.max_lat,
+					param_sched.max_lat, quant);
+
+		if (ctx->sched_lat.last != val)
+			node_update(&ctx->sched_lat, val, true, NULL);
 	}
 
 	if (ctx->sched_gran.active) {
-		uint64_t v_gran =
-			math_quantize_u64(l->max_gran, l->max_gran, q_ns);
-		if (ctx->sched_gran.last != v_gran)
-			node_update(&ctx->sched_gran, v_gran, true, NULL);
+		val = math_quantize_u64(param_sched.max_gran,
+					param_sched.max_gran, quant);
+
+		if (ctx->sched_gran.last != val)
+			node_update(&ctx->sched_gran, val, true, NULL);
 	}
 
 	if (ctx->sched_wake.active) {
-		uint64_t v_wake =
-			math_quantize_u64(l->max_wake, l->max_wake, q_ns);
-		if (ctx->sched_wake.last != v_wake)
-			node_update(&ctx->sched_wake, v_wake, true, NULL);
+		val = math_quantize_u64(param_sched.max_wake,
+					param_sched.max_wake, quant);
+
+		if (ctx->sched_wake.last != val)
+			node_update(&ctx->sched_wake, val, true, NULL);
 	}
 
 	if (ctx->sched_mig.active) {
-		uint64_t v_mig =
-			math_quantize_u64(l->max_mig, l->min_mig, q_ns);
-		if (ctx->sched_mig.last != v_mig)
-			node_update(&ctx->sched_mig, v_mig, true, NULL);
+		val = math_quantize_u64(param_sched.max_mig,
+					param_sched.min_mig, quant);
+
+		if (ctx->sched_mig.last != val)
+			node_update(&ctx->sched_mig, val, true, NULL);
 	}
 
 	if (ctx->sched_walt.active) {
-		uint64_t v_wlt = math_sanitize_u64(
-			l->min_walt, (uint64_t)Q16_TO_INT(l->min_walt));
-		if (ctx->sched_walt.last != v_wlt)
-			node_update(&ctx->sched_walt, v_wlt, true, NULL);
+		val = math_sanitize_u64(
+			param_sched.min_walt,
+			(uint64_t)Q16_TO_INT(param_sched.min_walt));
+
+		if (ctx->sched_walt.last != val)
+			node_update(&ctx->sched_walt, val, true, NULL);
 	}
 }
 
-static inline bool update_disp(struct context *ctx, const struct timespec *now)
+static inline bool update_display(struct context *ctx,
+				  const struct timespec *now)
 {
+	int32_t brightness = 0;
+	bool on;
+	int ret;
+
 	if (LIKELY(ctx->display_state == DISP_ON) &&
-	    time_dt_sec(&ctx->last_disp, now) < INT_TO_Q16(DISP_CHK_SEC))
+	    time_dt_sec(&ctx->last_disp, now) < INT_TO_Q16(DISP_CHECK_SEC))
 		return false;
 
 	ctx->last_disp = *now;
 
-	int32_t bl = 0;
-	int ret = sensor_read_backlight(&ctx->backlight, &bl);
-	bool on = ((ret < 0) ? true : (bl > 0)) != 0;
+	ret = sensor_read_backlight(&ctx->backlight, &brightness);
+	on = ((ret < 0) ? true : (brightness > 0)) != 0;
 
 	if (on && UNLIKELY(ctx->display_state != DISP_ON)) {
 		ctx->cpu_state.first_run = true;
@@ -147,10 +145,12 @@ static inline bool update_disp(struct context *ctx, const struct timespec *now)
 		ctx->psi_state.initial = true;
 		ctx->display_state = DISP_ON;
 		ctx->remap_pending = true;
+
 	} else if (!on && (ctx->display_state == DISP_ON ||
 			   ctx->display_state == DISP_UNKNOWN)) {
 		ctx->display_state = DISP_GRACE;
 		ctx->last_off = *now;
+
 	} else if (!on && ctx->display_state == DISP_GRACE) {
 		if (time_dt_sec(&ctx->last_off, now) > INT_TO_Q16(10))
 			ctx->display_state = DISP_SUSPEND;
@@ -163,8 +163,10 @@ static inline bool update_disp(struct context *ctx, const struct timespec *now)
 		ctx->last_tick = *now;
 
 #ifdef NDK_BUILD
-		q16_t sweep_elaps = time_dt_sec(&ctx->last_sweep, now);
-		if (sweep_elaps > INT_TO_Q16(SWEEP_IVL_SEC)) {
+		q16_t elapsed;
+
+		elapsed = time_dt_sec(&ctx->last_sweep, now);
+		if (elapsed > INT_TO_Q16(SWEEP_IVL_SEC)) {
 			pg_sweep_run(ctx);
 			clock_gettime(CLOCK_MONOTONIC, &ctx->last_sweep);
 		}
@@ -176,10 +178,11 @@ static inline bool update_disp(struct context *ctx, const struct timespec *now)
 	return false;
 }
 
-static void arm_trigger(struct context *ctx)
+static void register_psi_trigger(struct context *ctx)
 {
-	int fd =
-		psi_trigger_open(PSI_CPU_PATH, PSI_THRESHOLD_US, PSI_WINDOW_US);
+	int fd;
+
+	fd = psi_trigger_open(PSI_CPU_PATH, PSI_THRESHOLD_US, PSI_WINDOW_US);
 	if (fd < 0)
 		return;
 
@@ -193,22 +196,25 @@ static void arm_trigger(struct context *ctx)
 static inline bool read_psi(struct context *ctx, const struct timespec *now,
 			    struct psi_sample *sample)
 {
-	int status = psi_read(&ctx->psi_state, sample, now);
+	uint32_t delay;
+	int ret;
 
-	if (LIKELY(status == 0)) {
+	ret = psi_read(&ctx->psi_state, sample, now);
+	if (LIKELY(ret == 0)) {
 		if (UNLIKELY(ctx->psi_fails != 0)) {
 			ctx->psi_fails = 0;
 			LOGI("gov: psi read recovered");
 		}
+
 		return true;
 	}
 
 	if (ctx->psi_fails < PSI_FAIL_MAX) {
 		ctx->psi_fails++;
-		LOGW("gov: psi read failed status=%d, init recov", status);
+		LOGW("gov: psi read failed status=%d, init recov", ret);
 	}
 
-	uint32_t delay = 1000U << (ctx->psi_fails - 1);
+	delay = 1000U << (ctx->psi_fails - 1);
 	ctx->next_wake = (int)(delay > 30000U ? 30000U : delay);
 
 	epoll_rm_trigger(ctx);
@@ -219,8 +225,7 @@ static inline bool read_psi(struct context *ctx, const struct timespec *now,
 	}
 
 	psi_recover(&ctx->psi_state, PSI_CPU_PATH);
-
-	arm_trigger(ctx);
+	register_psi_trigger(ctx);
 
 	return false;
 }
@@ -228,8 +233,10 @@ static inline bool read_psi(struct context *ctx, const struct timespec *now,
 static inline void poll_battery_metrics(struct context *ctx,
 					const struct timespec *now)
 {
-	q16_t elaps_bat = time_dt_sec(&ctx->last_bat, now);
-	if (elaps_bat < INT_TO_Q16(BAT_CHK_SEC))
+	q16_t elapsed;
+
+	elapsed = time_dt_sec(&ctx->last_bat, now);
+	if (elapsed < INT_TO_Q16(BAT_CHECK_SEC))
 		return;
 
 	sensor_read_battery_capacity(&ctx->battery, &ctx->level_bat);
@@ -237,34 +244,39 @@ static inline void poll_battery_metrics(struct context *ctx,
 	ctx->last_bat = *now;
 
 	if (UNLIKELY(ctx->tfd < 0))
-		arm_trigger(ctx);
+		register_psi_trigger(ctx);
 }
 
 static inline void poll_thermal_metrics(struct context *ctx,
 					const struct timespec *now)
 {
-	q16_t elaps_therm = time_dt_sec(&ctx->last_therm, now);
-	if (elaps_therm < INT_TO_Q16(THERM_CHK_SEC))
-		return;
-
 	q16_t cpu_temp = 0;
+	q16_t elapsed;
+	q16_t scale;
 	bool hold = false;
+
+	elapsed = time_dt_sec(&ctx->last_therm, now);
+	if (elapsed < INT_TO_Q16(THERM_CHECK_SEC))
+		return;
 
 	if (LIKELY(ctx->cpu_temp.fd >= 0)) {
 		if (sensor_read_cpu_temp(&ctx->cpu_temp, &cpu_temp) == 0) {
 			ctx->temp_fails = 0;
+
 		} else if (ctx->temp_fails < TEMP_FAIL_MAX) {
 			ctx->temp_fails++;
 			hold = true;
+
 		} else {
 			cpu_temp = 0;
 		}
 	}
 
-	if (LIKELY(!hold))
-		ctx->therm_scale = thermal_update(&ctx->therm_state, cpu_temp,
-						  ctx->temp_bat, &param_thermal,
-						  now);
+	if (LIKELY(!hold)) {
+		scale = thermal_update(&ctx->therm_state, cpu_temp,
+				       ctx->temp_bat, &param_thermal, now);
+		ctx->therm_scale = scale;
+	}
 
 	ctx->last_therm = *now;
 	ctx->remap_pending = true;
@@ -273,63 +285,70 @@ static inline void poll_thermal_metrics(struct context *ctx,
 static inline void calc_demand(struct context *ctx, const struct timespec *now,
 			       const struct psi_sample *sample,
 			       q16_t *RESTRICT therm_scale,
-			       q16_t *RESTRICT l_dem, q16_t *RESTRICT p_eff)
+			       q16_t *RESTRICT demand, q16_t *RESTRICT pressure)
 {
+	struct cpu_demand input;
+	struct cpu_efficiency *eff;
+	q16_t dt_real;
+	q16_t dt_safe;
+	q16_t integral;
+	q16_t integral_dt;
+	q16_t trend_factor;
+	bool struct_break;
+
 	poll_battery_metrics(ctx, now);
 	poll_thermal_metrics(ctx, now);
 
 	*therm_scale = ctx->therm_scale;
 
-	struct cpu_efficiency *eff = &ctx->cpu_state.efficiency;
+	eff = &ctx->cpu_state.efficiency;
 	cpu_update_efficiency(eff, ctx->level_bat, *therm_scale,
 			      sample->some.avg300);
 
-	q16_t dt_real = time_dt_sec(&ctx->last_tick, now);
-	q16_t dt_safe = math_clamp(dt_real, 1, FLOAT_TO_Q16(0.1F));
+	dt_real = time_dt_sec(&ctx->last_tick, now);
+	dt_safe = math_clamp(dt_real, 1, FLOAT_TO_Q16(0.1F));
 	ctx->last_tick = *now;
 
-	q16_t i;
-	q16_t i_dt;
-	cpu_update_integral(&ctx->cpu_state, ctx->level_bat, dt_real, &i,
-			    &i_dt);
+	cpu_update_integral(&ctx->cpu_state, ctx->level_bat, dt_real, &integral,
+			    &integral_dt);
 
-	q16_t t_fact = cpu_calc_trend_gain(sample->some.velocity);
-	bool s_break = sample->some.nis > eff->nis_thresh;
-	struct cpu_demand d_in = {
-		.target_psi = sample->some.stall_rate,
-		.velocity = sample->some.velocity,
-		.dt_safe = dt_safe,
-		.therm_scale = *therm_scale,
-		.trend_factor = t_fact,
-		.integral = i,
-		.integral_dt = i_dt,
-		.struct_break = s_break,
-	};
+	trend_factor = cpu_calc_trend_gain(sample->some.velocity);
+	struct_break = sample->some.nis > eff->nis_thresh;
 
-	*l_dem = cpu_calc_load_demand(&ctx->cpu_state, &d_in, &param_cpu);
-	*p_eff = cpu_calc_effective_pressure(*l_dem, t_fact, eff);
+	input.target_psi = sample->some.stall_rate;
+	input.velocity = sample->some.velocity;
+	input.dt_safe = dt_safe;
+	input.therm_scale = *therm_scale;
+	input.trend_factor = trend_factor;
+	input.integral = integral;
+	input.integral_dt = integral_dt;
+	input.struct_break = struct_break;
+
+	*demand = cpu_calc_load_demand(&ctx->cpu_state, &input, &param_cpu);
+	*pressure = cpu_calc_effective_pressure(*demand, trend_factor, eff);
 }
 
-static inline bool gov_gate(struct context *ctx,
-			    const struct psi_sample *sample, q16_t p_eff)
+static inline bool should_apply_mapping(struct context *ctx,
+					const struct psi_sample *sample,
+					q16_t pressure)
 {
-	const struct cpu_param *c = &param_cpu;
-	int32_t n_poll;
-	int32_t t_poll;
+	int32_t next_wake;
+	int32_t trans_wake;
+	bool moving;
 
-	n_poll = (int32_t)poll_calc_next(&ctx->poll_state, p_eff,
-					 sample->some.avg300,
-					 sample->some.velocity);
-	ctx->next_wake = n_poll;
+	next_wake = (int32_t)poll_calc_next(&ctx->poll_state, pressure,
+					    sample->some.avg300,
+					    sample->some.velocity);
+	ctx->next_wake = next_wake;
 
-	bool moving = cpu_transient(&ctx->cpu_state, c);
+	moving = cpu_transient(&ctx->cpu_state, &param_cpu);
 	if (!moving && !ctx->remap_pending)
 		return false;
 
 	if (moving) {
-		t_poll = Q16_TO_INT(c->trans_poll);
-		if (n_poll > t_poll)
-			ctx->next_wake = t_poll;
+		trans_wake = Q16_TO_INT(param_cpu.trans_poll);
+		if (next_wake > trans_wake)
+			ctx->next_wake = trans_wake;
 	}
 
 	ctx->cpu_state.psi_ref = ctx->cpu_state.psi_val;
@@ -339,104 +358,104 @@ static inline bool gov_gate(struct context *ctx,
 
 static inline void apply_mapping(struct context *ctx,
 				 const struct psi_sample *sample,
-				 q16_t therm_scale, q16_t l_dem, q16_t p_eff)
+				 q16_t therm_scale, q16_t demand,
+				 q16_t pressure)
 {
-	const struct cpu_param *c = &param_cpu;
-	const struct cpu_limit *l = &param_sched;
-	const uint64_t q_ns = QUANT_NS;
+	const uint64_t quant = QUANT_NS;
 	struct cpu_efficiency *eff = &ctx->cpu_state.efficiency;
-
-	uint64_t v_lat = 0;
-	uint64_t v_gran = 0;
-	uint64_t v_wake = 0;
-	uint64_t v_mig = 0;
-	uint64_t v_wlt = 0;
-	uint64_t v_ucl = 0;
-	uint64_t v_ucl_max = CPU_UCLAMP_MAX_CEILING;
-
+	uint64_t out_gran = 0;
+	uint64_t out_lat = 0;
+	uint64_t out_mig = 0;
+	uint64_t out_uclmax = CPU_UCLAMP_MAX_CEILING;
+	uint64_t out_uclmin = 0;
+	uint64_t out_wake = 0;
+	uint64_t out_walt = 0;
 	q16_t gran = 0;
 	q16_t lat = 0;
 	q16_t mig = 0;
 	q16_t therm_lat = 0;
-	q16_t ucl = 0;
-	q16_t ucl_max = 0;
+	q16_t uclmax = 0;
+	q16_t uclmin = 0;
 	q16_t wake = 0;
-	q16_t wlt = 0;
+	q16_t walt = 0;
 
 	if (ctx->sched_lat.active || ctx->sched_gran.active) {
-		therm_lat = cpu_calc_thermal_latency(therm_scale, l);
-		lat = cpu_calc_latency(p_eff, l_dem, therm_lat, c, eff, l);
-
-		if (ctx->sched_lat.active)
-			v_lat = math_quantize_u64(lat, l->max_lat, q_ns);
+		therm_lat = cpu_calc_thermal_latency(therm_scale, &param_sched);
+		lat = cpu_calc_latency(pressure, demand, therm_lat, &param_cpu,
+				       eff, &param_sched);
 	}
 
+	if (ctx->sched_lat.active)
+		out_lat = math_quantize_u64(lat, param_sched.max_lat, quant);
+
 	if (ctx->sched_gran.active) {
-		gran = cpu_calc_granularity(lat, c, l);
-		v_gran = math_quantize_u64(gran, l->max_gran, q_ns);
+		gran = cpu_calc_granularity(lat, &param_cpu, &param_sched);
+		out_gran = math_quantize_u64(gran, param_sched.max_gran, quant);
 	}
 
 	if (ctx->sched_wake.active) {
-		wake = cpu_calc_wakeup(p_eff, eff, l);
-		v_wake = math_quantize_u64(wake, l->max_wake, q_ns);
+		wake = cpu_calc_wakeup(pressure, eff, &param_sched);
+		out_wake = math_quantize_u64(wake, param_sched.max_wake, quant);
 	}
 
 	if (ctx->sched_mig.active) {
-		mig = cpu_calc_migration(sample->some.velocity, p_eff, l);
-		v_mig = math_quantize_u64(mig, l->min_mig, q_ns);
+		mig = cpu_calc_migration(sample->some.velocity, pressure,
+					 &param_sched);
+
+		out_mig = math_quantize_u64(mig, param_sched.min_mig, quant);
 	}
 
 	if (ctx->sched_walt.active) {
-		wlt = cpu_calc_walt(p_eff, l);
-		v_wlt = math_sanitize_u64(wlt,
-					  (uint64_t)Q16_TO_INT(l->min_walt));
+		walt = cpu_calc_walt(pressure, &param_sched);
+
+		out_walt = math_sanitize_u64(
+			walt, (uint64_t)Q16_TO_INT(param_sched.min_walt));
 	}
 
 	if (ctx->sched_uclmax.active) {
-		ucl_max = cpu_calc_uclamp_max(therm_scale, ctx->level_bat, l);
-		v_ucl_max = math_sanitize_u64(ucl_max,
-					      (uint64_t)CPU_UCLAMP_MAX_CEILING);
+		uclmax = cpu_calc_uclamp_max(therm_scale, ctx->level_bat,
+					     &param_sched);
+
+		out_uclmax = math_sanitize_u64(
+			uclmax, (uint64_t)CPU_UCLAMP_MAX_CEILING);
 	}
 
 	if (ctx->sched_uclmin.active) {
-		ucl = cpu_calc_uclamp_min(p_eff, therm_scale, c, eff, l);
-		v_ucl = math_sanitize_u64(ucl,
-					  (uint64_t)Q16_TO_INT(l->min_ucl));
-		if (ctx->sched_uclmax.active && v_ucl > v_ucl_max)
-			v_ucl = v_ucl_max;
+		uclmin = cpu_calc_uclamp_min(pressure, therm_scale, &param_cpu,
+					     eff, &param_sched);
+
+		out_uclmin = math_sanitize_u64(
+			uclmin, (uint64_t)Q16_TO_INT(param_sched.min_ucl));
+
+		if (ctx->sched_uclmax.active && out_uclmin > out_uclmax)
+			out_uclmin = out_uclmax;
 	}
 
-	LOGD("gov: lat=%llu gran=%llu wake=%llu mig=%llu walt=%llu uclamp=%llu uclamp_max=%llu poll=%d",
-	     (unsigned long long)v_lat, (unsigned long long)v_gran,
-	     (unsigned long long)v_wake, (unsigned long long)v_mig,
-	     (unsigned long long)v_wlt, (unsigned long long)v_ucl,
-	     (unsigned long long)v_ucl_max, ctx->next_wake);
-
-	node_update(&ctx->sched_lat, v_lat, false, &check_lat);
-	node_update(&ctx->sched_gran, v_gran, false, &check_gran);
-	node_update(&ctx->sched_wake, v_wake, false, &check_wake);
-	node_update(&ctx->sched_mig, v_mig, false, &check_mig);
-	node_update(&ctx->sched_walt, v_wlt, false, &check_walt);
-	node_update(&ctx->sched_uclmin, v_ucl, false, &check_ucl);
-	node_update(&ctx->sched_uclmax, v_ucl_max, false, &check_ucl_max);
+	node_update(&ctx->sched_lat, out_lat, false, &check_lat);
+	node_update(&ctx->sched_gran, out_gran, false, &check_gran);
+	node_update(&ctx->sched_wake, out_wake, false, &check_wake);
+	node_update(&ctx->sched_mig, out_mig, false, &check_mig);
+	node_update(&ctx->sched_walt, out_walt, false, &check_walt);
+	node_update(&ctx->sched_uclmin, out_uclmin, false, &check_ucl);
+	node_update(&ctx->sched_uclmax, out_uclmax, false, &check_ucl);
 }
 
-static inline void exec_gov_logic(struct context *ctx,
-				  const struct timespec *now)
+static inline void active_tick(struct context *ctx, const struct timespec *now)
 {
-	if (update_disp(ctx, now))
+	struct psi_sample sample;
+	q16_t demand;
+	q16_t pressure;
+	q16_t therm_scale;
+
+	if (update_display(ctx, now))
 		return;
 
-	struct psi_sample sample;
 	if (!read_psi(ctx, now, &sample))
 		return;
 
-	q16_t l_dem;
-	q16_t p_eff;
-	q16_t therm_scale;
-	calc_demand(ctx, now, &sample, &therm_scale, &l_dem, &p_eff);
-	if (gov_gate(ctx, &sample, p_eff))
-		apply_mapping(ctx, &sample, therm_scale, l_dem, p_eff);
+	calc_demand(ctx, now, &sample, &therm_scale, &demand, &pressure);
+	if (should_apply_mapping(ctx, &sample, pressure))
+		apply_mapping(ctx, &sample, therm_scale, demand, pressure);
 }
 
 static void dormant_tick(struct context *ctx)
@@ -444,15 +463,20 @@ static void dormant_tick(struct context *ctx)
 #ifdef NDK_BUILD
 	struct timespec now;
 	clock_gettime(CLOCK_MONOTONIC, &now);
-	if (!update_disp(ctx, &now))
+	if (!update_display(ctx, &now))
 		ctx->next_wake = POLL_MAX_MS;
 #else
 	ctx->next_wake = -1;
 #endif // NDK_BUILD
 }
 
-void pg_gov_process(struct context *ctx)
+void gov_run(struct context *ctx)
 {
+	struct timespec end;
+	struct timespec now;
+	q16_t dt;
+	int ms;
+
 	if (UNLIKELY(!ctx))
 		return;
 
@@ -461,14 +485,14 @@ void pg_gov_process(struct context *ctx)
 		return;
 	}
 
-	struct timespec now;
-	struct timespec end_calc;
 	clock_gettime(CLOCK_MONOTONIC, &now);
-	exec_gov_logic(ctx, &now);
-	clock_gettime(CLOCK_MONOTONIC, &end_calc);
+	active_tick(ctx, &now);
+	clock_gettime(CLOCK_MONOTONIC, &end);
 
-	q16_t calc_s = time_dt_sec(&now, &end_calc);
-	int calc_ms = (int)((((q32_t)calc_s) * 1000) >> Q16_SHIFT);
-	int adj_wake = ctx->next_wake - calc_ms;
-	ctx->next_wake = (adj_wake > 0) ? adj_wake : 1;
+	dt = time_dt_sec(&now, &end);
+	ms = (int)((((q32_t)dt) * 1000) >> Q16_SHIFT);
+	if (ctx->next_wake > ms)
+		ctx->next_wake -= ms;
+	else
+		ctx->next_wake = 1;
 }
