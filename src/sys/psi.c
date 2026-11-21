@@ -43,10 +43,10 @@ int psi_trigger_open(const char *path, int32_t threshold_us, int32_t window_us)
 	payload[4] = ' ';
 	pos = 5;
 
-	pos += pg_fmt_u32(threshold_us, payload + pos);
+	pos += parse_fmt_u32(threshold_us, payload + pos);
 	payload[pos++] = ' ';
 
-	pos += pg_fmt_u32(window_us, payload + pos);
+	pos += parse_fmt_u32(window_us, payload + pos);
 	payload[pos++] = '\n';
 
 	do {
@@ -157,7 +157,7 @@ static inline size_t parse_metrics(const uint8_t *RESTRICT buf, size_t len,
 			}
 
 			metrics->avg10 =
-				pg_parse_q16(buf, len, pos + 6, &next_pos);
+				parse_q16(buf, len, pos + 6, &next_pos);
 
 			pos = next_pos;
 			continue;
@@ -165,15 +165,14 @@ static inline size_t parse_metrics(const uint8_t *RESTRICT buf, size_t len,
 
 		if (pos + 7 <= len && match_token(&buf[pos], "avg300=", 7)) {
 			metrics->avg300 =
-				pg_parse_q16(buf, len, pos + 7, &next_pos);
+				parse_q16(buf, len, pos + 7, &next_pos);
 
 			pos = next_pos;
 			continue;
 		}
 
 		if (pos + 6 <= len && match_token(&buf[pos], "total=", 6)) {
-			parsed_total =
-				pg_parse_u64(buf, len, pos + 6, &next_pos);
+			parsed_total = parse_u64(buf, len, pos + 6, &next_pos);
 
 			if (LIKELY(next_pos > pos + 6))
 				*cur_total = parsed_total;
@@ -323,7 +322,7 @@ int psi_read_avg10(const char *path, q16_t *avg10)
 	len = (size_t)res;
 	while (pos + 6 <= len) {
 		if (match_token(&buf[pos], "avg10=", 6)) {
-			*avg10 = pg_parse_q16(buf, len, pos + 6, &next_pos);
+			*avg10 = parse_q16(buf, len, pos + 6, &next_pos);
 			return 0;
 		}
 

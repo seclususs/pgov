@@ -30,7 +30,7 @@ static void format_path(char *RESTRICT buf, size_t buf_len,
 			if (pos + 11 >= buf_len)
 				break;
 
-			pos += pg_fmt_u32(cpu, buf + pos);
+			pos += parse_fmt_u32(cpu, buf + pos);
 			i += 2;
 			continue;
 		}

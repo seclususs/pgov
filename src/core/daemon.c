@@ -133,7 +133,7 @@ static void crash_restore(void)
 	ssize_t res;
 
 	for (i = 0; i < restore_count; i++) {
-		len = pg_fmt_u64(restore_table[i].base, buf);
+		len = parse_fmt_u64(restore_table[i].base, buf);
 		res = pwrite(restore_table[i].fd, buf, len, 0);
 		UNUSED(res);
 	}

@@ -342,8 +342,7 @@ static int find_best_trip_point(const char *name, char *path, size_t len)
 			continue;
 
 		valid = false;
-		cur_temp =
-			pg_parse_i32((const uint8_t *)buf, (size_t)res, &valid);
+		cur_temp = parse_i32((const uint8_t *)buf, (size_t)res, &valid);
 
 		if (!valid || cur_temp < 40000)
 			continue;
@@ -555,7 +554,7 @@ static inline int read_temperature(struct sensor_temp *sensor, q16_t *temp,
 		return -EIO;
 	}
 
-	val = pg_parse_i32(sensor->buf, (size_t)res, &valid);
+	val = parse_i32(sensor->buf, (size_t)res, &valid);
 	if (!valid) {
 		*temp = fallback;
 		return -EINVAL;
@@ -620,7 +619,7 @@ int sensor_read_battery_capacity(struct sensor_battery *sensor, q16_t *capacity)
 		return -EIO;
 	}
 
-	val = pg_parse_i32(sensor->buf, (size_t)res, &valid);
+	val = parse_i32(sensor->buf, (size_t)res, &valid);
 	if (UNLIKELY(!valid || val < 0 || val > 100)) {
 		*capacity = FALLBACK_BATTERY_CAPACITY;
 		return -EINVAL;
@@ -656,7 +655,7 @@ int sensor_read_backlight(struct sensor_backlight *sensor, int32_t *brightness)
 		if (res <= 0)
 			continue;
 
-		val = pg_parse_i32(sensor->buf, (size_t)res, &valid);
+		val = parse_i32(sensor->buf, (size_t)res, &valid);
 		if (UNLIKELY(!valid))
 			continue;
 

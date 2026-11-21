@@ -118,7 +118,7 @@ int node_read_i32(const char *path, int32_t *out_val)
 		goto out;
 	}
 
-	val = pg_parse_i32((const uint8_t *)buf, (size_t)res, &valid);
+	val = parse_i32((const uint8_t *)buf, (size_t)res, &valid);
 	if (!valid) {
 		ret = -EINVAL;
 		LOGE("node: failed to parse valid i32 from %s", path);
@@ -142,7 +142,7 @@ int node_write_stream(int fd, uint64_t val)
 	if (fd < 0)
 		return -EBADF;
 
-	len = pg_fmt_u64(val, buf);
+	len = parse_fmt_u64(val, buf);
 
 	do {
 		res = pwrite(fd, buf, len, 0);
