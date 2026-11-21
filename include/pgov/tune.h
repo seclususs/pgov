@@ -4,7 +4,7 @@
 #ifndef PGOV_TUNE_H
 #define PGOV_TUNE_H
 
-void pg_tune_limits(void);
-void pg_tune_configs(void);
+void tune_limits(void);
+void tune_params(void);
 
 #endif // PGOV_TUNE_H

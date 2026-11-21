@@ -327,8 +327,8 @@ int daemon_init(void)
 	}
 
 	LOGD("daemon: executing environment tuning");
-	pg_tune_limits();
-	pg_tune_configs();
+	tune_limits();
+	tune_params();
 
 	ret = init_sensors_and_triggers(&dctx);
 	if (ret != 0)
