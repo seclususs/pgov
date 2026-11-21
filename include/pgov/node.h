@@ -7,6 +7,7 @@
 #include "pgov/compiler.h"
 #include <stdbool.h>
 #include <stdint.h>
+#include <sys/types.h>
 
 enum node_check_type {
 	NODE_CHECK_ABSOLUTE = 0,
@@ -53,6 +54,8 @@ void node_restore(struct node_cache *cache);
 void node_cache_cleanup(struct node_cache *cache);
 
 int node_read_i32(const char *path, int32_t *out_val);
+
+ssize_t node_read_str(const char *path, char *buf, size_t len);
 
 /**
  * @brief Flushes a 64-bit unsigned integer to a node using a positional write.

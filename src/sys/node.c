@@ -132,6 +132,39 @@ out:
 	return ret;
 }
 
+ssize_t node_read_str(const char *path, char *buf, size_t len)
+{
+	ssize_t res;
+	int fd;
+
+	if (UNLIKELY(!path || !buf || len == 0))
+		return -1;
+
+	fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0)
+		return -1;
+
+	do {
+		res = read(fd, buf, len - 1);
+	} while (res < 0 && errno == EINTR);
+
+	close(fd);
+
+	if (res <= 0)
+		return -1;
+
+	buf[res] = '\0';
+	for (ssize_t i = 0; i < res; ++i) {
+		if (buf[i] == '\n' || buf[i] == '\r') {
+			buf[i] = '\0';
+			res = i;
+			break;
+		}
+	}
+
+	return res;
+}
+
 int node_write_stream(int fd, uint64_t val)
 {
 	char buf[32];

@@ -98,39 +98,6 @@ static inline bool check_thermal_valid(const char *name)
 	return true;
 }
 
-static ssize_t read_sysfs_string(const char *path, char *buf, size_t len)
-{
-	ssize_t res;
-	int fd;
-
-	if (UNLIKELY(!path || !buf || len == 0))
-		return -1;
-
-	fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (fd < 0)
-		return -1;
-
-	do {
-		res = read(fd, buf, len - 1);
-	} while (res < 0 && errno == EINTR);
-
-	close(fd);
-
-	if (res <= 0)
-		return -1;
-
-	buf[res] = '\0';
-	for (ssize_t i = 0; i < res; ++i) {
-		if (buf[i] == '\n' || buf[i] == '\r') {
-			buf[i] = '\0';
-			res = i;
-			break;
-		}
-	}
-
-	return res;
-}
-
 static bool check_thermal_type(const char *name)
 {
 	char type_path[256];
@@ -138,7 +105,7 @@ static bool check_thermal_type(const char *name)
 
 	str_build_path(type_path, sizeof(type_path), THERMAL, name, "type");
 
-	if (read_sysfs_string(type_path, buf, sizeof(buf)) <= 0)
+	if (node_read_str(type_path, buf, sizeof(buf)) <= 0)
 		return false;
 
 	for (size_t i = 0; i < ARRAY_SIZE(THERMAL_PRIORITY); ++i) {
@@ -204,7 +171,7 @@ int sensor_scan_thermal_zone(char *path, size_t len)
 		str_build_path(type_path, sizeof(type_path), THERMAL,
 			       entry->d_name, "type");
 
-		if (read_sysfs_string(type_path, buf, sizeof(buf)) <= 0)
+		if (node_read_str(type_path, buf, sizeof(buf)) <= 0)
 			continue;
 
 		strncpy(zones[zone_count].name, buf, 63);
@@ -318,7 +285,7 @@ static int find_best_trip_point(const char *name, char *path, size_t len)
 		str_build_path(node_path, sizeof(node_path), THERMAL, name,
 			       file);
 
-		if (read_sysfs_string(node_path, buf, sizeof(buf)) <= 0)
+		if (node_read_str(node_path, buf, sizeof(buf)) <= 0)
 			continue;
 
 		if (str_contains(buf, "passive"))
@@ -337,7 +304,7 @@ static int find_best_trip_point(const char *name, char *path, size_t len)
 		str_build_path(node_path, sizeof(node_path), THERMAL, name,
 			       file);
 
-		res = read_sysfs_string(node_path, buf, sizeof(buf));
+		res = node_read_str(node_path, buf, sizeof(buf));
 		if (res <= 0)
 			continue;
 
