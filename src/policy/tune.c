@@ -24,8 +24,8 @@ static inline q16_t calc_heuristic_cap(int32_t core, int32_t mhz)
 
 void pg_tune_limits(void)
 {
-	int32_t core = pg_topo_get_core_count();
-	int32_t freq_khz = pg_topo_get_max_freq_khz();
+	int32_t core = topo_get_core_count();
+	int32_t freq_khz = topo_get_maxfrq_khz();
 	if (core <= 0 || freq_khz <= 0)
 		return;
 
@@ -85,9 +85,9 @@ static void calc_topo_metrics(q16_t *RESTRICT rat, q16_t *RESTRICT rel,
 	int32_t max_c = 0;
 	int32_t mhz;
 
-	bool eas = (pg_topo_get_cpu_capacity(&cap, &min_c, &max_c) == 0);
-	int32_t khz = pg_topo_get_max_freq_khz();
-	int32_t core = pg_topo_get_core_count();
+	bool eas = (topo_get_cpu_capacity(&cap, &min_c, &max_c) == 0);
+	int32_t khz = topo_get_maxfrq_khz();
+	int32_t core = topo_get_core_count();
 
 	if (!eas || max_c <= 0 || khz <= 0) {
 		mhz = (khz > 0) ? (khz / 1000) : 2000;

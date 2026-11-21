@@ -113,7 +113,7 @@ int task_set_core_affinity(void)
 	int err;
 	int ret;
 
-	ret = pg_topo_set_little_core();
+	ret = topo_set_little_core();
 	if (ret < 0) {
 		err = (ret == -1) ? errno : -ret;
 		LOGE("task: failed to set topo affinity err=%d", err);

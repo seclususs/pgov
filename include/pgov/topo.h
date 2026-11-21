@@ -23,13 +23,13 @@
  * @return 0 on successful affinity binding (including the all-cores fallback), or a
  *         negative POSIX error code (-EINVAL if no cores are reported, otherwise -errno).
  */
-int pg_topo_set_little_core(void);
+int topo_set_little_core(void);
 
-int32_t pg_topo_get_core_count(void);
-int32_t pg_topo_get_max_freq_khz(void);
+int32_t topo_get_core_count(void);
+int32_t topo_get_maxfrq_khz(void);
 
-int pg_topo_get_cpu_capacity(int32_t *RESTRICT total,
-			     int32_t *RESTRICT min_capacity,
-			     int32_t *RESTRICT max_capacity);
+int topo_get_cpu_capacity(int32_t *RESTRICT total,
+			  int32_t *RESTRICT min_capacity,
+			  int32_t *RESTRICT max_capacity);
 
 #endif // PGOV_TOPO_H

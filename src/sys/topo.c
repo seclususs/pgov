@@ -3,10 +3,10 @@
 
 #define _GNU_SOURCE
 #include "pgov/topo.h"
-#include "pgov/log.h"
 #include "pgov/compiler.h"
-#include "pgov/parser.h"
+#include "pgov/log.h"
 #include "pgov/node.h"
+#include "pgov/parser.h"
 #include <errno.h>
 #include <fcntl.h>
 #include <sched.h>
@@ -16,52 +16,54 @@
 #define CPU_CAPACITY "/sys/devices/system/cpu/cpu%d/cpu_capacity"
 #define CPU_MAX_FREQ "/sys/devices/system/cpu/cpu%d/cpufreq/cpuinfo_max_freq"
 
-static void format_path(char *RESTRICT buf, size_t buf_len,
+static void format_path(char *RESTRICT buf, size_t len,
 			const char *RESTRICT fmt, int32_t cpu)
 {
-	size_t pos = 0;
 	size_t i = 0;
+	size_t pos = 0;
 
-	if (UNLIKELY(buf_len == 0))
+	if (UNLIKELY(!buf || !fmt || len == 0))
 		return;
 
 	while (fmt[i] != '\0') {
 		if (fmt[i] == '%' && fmt[i + 1] == 'd') {
-			if (pos + 11 >= buf_len)
+			if (pos + 11 >= len)
 				break;
 
-			pos += parse_fmt_u32(cpu, buf + pos);
+			pos += parse_fmt_u32((uint32_t)cpu, buf + pos);
 			i += 2;
 			continue;
 		}
 
-		if (pos + 1 >= buf_len)
+		if (pos + 1 >= len)
 			break;
 
 		buf[pos++] = fmt[i++];
 	}
 
-	if (pos >= buf_len)
-		pos = buf_len - 1;
+	if (pos >= len)
+		pos = len - 1;
 
 	buf[pos] = '\0';
 }
 
-static bool build_cpuset(long num_cores, const char *fmt, cpu_set_t *cpuset)
+static bool build_cpuset(long cores, const char *fmt, cpu_set_t *cpuset)
 {
-	long min_val = INT32_MAX;
-	bool found = false;
 	char buf[128];
+	long min_val = INT32_MAX;
+	int32_t val;
+	bool found = false;
 	int i;
+
+	if (UNLIKELY(!cpuset || !fmt || cores <= 0))
+		return false;
 
 	CPU_ZERO(cpuset);
 
-	if (num_cores > CPU_SETSIZE)
-		num_cores = CPU_SETSIZE;
+	if (cores > CPU_SETSIZE)
+		cores = CPU_SETSIZE;
 
-	for (i = 0; i < num_cores; ++i) {
-		int32_t val;
-
+	for (i = 0; i < cores; ++i) {
 		format_path(buf, sizeof(buf), fmt, i);
 
 		if (node_read_i32(buf, &val) != 0 || val <= 0)
@@ -83,57 +85,63 @@ static bool build_cpuset(long num_cores, const char *fmt, cpu_set_t *cpuset)
 	return found;
 }
 
-int pg_topo_set_little_core(void)
+int topo_set_little_core(void)
 {
-	long num_cores = sysconf(_SC_NPROCESSORS_CONF);
-	cpu_set_t little_cpuset;
+	cpu_set_t cpuset;
+	long cores;
 	int i;
 
-	if (num_cores <= 0)
+	cores = sysconf(_SC_NPROCESSORS_CONF);
+	if (cores <= 0)
 		return -EINVAL;
 
-	if (build_cpuset(num_cores, CPU_CAPACITY, &little_cpuset) &&
-	    sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset) == 0)
+	if (build_cpuset(cores, CPU_CAPACITY, &cpuset) &&
+	    sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) == 0)
 		return 0;
 
-	if (build_cpuset(num_cores, CPU_MAX_FREQ, &little_cpuset) &&
-	    sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset) == 0)
+	if (build_cpuset(cores, CPU_MAX_FREQ, &cpuset) &&
+	    sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) == 0)
 		return 0;
 
 	LOGW("topology: detection failed, binding to all cores");
 
-	if (num_cores > CPU_SETSIZE)
-		num_cores = CPU_SETSIZE;
+	if (cores > CPU_SETSIZE)
+		cores = CPU_SETSIZE;
 
-	CPU_ZERO(&little_cpuset);
-	for (i = 0; i < num_cores; ++i)
-		CPU_SET(i, &little_cpuset);
+	CPU_ZERO(&cpuset);
+	for (i = 0; i < cores; ++i)
+		CPU_SET(i, &cpuset);
 
-	if (sched_setaffinity(0, sizeof(cpu_set_t), &little_cpuset) < 0)
+	if (sched_setaffinity(0, sizeof(cpu_set_t), &cpuset) < 0)
 		return -errno;
 
 	return 0;
 }
 
-int32_t pg_topo_get_core_count(void)
+int32_t topo_get_core_count(void)
 {
-	long cores = sysconf(_SC_NPROCESSORS_CONF);
-	return (cores > 0) ? (int32_t)cores : 0;
-}
+	long cores;
 
-int32_t pg_topo_get_max_freq_khz(void)
-{
-	long num_cores = sysconf(_SC_NPROCESSORS_CONF);
-	int32_t freq = 0;
-	char buf[128];
-	int i;
-
-	if (num_cores <= 0)
+	cores = sysconf(_SC_NPROCESSORS_CONF);
+	if (cores <= 0)
 		return 0;
 
-	for (i = 0; i < num_cores; ++i) {
-		int32_t val;
+	return (int32_t)cores;
+}
 
+int32_t topo_get_maxfrq_khz(void)
+{
+	char buf[128];
+	long cores;
+	int32_t freq = 0;
+	int32_t val;
+	int i;
+
+	cores = sysconf(_SC_NPROCESSORS_CONF);
+	if (cores <= 0)
+		return 0;
+
+	for (i = 0; i < cores; ++i) {
 		format_path(buf, sizeof(buf), CPU_MAX_FREQ, i);
 		if (node_read_i32(buf, &val) == 0 && val > freq)
 			freq = val;
@@ -142,48 +150,48 @@ int32_t pg_topo_get_max_freq_khz(void)
 	return freq;
 }
 
-int pg_topo_get_cpu_capacity(int32_t *RESTRICT total,
-			     int32_t *RESTRICT min_capacity,
-			     int32_t *RESTRICT max_capacity)
+int topo_get_cpu_capacity(int32_t *RESTRICT total,
+			  int32_t *RESTRICT min_capacity,
+			  int32_t *RESTRICT max_capacity)
 {
-	long num_cores = sysconf(_SC_NPROCESSORS_CONF);
-	int32_t t = 0;
-	int32_t min_cap = INT32_MAX;
-	int32_t max_cap = 0;
 	char buf[128];
+	long cores;
+	int32_t min_val = INT32_MAX;
+	int32_t max_val = 0;
+	int32_t sum = 0;
+	int32_t val;
 	int i;
 
-	if (num_cores <= 0)
+	cores = sysconf(_SC_NPROCESSORS_CONF);
+	if (cores <= 0)
 		return -EINVAL;
 
-	for (i = 0; i < num_cores; ++i) {
-		int32_t val;
-
+	for (i = 0; i < cores; ++i) {
 		format_path(buf, sizeof(buf), CPU_CAPACITY, i);
 
 		if (node_read_i32(buf, &val) != 0 || val <= 0)
 			continue;
 
-		t += val;
+		sum += val;
 
-		if (val < min_cap)
-			min_cap = val;
+		if (val < min_val)
+			min_val = val;
 
-		if (val > max_cap)
-			max_cap = val;
+		if (val > max_val)
+			max_val = val;
 	}
 
-	if (t == 0)
+	if (sum == 0)
 		return -ENODATA;
 
 	if (total)
-		*total = t;
+		*total = sum;
 
 	if (min_capacity)
-		*min_capacity = min_cap;
+		*min_capacity = min_val;
 
 	if (max_capacity)
-		*max_capacity = max_cap;
+		*max_capacity = max_val;
 
 	return 0;
 }
