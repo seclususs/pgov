@@ -341,7 +341,7 @@ int pg_daemon_init(void)
 	dctx.on_trigger = pg_gov_process;
 	dctx.on_timeout = pg_gov_process;
 	LOGI("daemon: entering epoll reactor loop");
-	ret = pg_epoll_run(&dctx);
+	ret = epoll_run(&dctx);
 
 	LOGI("daemon: reactor shutdown cleanly status=%d", ret);
 

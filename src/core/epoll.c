@@ -3,9 +3,9 @@
 
 #define _GNU_SOURCE
 #include "pgov/epoll.h"
+#include "pgov/compiler.h"
 #include "pgov/log.h"
 #include "pgov/state.h"
-#include "pgov/compiler.h"
 #include "pgov/time.h"
 #include <errno.h>
 #include <sys/epoll.h>
@@ -13,22 +13,25 @@
 #include <time.h>
 #include <unistd.h>
 
-#define MAX_EVENTS 16
+#define MAX_EVENT 16
 
-static inline void epoll_error(struct context *ctx,
-			       const struct timespec *wait_start)
+static inline void handle_error(struct context *ctx,
+				const struct timespec *start)
 {
+	struct timespec now;
+	q16_t dt;
+	int ms;
+
 	if (errno == EINTR) {
 		if (ctx->next_wake < 0)
 			return;
 
-		struct timespec wait_end;
-		clock_gettime(CLOCK_MONOTONIC, &wait_end);
+		clock_gettime(CLOCK_MONOTONIC, &now);
 
-		q16_t dt = time_dt_sec(wait_start, &wait_end);
-		int elapsed = (int)((((q32_t)dt) * 1000) >> Q16_SHIFT);
+		dt = time_dt_sec(start, &now);
+		ms = (int)((((q32_t)dt) * 1000) >> Q16_SHIFT);
 
-		ctx->next_wake -= elapsed;
+		ctx->next_wake -= ms;
 		if (ctx->next_wake < 1)
 			ctx->next_wake = 1;
 	} else {
@@ -37,58 +40,61 @@ static inline void epoll_error(struct context *ctx,
 	}
 }
 
-static inline void handle_signal_event(struct context *ctx)
+static inline void handle_signal(struct context *ctx)
 {
-	struct signalfd_siginfo s_info;
-	ssize_t s;
+	struct signalfd_siginfo info;
+	ssize_t res;
 
 	do {
-		s = read(ctx->sfd, &s_info, sizeof(s_info));
-	} while (s < 0 && errno == EINTR);
+		res = read(ctx->sfd, &info, sizeof(info));
+	} while (res < 0 && errno == EINTR);
 
-	if (s == sizeof(s_info))
+	if (res == sizeof(info))
 		ctx->shutdown_req = true;
 }
 
-static inline void handle_trigger_event(struct context *ctx)
+static inline void handle_trigger(struct context *ctx)
 {
 	if (LIKELY(ctx->on_trigger != NULL && !ctx->shutdown_req))
 		ctx->on_trigger(ctx);
 }
 
-static inline void epoll_events(struct context *ctx, struct epoll_event *events,
-				int nfds)
+static inline void dispatch_events(struct context *ctx,
+				   struct epoll_event *events, int ready)
 {
-	for (int i = 0; i < nfds; ++i) {
-		int ev_fd = events[i].data.fd;
+	int fd;
+	int i;
 
-		if (ev_fd == ctx->sfd)
-			handle_signal_event(ctx);
+	for (i = 0; i < ready; ++i) {
+		fd = events[i].data.fd;
 
-		else if (ev_fd == ctx->tfd)
-			handle_trigger_event(ctx);
+		if (fd == ctx->sfd)
+			handle_signal(ctx);
+		else if (fd == ctx->tfd)
+			handle_trigger(ctx);
 	}
 }
 
-int pg_epoll_add_trg(struct context *ctx)
+int epoll_add_trigger(struct context *ctx)
 {
+	struct epoll_event event = { 0 };
+
 	if (UNLIKELY(!ctx))
 		return -EINVAL;
 
 	if (ctx->tfd < 0 || ctx->efd < 0)
 		return -EBADF;
 
-	struct epoll_event ev_trg = { 0 };
-	ev_trg.events = EPOLLPRI | EPOLLERR | EPOLLET;
-	ev_trg.data.fd = ctx->tfd;
+	event.events = EPOLLPRI | EPOLLERR | EPOLLET;
+	event.data.fd = ctx->tfd;
 
-	if (epoll_ctl(ctx->efd, EPOLL_CTL_ADD, ctx->tfd, &ev_trg) < 0)
+	if (epoll_ctl(ctx->efd, EPOLL_CTL_ADD, ctx->tfd, &event) < 0)
 		return -errno;
 
 	return 0;
 }
 
-void pg_epoll_rm_trg(struct context *ctx)
+void epoll_rm_trigger(struct context *ctx)
 {
 	if (UNLIKELY(!ctx))
 		return;
@@ -97,17 +103,19 @@ void pg_epoll_rm_trg(struct context *ctx)
 		epoll_ctl(ctx->efd, EPOLL_CTL_DEL, ctx->tfd, NULL);
 }
 
-static int epoll_setup(struct context *ctx)
+static int setup(struct context *ctx)
 {
+	struct epoll_event event = { 0 };
+	int ret;
+
 	ctx->efd = epoll_create1(EPOLL_CLOEXEC);
 	if (ctx->efd < 0)
 		return -errno;
 
-	struct epoll_event ev_sig = { 0 };
-	ev_sig.events = EPOLLIN | EPOLLERR;
-	ev_sig.data.fd = ctx->sfd;
-	if (epoll_ctl(ctx->efd, EPOLL_CTL_ADD, ctx->sfd, &ev_sig) < 0) {
-		int ret = -errno;
+	event.events = EPOLLIN | EPOLLERR;
+	event.data.fd = ctx->sfd;
+	if (epoll_ctl(ctx->efd, EPOLL_CTL_ADD, ctx->sfd, &event) < 0) {
+		ret = -errno;
 		LOGE("epoll: failed to register sfd err=%d", -ret);
 		close(ctx->efd);
 		ctx->efd = -1;
@@ -115,7 +123,7 @@ static int epoll_setup(struct context *ctx)
 	}
 
 	if (ctx->tfd >= 0) {
-		int ret = pg_epoll_add_trg(ctx);
+		ret = epoll_add_trigger(ctx);
 		if (ret < 0) {
 			LOGE("epoll: failed to register tfd err=%d", -ret);
 			close(ctx->efd);
@@ -127,37 +135,38 @@ static int epoll_setup(struct context *ctx)
 	return 0;
 }
 
-int pg_epoll_run(struct context *ctx)
+int epoll_run(struct context *ctx)
 {
+	struct epoll_event events[MAX_EVENT];
+	struct timespec start;
+	int ready;
+	int ret;
+
 	if (UNLIKELY(!ctx))
 		return -EINVAL;
 
-	int ret = epoll_setup(ctx);
+	ret = setup(ctx);
 	if (ret < 0)
 		return ret;
 
-	struct epoll_event events[MAX_EVENTS];
-
 	while (LIKELY(!ctx->shutdown_req)) {
-		struct timespec wait_start;
-		clock_gettime(CLOCK_MONOTONIC, &wait_start);
+		clock_gettime(CLOCK_MONOTONIC, &start);
 
-		int nfds = epoll_wait(ctx->efd, events, MAX_EVENTS,
-				      ctx->next_wake);
+		ready = epoll_wait(ctx->efd, events, MAX_EVENT, ctx->next_wake);
 
-		if (UNLIKELY(nfds < 0)) {
-			epoll_error(ctx, &wait_start);
+		if (UNLIKELY(ready < 0)) {
+			handle_error(ctx, &start);
 			continue;
 		}
 
-		if (nfds == 0) {
+		if (ready == 0) {
 			if (LIKELY(ctx->on_timeout != NULL))
 				ctx->on_timeout(ctx);
 
 			continue;
 		}
 
-		epoll_events(ctx, events, nfds);
+		dispatch_events(ctx, events, ready);
 	}
 
 	close(ctx->efd);

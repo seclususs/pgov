@@ -184,7 +184,7 @@ static void arm_trigger(struct context *ctx)
 		return;
 
 	ctx->tfd = fd;
-	if (pg_epoll_add_trg(ctx) < 0) {
+	if (epoll_add_trigger(ctx) < 0) {
 		psi_trigger_close(fd);
 		ctx->tfd = -1;
 	}
@@ -211,7 +211,7 @@ static inline bool read_psi(struct context *ctx, const struct timespec *now,
 	uint32_t delay = 1000U << (ctx->psi_fails - 1);
 	ctx->next_wake = (int)(delay > 30000U ? 30000U : delay);
 
-	pg_epoll_rm_trg(ctx);
+	epoll_rm_trigger(ctx);
 
 	if (ctx->tfd >= 0) {
 		psi_trigger_close(ctx->tfd);
