@@ -20,6 +20,6 @@
  * @return 0 upon successful, clean daemon shutdown, or a negative POSIX error code
  *         if the bootstrap sequence or reactor encounters an unrecoverable fault.
  */
-int pg_daemon_init(void);
+int daemon_init(void);
 
 #endif // PGOV_DAEMON_H

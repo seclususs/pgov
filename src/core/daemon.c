@@ -5,22 +5,22 @@
 #include "pgov/daemon.h"
 #include "pgov/compiler.h"
 #include "pgov/epoll.h"
+#include "pgov/gov.h"
 #include "pgov/lockfile.h"
-#include "pgov/opt.h"
 #include "pgov/log.h"
 #include "pgov/memory.h"
+#include "pgov/node.h"
+#include "pgov/opt.h"
 #include "pgov/parser.h"
-#include "pgov/prop.h"
-#include "pgov/signal.h"
-#include "pgov/tune.h"
-#include "pgov/state.h"
-#include "pgov/task.h"
-#include "pgov/gov.h"
 #include "pgov/poll.h"
+#include "pgov/prop.h"
 #include "pgov/psi.h"
 #include "pgov/sensor.h"
-#include "pgov/node.h"
+#include "pgov/signal.h"
+#include "pgov/state.h"
+#include "pgov/task.h"
 #include "pgov/thermal.h"
+#include "pgov/tune.h"
 #include <errno.h> // IWYU pragma: keep
 #include <fcntl.h>
 #include <unistd.h>
@@ -97,39 +97,45 @@ static const char *const CAND_BAT_CAP[] = {
 
 #define NR_SINKS 7
 
-static struct {
+struct restore_entry {
 	int fd;
 	uint64_t base;
-} rs_tbl[NR_SINKS];
+};
 
-static size_t rs_cnt;
+static struct restore_entry restore_table[NR_SINKS];
+static size_t restore_count;
 
 static void restore_snapshot(const struct context *ctx)
 {
-	const struct node_cache *const c[NR_SINKS] = {
+	const struct node_cache *const nodes[NR_SINKS] = {
 		&ctx->sched_lat,    &ctx->sched_gran, &ctx->sched_wake,
 		&ctx->sched_mig,    &ctx->sched_walt, &ctx->sched_uclmin,
 		&ctx->sched_uclmax,
 	};
+	size_t i;
 
-	rs_cnt = 0;
-	for (size_t i = 0; i < NR_SINKS; i++) {
-		if (!c[i]->active || !c[i]->has_base)
+	restore_count = 0;
+	for (i = 0; i < NR_SINKS; i++) {
+		if (!nodes[i]->active || !nodes[i]->has_base)
 			continue;
 
-		rs_tbl[rs_cnt].fd = c[i]->fd;
-		rs_tbl[rs_cnt].base = c[i]->base;
-		rs_cnt++;
+		restore_table[restore_count].fd = nodes[i]->fd;
+		restore_table[restore_count].base = nodes[i]->base;
+		restore_count++;
 	}
 }
 
 static void crash_restore(void)
 {
-	for (size_t i = 0; i < rs_cnt; i++) {
-		char buf[32];
-		size_t len = pg_fmt_u64(rs_tbl[i].base, buf);
-		ssize_t unused = pwrite(rs_tbl[i].fd, buf, len, 0);
-		UNUSED(unused);
+	char buf[32];
+	size_t i;
+	size_t len;
+	ssize_t res;
+
+	for (i = 0; i < restore_count; i++) {
+		len = pg_fmt_u64(restore_table[i].base, buf);
+		res = pwrite(restore_table[i].fd, buf, len, 0);
+		UNUSED(res);
 	}
 }
 
@@ -142,17 +148,17 @@ static void restore_all(struct context *ctx)
 	node_restore(&ctx->sched_walt);
 	node_restore(&ctx->sched_uclmin);
 	node_restore(&ctx->sched_uclmax);
-	rs_cnt = 0;
+	restore_count = 0;
 }
 
 static void init_os_environment(void)
 {
-	int log_fd =
-		open(PATH_LOG, O_CREAT | O_WRONLY | O_APPEND | O_CLOEXEC, 0644);
+	int fd;
 
-	if (log_fd >= 0) {
-		dup2(log_fd, STDERR_FILENO);
-		close(log_fd);
+	fd = open(PATH_LOG, O_CREAT | O_WRONLY | O_APPEND | O_CLOEXEC, 0644);
+	if (fd >= 0) {
+		dup2(fd, STDERR_FILENO);
+		close(fd);
 	}
 
 	pg_signal_catch_crash(crash_restore);
@@ -169,6 +175,8 @@ static void init_os_environment(void)
 
 static inline void init_context_defaults(struct context *ctx)
 {
+	size_t i;
+
 	ctx->shutdown_req = false;
 	ctx->next_wake = POLL_MIN_MS;
 	ctx->display_state = DISP_UNKNOWN;
@@ -187,7 +195,7 @@ static inline void init_context_defaults(struct context *ctx)
 	ctx->battery.fd = -1;
 
 	ctx->backlight.count = 0;
-	for (size_t i = 0; i < SENSOR_BACKLIGHT_MAX; i++)
+	for (i = 0; i < SENSOR_BACKLIGHT_MAX; i++)
 		ctx->backlight.fd[i] = -1;
 
 	ctx->sched_lat.fd = -1;
@@ -204,25 +212,29 @@ static inline void init_context_defaults(struct context *ctx)
 
 static int init_node_caches(struct context *ctx)
 {
-	int n = 0;
+	int count = 0;
 
-	n += node_cache_init(&ctx->sched_lat, CAND_LAT);
-	n += node_cache_init(&ctx->sched_gran, CAND_GRAN);
-	n += node_cache_init(&ctx->sched_wake, CAND_WAKE);
-	n += node_cache_init(&ctx->sched_mig, CAND_MIG);
-	n += node_cache_init(&ctx->sched_walt, CAND_WALT);
-	n += node_cache_init(&ctx->sched_uclmin, CAND_UCL);
-	n += node_cache_init(&ctx->sched_uclmax, CAND_UCL_MAX);
+	count += node_cache_init(&ctx->sched_lat, CAND_LAT);
+	count += node_cache_init(&ctx->sched_gran, CAND_GRAN);
+	count += node_cache_init(&ctx->sched_wake, CAND_WAKE);
+	count += node_cache_init(&ctx->sched_mig, CAND_MIG);
+	count += node_cache_init(&ctx->sched_walt, CAND_WALT);
+	count += node_cache_init(&ctx->sched_uclmin, CAND_UCL);
+	count += node_cache_init(&ctx->sched_uclmax, CAND_UCL_MAX);
 
-	return n;
+	return count;
 }
 
 static int init_sensors_and_triggers(struct context *ctx)
 {
-	char t_path[SENSOR_PATH_LEN];
-	sensor_scan_thermal_zone(t_path, sizeof(t_path));
-	LOGD("daemon: cpu thermal sensor mapped to %s", t_path);
-	sensor_init_cpu_temp(&ctx->cpu_temp, t_path);
+	char backlight_paths[SENSOR_BACKLIGHT_MAX][SENSOR_PATH_LEN];
+	char thermal_path[SENSOR_PATH_LEN];
+	int count;
+	int i;
+
+	sensor_scan_thermal_zone(thermal_path, sizeof(thermal_path));
+	LOGD("daemon: cpu thermal sensor mapped to %s", thermal_path);
+	sensor_init_cpu_temp(&ctx->cpu_temp, thermal_path);
 
 	sensor_init_battery_temp(&ctx->bat_temp, CAND_BAT_TEMP);
 	sensor_init_battery(&ctx->battery, CAND_BAT_CAP);
@@ -246,10 +258,9 @@ static int init_sensors_and_triggers(struct context *ctx)
 	thermal_init(&ctx->therm_state);
 	poll_init(&ctx->poll_state);
 
-	char b_path[SENSOR_BACKLIGHT_MAX][SENSOR_PATH_LEN];
-	int n_bl = sensor_scan_backlight(b_path, SENSOR_BACKLIGHT_MAX);
-	for (int i = 0; i < n_bl; i++)
-		sensor_init_backlight(&ctx->backlight, b_path[i]);
+	count = sensor_scan_backlight(backlight_paths, SENSOR_BACKLIGHT_MAX);
+	for (i = 0; i < count; i++)
+		sensor_init_backlight(&ctx->backlight, backlight_paths[i]);
 
 	return 0;
 }
@@ -283,7 +294,7 @@ static void cleanup_context(struct context *ctx)
 	node_cache_cleanup(&ctx->sched_uclmax);
 }
 
-int pg_daemon_init(void)
+int daemon_init(void)
 {
 	int ret = 0;
 
