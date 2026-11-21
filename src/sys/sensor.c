@@ -335,7 +335,6 @@ static int find_best_trip_point(const char *name, char *path, size_t len)
 static int scan_trip_point_node(char *path, size_t len)
 {
 	struct dirent *entry;
-	int ret = -ENODEV;
 	DIR *dir;
 
 	if (UNLIKELY(!path || len == 0))
@@ -355,16 +354,14 @@ static int scan_trip_point_node(char *path, size_t len)
 			continue;
 
 		if (find_best_trip_point(entry->d_name, path, len) == 0) {
-			ret = 0;
-			goto out;
+			closedir(dir);
+			return 0;
 		}
 	}
 
-	path[0] = '\0';
-
-out:
 	closedir(dir);
-	return ret;
+	path[0] = '\0';
+	return -ENODEV;
 }
 
 void sensor_init_cpu_temp(struct sensor_temp *sensor, const char *path)

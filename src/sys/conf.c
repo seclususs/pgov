@@ -145,12 +145,10 @@ int conf_parse(const char *path, conf_callback cb)
 		line[len++] = c;
 	}
 
-	if (res < 0) {
+	if (res < 0)
 		ret = -errno;
-		goto out;
-	}
 
-	if (!skip)
+	else if (!skip)
 		ret = dispatch_line(line, len, cb);
 
 out:

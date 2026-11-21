@@ -117,22 +117,23 @@ static int setup(struct context *ctx)
 	if (epoll_ctl(ctx->efd, EPOLL_CTL_ADD, ctx->sfd, &event) < 0) {
 		ret = -errno;
 		LOGE("epoll: failed to register sfd err=%d", -ret);
-		close(ctx->efd);
-		ctx->efd = -1;
-		return ret;
+		goto err_close_efd;
 	}
 
 	if (ctx->tfd >= 0) {
 		ret = epoll_add_trigger(ctx);
 		if (ret < 0) {
 			LOGE("epoll: failed to register tfd err=%d", -ret);
-			close(ctx->efd);
-			ctx->efd = -1;
-			return ret;
+			goto err_close_efd;
 		}
 	}
 
 	return 0;
+
+err_close_efd:
+	close(ctx->efd);
+	ctx->efd = -1;
+	return ret;
 }
 
 int epoll_run(struct context *ctx)

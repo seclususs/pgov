@@ -26,15 +26,11 @@ int lockfile_init(const char *path)
 
 	if (flock(fd, LOCK_EX | LOCK_NB) < 0) {
 		LOGE("lockfile: another process is already running");
-		err = -EAGAIN;
-		goto err_close;
+		close(fd);
+		return -EAGAIN;
 	}
 
 	return fd;
-
-err_close:
-	close(fd);
-	return err;
 }
 
 void lockfile_close(int fd)

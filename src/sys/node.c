@@ -94,7 +94,6 @@ int node_read_i32(const char *path, int32_t *out_val)
 	ssize_t res;
 	int32_t val;
 	bool valid;
-	int ret = 0;
 	int fd;
 	int err;
 
@@ -112,24 +111,22 @@ int node_read_i32(const char *path, int32_t *out_val)
 		res = read(fd, buf, sizeof(buf));
 	} while (res < 0 && errno == EINTR);
 
+	close(fd);
+
 	if (res <= 0) {
-		ret = (res < 0) ? -errno : -ENODATA;
-		LOGE("node: failed to read data %s err=%d", path, -ret);
-		goto out;
+		err = (res < 0) ? errno : ENODATA;
+		LOGE("node: failed to read data %s err=%d", path, err);
+		return -err;
 	}
 
 	val = parse_i32((const uint8_t *)buf, (size_t)res, &valid);
 	if (!valid) {
-		ret = -EINVAL;
 		LOGE("node: failed to parse valid i32 from %s", path);
-		goto out;
+		return -EINVAL;
 	}
 
 	*out_val = val;
-
-out:
-	close(fd);
-	return ret;
+	return 0;
 }
 
 ssize_t node_read_str(const char *path, char *buf, size_t len)
@@ -202,7 +199,6 @@ int node_write(const char *path, const char *val)
 	size_t len = 0;
 	size_t i;
 	ssize_t res;
-	int ret = 0;
 	int fd;
 	int err;
 
@@ -233,21 +229,20 @@ int node_write(const char *path, const char *val)
 		res = pwrite(fd, data, len, 0);
 	} while (res < 0 && errno == EINTR);
 
+	close(fd);
+
 	if (res < 0) {
-		ret = -errno;
-		LOGE("node: failed to write %s err=%d", path, -ret);
-		goto out;
+		err = errno;
+		LOGE("node: failed to write %s err=%d", path, err);
+		return -err;
 	}
 
 	if ((size_t)res != len) {
-		ret = -EIO;
 		LOGE("node: incomplete write %s", path);
-		goto out;
+		return -EIO;
 	}
 
-out:
-	close(fd);
-	return ret;
+	return 0;
 }
 
 static inline bool check_absolute(uint64_t cur, uint64_t target,

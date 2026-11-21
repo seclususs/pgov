@@ -79,14 +79,11 @@ int signal_init(void)
 	if (sfd == -1) {
 		err = errno;
 		LOGE("signal: failed to create signalfd err=%d", err);
-		goto out_unblock;
+		sigprocmask(SIG_UNBLOCK, &mask, NULL);
+		return -err;
 	}
 
 	return sfd;
-
-out_unblock:
-	sigprocmask(SIG_UNBLOCK, &mask, NULL);
-	return -err;
 }
 
 void signal_catch_crash(void (*hook)(void))

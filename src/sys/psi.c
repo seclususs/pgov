@@ -56,15 +56,12 @@ int psi_trigger_open(const char *path, int32_t threshold_us, int32_t window_us)
 	if (res < 0) {
 		err = errno;
 		LOGE("psi: failed to write trigger config err=%d", err);
-		goto out_err;
+		close(fd);
+		return -err;
 	}
 
 	LOGD("psi: registered trigger %dus/%dus", threshold_us, window_us);
 	return fd;
-
-out_err:
-	close(fd);
-	return -err;
 }
 
 void psi_trigger_close(int fd)
