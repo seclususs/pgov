@@ -194,7 +194,7 @@ int node_write_stream(int fd, uint64_t val)
 
 int node_write(const char *path, const char *val)
 {
-	char buf[64];
+	char buf[256];
 	const char *data;
 	size_t len = 0;
 	size_t i;
