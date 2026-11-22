@@ -121,12 +121,24 @@ static ALWAYS_INLINE q16_t math_sqrt_q16(q16_t val)
 
 static ALWAYS_INLINE CONST q16_t math_sigmoid(q16_t val, q16_t k, q16_t mid)
 {
+	q32_t diff;
+	q16_t delta;
 	q16_t x;
 	q16_t abs_x;
 	q16_t den;
 	q16_t frac;
 
-	x = math_mul_q16(k, val - mid);
+	diff = (q32_t)val - (q32_t)mid;
+
+	if (diff > (q32_t)INT_TO_Q16(100))
+		delta = INT_TO_Q16(100);
+	else if (diff < (q32_t)INT_TO_Q16(-100))
+		delta = INT_TO_Q16(-100);
+	else
+		delta = (q16_t)diff;
+
+	x = math_mul_q16(k, delta);
+	x = math_clamp(x, INT_TO_Q16(-16), INT_TO_Q16(16));
 	abs_x = (x >= 0) ? x : -x;
 	den = Q16_ONE + abs_x;
 	frac = math_div_q16(x, den);
