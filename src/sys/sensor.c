@@ -373,6 +373,7 @@ void sensor_init_cpu_temp(struct sensor_temp *sensor, const char *path)
 
 	sensor->fd = -1;
 	sensor->scale = SCALE_MILLI;
+	sensor->calibrated = false;
 
 	if (!path || path[0] == '\0') {
 		if (sensor_scan_thermal_zone(auto_path, sizeof(auto_path)) == 0)
@@ -396,6 +397,7 @@ void sensor_init_battery_temp(struct sensor_temp *sensor,
 
 	sensor->fd = -1;
 	sensor->scale = SCALE_DECI;
+	sensor->calibrated = false;
 
 	if (UNLIKELY(!paths))
 		return;
@@ -524,14 +526,18 @@ static inline int read_temperature(struct sensor_temp *sensor, q16_t *temp,
 		return -EINVAL;
 	}
 
-	if (val >= 10000 && val <= 150000)
-		sensor->scale = SCALE_MILLI;
+	if (UNLIKELY(!sensor->calibrated)) {
+		if (val >= 10000 && val <= 150000)
+			sensor->scale = SCALE_MILLI;
 
-	else if (val >= 100 && val <= 1500)
-		sensor->scale = SCALE_DECI;
+		else if (val >= 100 && val <= 1500)
+			sensor->scale = SCALE_DECI;
 
-	else if (val >= -30 && val <= 150)
-		sensor->scale = 1;
+		else if (val >= -30 && val <= 150 && sensor->scale == 1)
+			sensor->scale = 1;
+
+		sensor->calibrated = true;
+	}
 
 	if (UNLIKELY(sensor->scale <= 0)) {
 		*temp = fallback;

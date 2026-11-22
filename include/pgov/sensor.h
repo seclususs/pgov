@@ -5,6 +5,7 @@
 #define PGOV_SENSOR_H
 
 #include "pgov/math.h"
+#include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
@@ -14,6 +15,7 @@
 struct sensor_temp {
 	int fd;
 	q16_t scale;
+	bool calibrated;
 	uint8_t buf[16];
 };
 
