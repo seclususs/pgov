@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <sys/syscall.h>
 #include <time.h>
@@ -79,7 +80,7 @@ static bool check_database_file(const char *name)
 	for (i = 0; i < ARRAY_SIZE(DB_EXTS); ++i) {
 		ext_len = strlen(DB_EXTS[i]);
 		if (len >= ext_len &&
-		    memcmp(name + len - ext_len, DB_EXTS[i], ext_len) == 0)
+		    strncasecmp(name + len - ext_len, DB_EXTS[i], ext_len) == 0)
 			return true;
 	}
 
