@@ -109,8 +109,11 @@ static int setup(struct context *ctx)
 	int ret;
 
 	ctx->efd = epoll_create1(EPOLL_CLOEXEC);
-	if (ctx->efd < 0)
-		return -errno;
+	if (ctx->efd < 0) {
+		ret = -errno;
+		LOGE("epoll: failed to create efd err=%d", errno);
+		return ret;
+	}
 
 	event.events = EPOLLIN | EPOLLERR;
 	event.data.fd = ctx->sfd;

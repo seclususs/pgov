@@ -17,12 +17,10 @@ void memory_lock(void)
 		return;
 	}
 
-	LOGW("memory: on-fault locking unsupported");
+	LOGD("memory: on-fault locking unsupported");
 
-	if (mlockall(MCL_CURRENT | MCL_FUTURE) == 0) {
-		LOGD("memory: aggressive ram locking enabled");
+	if (mlockall(MCL_CURRENT | MCL_FUTURE) == 0)
 		return;
-	}
 
 	LOGE("memory: failed to lock mem err=%d", errno);
 }

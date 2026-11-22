@@ -239,8 +239,10 @@ int sensor_scan_backlight(char (*paths)[SENSOR_PATH_LEN], size_t max)
 	if (count == 0)
 		scan_brightness_nodes(LEDS, "backlight", paths, &count, max);
 
-	if (count == 0)
+	if (count == 0) {
+		LOGW("sensor: no usable backlight node");
 		return -ENODEV;
+	}
 
 	return (int)count;
 }
@@ -383,8 +385,12 @@ void sensor_init_cpu_temp(struct sensor_temp *sensor, const char *path)
 	}
 
 	sensor->fd = open(path, O_RDONLY | O_CLOEXEC);
-	if (sensor->fd < 0)
+	if (sensor->fd < 0) {
 		LOGW("sensor: failed to open node %s err=%d", path, errno);
+		return;
+	}
+
+	LOGD("sensor: mapped cpu temp to %s", path);
 }
 
 void sensor_init_battery_temp(struct sensor_temp *sensor,
@@ -406,7 +412,7 @@ void sensor_init_battery_temp(struct sensor_temp *sensor,
 		fd = open(paths[i], O_RDONLY | O_CLOEXEC);
 		if (fd >= 0) {
 			sensor->fd = fd;
-			LOGI("sensor: mapped battery temp to %s", paths[i]);
+			LOGD("sensor: mapped battery temp to %s", paths[i]);
 			return;
 		}
 	}
@@ -442,7 +448,7 @@ void sensor_init_battery(struct sensor_battery *sensor,
 		fd = open(paths[i], O_RDONLY | O_CLOEXEC);
 		if (fd >= 0) {
 			sensor->fd = fd;
-			LOGI("sensor: mapped battery capacity to %s", paths[i]);
+			LOGD("sensor: mapped battery capacity to %s", paths[i]);
 			return;
 		}
 	}

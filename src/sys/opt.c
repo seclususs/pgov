@@ -72,6 +72,9 @@ int opt_init(void)
 		return ret;
 	}
 
+	if (prop_count > 0)
+		LOGD("opt: applied %zu properties", prop_count);
+
 	if (ret == -ENOENT)
 		return 0;
 

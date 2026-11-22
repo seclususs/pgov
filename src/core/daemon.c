@@ -149,6 +149,7 @@ static void restore_all(struct context *ctx)
 	node_restore(&ctx->sched_uclmin);
 	node_restore(&ctx->sched_uclmax);
 	restore_count = 0;
+	LOGD("daemon: restored tunables");
 }
 
 static void init_os_environment(void)
@@ -233,7 +234,6 @@ static int init_sensors_and_triggers(struct context *ctx)
 	int i;
 
 	sensor_scan_thermal_zone(thermal_path, sizeof(thermal_path));
-	LOGD("daemon: cpu thermal sensor mapped to %s", thermal_path);
 	sensor_init_cpu_temp(&ctx->cpu_temp, thermal_path);
 
 	sensor_init_battery_temp(&ctx->bat_temp, CAND_BAT_TEMP);
@@ -243,10 +243,8 @@ static int init_sensors_and_triggers(struct context *ctx)
 		ctx->tfd = psi_trigger_open(PSI_CPU_PATH, PSI_THRESHOLD_US,
 					    PSI_WINDOW_US);
 
-		if (ctx->tfd < 0) {
-			LOGE("daemon: failed inject err=%d", ctx->tfd);
+		if (ctx->tfd < 0)
 			return ctx->tfd;
-		}
 	}
 
 	psi_init(&ctx->psi_state, PSI_CPU_PATH);
@@ -300,7 +298,7 @@ int daemon_init(void)
 
 	init_context_defaults(&dctx);
 	init_os_environment();
-	LOGI("daemon: initiating daemon sequence");
+	LOGI("daemon: initiating");
 
 	dctx.lfd = lockfile_init(PATH_LOCK);
 	if (dctx.lfd < 0) {
@@ -308,17 +306,14 @@ int daemon_init(void)
 		goto cleanup;
 	}
 
-	LOGD("daemon: waiting for android subsystem");
 	if (!prop_wait_boot()) {
 		ret = -ETIMEDOUT;
 		goto cleanup;
 	}
 
-	LOGD("daemon: mapping cache nodes");
-	if (init_node_caches(&dctx) == 0) {
-		LOGW("daemon: no node is writable on this kernel, gov goes dormant");
+	if (init_node_caches(&dctx) == 0)
 		dctx.dormant = true;
-	}
+
 	restore_snapshot(&dctx);
 
 	if (!psi_available()) {
@@ -326,7 +321,6 @@ int daemon_init(void)
 		goto cleanup;
 	}
 
-	LOGD("daemon: executing environment tuning");
 	tune_limits();
 	tune_params();
 
@@ -351,12 +345,15 @@ int daemon_init(void)
 
 	dctx.on_trigger = gov_run;
 	dctx.on_timeout = gov_run;
-	LOGI("daemon: entering epoll reactor loop");
+	LOGI("daemon: running mode=%s", dctx.dormant ? "dormant" : "active");
 	ret = epoll_run(&dctx);
 
-	LOGI("daemon: reactor shutdown cleanly status=%d", ret);
+	LOGI("daemon: shutdown status=%d", ret);
 
 cleanup:
+	if (ret != 0)
+		LOGE("daemon: aborted status=%d", ret);
+
 	cleanup_context(&dctx);
 	return ret;
 }

@@ -209,10 +209,8 @@ static inline bool read_psi(struct context *ctx, const struct timespec *now,
 		return true;
 	}
 
-	if (ctx->psi_fails < PSI_FAIL_MAX) {
+	if (ctx->psi_fails < PSI_FAIL_MAX)
 		ctx->psi_fails++;
-		LOGW("gov: psi read failed status=%d, init recov", ret);
-	}
 
 	delay = 1000U << (ctx->psi_fails - 1);
 	ctx->next_wake = (int)(delay > 30000U ? 30000U : delay);

@@ -54,7 +54,7 @@ int node_cache_init(struct node_cache *RESTRICT cache,
 			cache->has_base = true;
 		}
 
-		LOGI("node: mapped to %s", paths[i]);
+		LOGD("node: mapped to %s", paths[i]);
 		return 1;
 	}
 
