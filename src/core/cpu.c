@@ -55,6 +55,10 @@ void cpu_update_integral(struct cpu_state *RESTRICT state, q16_t bat_level,
 		diff = target - state->prev_integral;
 		tau = INT_TO_Q16(5);
 		rate = math_div_q16(diff, tau);
+
+		if (LIKELY(dt_real < tau))
+			target = state->prev_integral +
+				 math_mul_q16(rate, dt_real);
 	}
 
 	state->prev_integral = target;
