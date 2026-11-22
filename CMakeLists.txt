@@ -30,49 +30,50 @@ endif()
 include(CheckIPOSupported)
 check_ipo_supported(RESULT LTO_SUPPORTED OUTPUT LTO_ERROR)
 
-file(GLOB_RECURSE PG_SOURCES CONFIGURE_DEPENDS "src/*.c")
-list(REMOVE_ITEM PG_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.c")
+file(GLOB_RECURSE PGOV_SOURCES CONFIGURE_DEPENDS "src/*.c")
+list(REMOVE_ITEM PGOV_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/src/main.c")
 
-add_library(pgov STATIC ${PG_SOURCES})
+add_library(pgov STATIC ${PGOV_SOURCES})
 target_include_directories(pgov PUBLIC "${CMAKE_SOURCE_DIR}/include")
-target_compile_options(pgov PRIVATE -Wall -Wextra -Werror)
 target_compile_definitions(pgov PUBLIC NDK_BUILD)
+
+target_compile_options(
+  pgov PUBLIC
+  -Wall
+  -Wextra
+  -Werror)
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_compile_options(
-    pgov
-    PRIVATE -O2
-            -ffunction-sections
-            -fdata-sections
-            -fvisibility=hidden
-            -fno-math-errno
-            -fno-signed-zeros
-            -fno-trapping-math)
+    pgov PUBLIC
+    -O2
+    -ffunction-sections
+    -fdata-sections
+    -fvisibility=hidden)
 
   if(LTO_SUPPORTED)
     set_property(TARGET pgov PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
   endif()
 
 else()
-  target_compile_definitions(pgov PRIVATE DEBUG)
+  target_compile_definitions(pgov PUBLIC DEBUG)
 endif()
 
 add_executable(pgovd "src/main.c")
 
 if(CMAKE_BUILD_TYPE STREQUAL "Release")
   target_link_options(
-    pgovd
-    PRIVATE
+    pgovd PRIVATE
     -Wl,--gc-sections
     -Wl,--icf=all
     -Wl,-s
     -Wl,--build-id=none
-    -Wl,-O2
-    -Wl,--as-needed)
+    -Wl,--as-needed
+    -Wl,-z,max-page-size=16384)
 
   if(LTO_SUPPORTED)
     set_property(TARGET pgovd PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
   endif()
 endif()
 
-target_link_libraries(pgovd PRIVATE pgov android log m)
+target_link_libraries(pgovd PRIVATE pgov log)
