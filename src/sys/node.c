@@ -25,7 +25,7 @@ static inline uint32_t get_monotonic_ms(void)
 int node_cache_init(struct node_cache *RESTRICT cache,
 		    const char *const *RESTRICT paths)
 {
-	int32_t cur;
+	uint64_t cur = 0;
 	size_t i;
 	int fd;
 
@@ -45,12 +45,11 @@ int node_cache_init(struct node_cache *RESTRICT cache,
 		if (fd < 0)
 			continue;
 
-		cur = -1;
 		cache->fd = fd;
 		cache->active = true;
 
-		if (node_read_i32(paths[i], &cur) == 0 && cur >= 0) {
-			cache->base = (uint32_t)cur;
+		if (node_read_u64(paths[i], &cur) == 0) {
+			cache->base = cur;
 			cache->has_base = true;
 		}
 
@@ -100,6 +99,8 @@ int node_read_i32(const char *path, int32_t *out_val)
 	if (UNLIKELY(!path || !out_val))
 		return -EINVAL;
 
+	*out_val = 0;
+
 	fd = open(path, O_RDONLY | O_CLOEXEC);
 	if (fd < 0) {
 		err = errno;
@@ -122,6 +123,54 @@ int node_read_i32(const char *path, int32_t *out_val)
 	val = parse_i32((const uint8_t *)buf, (size_t)res, &valid);
 	if (!valid) {
 		LOGE("node: failed to parse valid i32 from %s", path);
+		return -EINVAL;
+	}
+
+	*out_val = val;
+	return 0;
+}
+
+int node_read_u64(const char *path, uint64_t *out_val)
+{
+	char buf[32];
+	ssize_t res;
+	uint64_t val;
+	size_t pos;
+	size_t start = 0;
+	int fd;
+	int err;
+
+	if (UNLIKELY(!path || !out_val))
+		return -EINVAL;
+
+	*out_val = 0;
+
+	fd = open(path, O_RDONLY | O_CLOEXEC);
+	if (fd < 0) {
+		err = errno;
+		LOGE("node: failed to open read %s err=%d", path, err);
+		return -err;
+	}
+
+	do {
+		res = read(fd, buf, sizeof(buf));
+	} while (res < 0 && errno == EINTR);
+
+	close(fd);
+
+	if (res <= 0) {
+		err = (res < 0) ? errno : ENODATA;
+		LOGE("node: failed to read data %s err=%d", path, err);
+		return -err;
+	}
+
+	while (start < (size_t)res && (buf[start] == ' ' || buf[start] == '\t'))
+		start++;
+
+	val = parse_u64((const uint8_t *)buf, (size_t)res, start, &pos);
+
+	if (pos == start) {
+		LOGE("node: failed to parse valid u64 from %s", path);
 		return -EINVAL;
 	}
 

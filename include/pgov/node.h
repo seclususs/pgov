@@ -22,8 +22,8 @@ struct node_check {
 
 struct node_cache {
 	uint64_t last;
+	uint64_t base;
 	int fd;
-	uint32_t base;
 	uint32_t retry_ms;
 	uint8_t fails;
 	bool has_base;
@@ -50,6 +50,13 @@ void node_cache_cleanup(struct node_cache *cache);
  * Returns 0 on success, or -errno on failure
  */
 int node_read_i32(const char *path, int32_t *out_val);
+
+/*
+ * Read and parse a 64-bit unsigned integer from node path
+ *
+ * Returns 0 on success, or -errno on failure
+ */
+int node_read_u64(const char *path, uint64_t *out_val);
 
 /*
  * Read string from path into buf up to len - 1 bytes and strip trailing
