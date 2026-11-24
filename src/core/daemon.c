@@ -3,18 +3,16 @@
 
 #define _GNU_SOURCE
 #include "pgov/daemon.h"
-#include "pgov/compiler.h"
 #include "pgov/epoll.h"
 #include "pgov/gov.h"
 #include "pgov/lockfile.h"
 #include "pgov/log.h"
 #include "pgov/memory.h"
-#include "pgov/node.h"
 #include "pgov/opt.h"
-#include "pgov/parser.h"
 #include "pgov/poll.h"
 #include "pgov/prop.h"
 #include "pgov/psi.h"
+#include "pgov/sched.h"
 #include "pgov/sensor.h"
 #include "pgov/signal.h"
 #include "pgov/state.h"
@@ -41,48 +39,6 @@
 
 static struct context dctx;
 
-static const char *const CAND_LAT[] = {
-	"/proc/sys/kernel/sched_latency_ns",
-	"/sys/kernel/debug/sched/latency_ns",
-	NULL,
-};
-
-static const char *const CAND_GRAN[] = {
-	"/proc/sys/kernel/sched_min_granularity_ns",
-	"/sys/kernel/debug/sched/min_granularity_ns",
-	NULL,
-};
-
-static const char *const CAND_WAKE[] = {
-	"/proc/sys/kernel/sched_wakeup_granularity_ns",
-	"/sys/kernel/debug/sched/wakeup_granularity_ns",
-	NULL,
-};
-
-static const char *const CAND_MIG[] = {
-	"/proc/sys/kernel/sched_migration_cost_ns",
-	"/sys/kernel/debug/sched/migration_cost_ns",
-	NULL,
-};
-
-static const char *const CAND_WALT[] = {
-	"/proc/sys/kernel/sched_walt_init_task_load_pct",
-	"/proc/sys/kernel/sched_init_task_load",
-	NULL,
-};
-
-static const char *const CAND_UCL[] = {
-	"/proc/sys/kernel/sched_uclamp_util_min",
-	"/proc/sys/kernel/sched_util_clamp_min",
-	NULL,
-};
-
-static const char *const CAND_UCL_MAX[] = {
-	"/proc/sys/kernel/sched_uclamp_util_max",
-	"/proc/sys/kernel/sched_util_clamp_max",
-	NULL,
-};
-
 static const char *const CAND_BAT_TEMP[] = {
 	"/sys/class/power_supply/battery/temp",
 	"/sys/class/power_supply/bms/temp",
@@ -95,63 +51,6 @@ static const char *const CAND_BAT_CAP[] = {
 	NULL,
 };
 
-#define NR_SINKS 7
-
-struct restore_entry {
-	int fd;
-	uint64_t base;
-};
-
-static struct restore_entry restore_table[NR_SINKS];
-static size_t restore_count;
-
-static void restore_snapshot(const struct context *ctx)
-{
-	const struct node_cache *const nodes[NR_SINKS] = {
-		&ctx->sched_lat,    &ctx->sched_gran, &ctx->sched_wake,
-		&ctx->sched_mig,    &ctx->sched_walt, &ctx->sched_uclmin,
-		&ctx->sched_uclmax,
-	};
-	size_t i;
-
-	restore_count = 0;
-	for (i = 0; i < NR_SINKS; i++) {
-		if (!nodes[i]->active || !nodes[i]->has_base)
-			continue;
-
-		restore_table[restore_count].fd = nodes[i]->fd;
-		restore_table[restore_count].base = nodes[i]->base;
-		restore_count++;
-	}
-}
-
-static void crash_restore(void)
-{
-	char buf[32];
-	size_t i;
-	size_t len;
-	ssize_t res;
-
-	for (i = 0; i < restore_count; i++) {
-		len = parse_fmt_u64(restore_table[i].base, buf);
-		res = pwrite(restore_table[i].fd, buf, len, 0);
-		UNUSED(res);
-	}
-}
-
-static void restore_all(struct context *ctx)
-{
-	node_restore(&ctx->sched_lat);
-	node_restore(&ctx->sched_gran);
-	node_restore(&ctx->sched_wake);
-	node_restore(&ctx->sched_mig);
-	node_restore(&ctx->sched_walt);
-	node_restore(&ctx->sched_uclmin);
-	node_restore(&ctx->sched_uclmax);
-	restore_count = 0;
-	LOGD("daemon: restored tunables");
-}
-
 static void init_os_environment(void)
 {
 	int fd;
@@ -162,7 +61,7 @@ static void init_os_environment(void)
 		close(fd);
 	}
 
-	signal_catch_crash(crash_restore);
+	signal_catch_crash(sched_restore);
 	task_protect_oom();
 	memory_lock();
 	task_set_max_fd();
@@ -211,21 +110,6 @@ static inline void init_context_defaults(struct context *ctx)
 	ctx->on_timeout = NULL;
 }
 
-static int init_node_caches(struct context *ctx)
-{
-	int count = 0;
-
-	count += node_cache_init(&ctx->sched_lat, CAND_LAT);
-	count += node_cache_init(&ctx->sched_gran, CAND_GRAN);
-	count += node_cache_init(&ctx->sched_wake, CAND_WAKE);
-	count += node_cache_init(&ctx->sched_mig, CAND_MIG);
-	count += node_cache_init(&ctx->sched_walt, CAND_WALT);
-	count += node_cache_init(&ctx->sched_uclmin, CAND_UCL);
-	count += node_cache_init(&ctx->sched_uclmax, CAND_UCL_MAX);
-
-	return count;
-}
-
 static int init_sensors_and_triggers(struct context *ctx)
 {
 	char backlight_paths[SENSOR_BACKLIGHT_MAX][SENSOR_PATH_LEN];
@@ -265,7 +149,7 @@ static int init_sensors_and_triggers(struct context *ctx)
 
 static void cleanup_context(struct context *ctx)
 {
-	restore_all(ctx);
+	sched_cleanup(ctx);
 
 #ifdef NDK_BUILD
 	opt_exit();
@@ -283,13 +167,6 @@ static void cleanup_context(struct context *ctx)
 	sensor_close_temp(&ctx->bat_temp);
 	sensor_close_battery(&ctx->battery);
 	sensor_close_backlight(&ctx->backlight);
-	node_cache_cleanup(&ctx->sched_lat);
-	node_cache_cleanup(&ctx->sched_gran);
-	node_cache_cleanup(&ctx->sched_wake);
-	node_cache_cleanup(&ctx->sched_mig);
-	node_cache_cleanup(&ctx->sched_walt);
-	node_cache_cleanup(&ctx->sched_uclmin);
-	node_cache_cleanup(&ctx->sched_uclmax);
 }
 
 int daemon_init(void)
@@ -310,10 +187,10 @@ int daemon_init(void)
 		goto cleanup;
 	}
 
-	if (init_node_caches(&dctx) == 0)
+	if (sched_init(&dctx) == 0)
 		dctx.dormant = true;
 
-	restore_snapshot(&dctx);
+	sched_snapshot(&dctx);
 
 	if (!psi_available()) {
 		ret = -ENODEV;
