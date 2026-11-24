@@ -297,14 +297,13 @@ int daemon_init(void)
 	int ret = 0;
 
 	init_context_defaults(&dctx);
-	init_os_environment();
-	LOGI("daemon: initiating");
 
 	dctx.lfd = lockfile_init(PATH_LOCK);
-	if (dctx.lfd < 0) {
-		ret = dctx.lfd;
-		goto cleanup;
-	}
+	if (dctx.lfd < 0)
+		return dctx.lfd;
+
+	init_os_environment();
+	LOGI("daemon: initiating");
 
 	if (!prop_wait_boot()) {
 		ret = -ETIMEDOUT;
