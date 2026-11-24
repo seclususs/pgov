@@ -182,13 +182,13 @@ static void register_psi_trigger(struct context *ctx)
 {
 	int fd;
 
-	fd = psi_trigger_open(PSI_CPU_PATH, PSI_THRESHOLD_US, PSI_WINDOW_US);
+	fd = psi_open(PSI_CPU, PSI_THRESHOLD, PSI_WINDOW);
 	if (fd < 0)
 		return;
 
 	ctx->tfd = fd;
 	if (epoll_add_trigger(ctx) < 0) {
-		psi_trigger_close(fd);
+		psi_close(fd);
 		ctx->tfd = -1;
 	}
 }
@@ -199,7 +199,7 @@ static inline bool read_psi(struct context *ctx, const struct timespec *now,
 	uint32_t delay;
 	int ret;
 
-	ret = psi_read(&ctx->psi_state, sample, now);
+	ret = psi_read_sample(&ctx->psi_state, sample, now);
 	if (LIKELY(ret == 0)) {
 		if (UNLIKELY(ctx->psi_fails != 0)) {
 			ctx->psi_fails = 0;
@@ -218,11 +218,11 @@ static inline bool read_psi(struct context *ctx, const struct timespec *now,
 	epoll_rm_trigger(ctx);
 
 	if (ctx->tfd >= 0) {
-		psi_trigger_close(ctx->tfd);
+		psi_close(ctx->tfd);
 		ctx->tfd = -1;
 	}
 
-	psi_recover(&ctx->psi_state, PSI_CPU_PATH);
+	psi_recover(&ctx->psi_state, PSI_CPU);
 	register_psi_trigger(ctx);
 
 	return false;

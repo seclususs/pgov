@@ -11,14 +11,14 @@
 
 bool psi_available(void)
 {
-	if (access(PSI_CPU_PATH, R_OK | W_OK) == 0)
+	if (access(PSI_CPU, R_OK | W_OK) == 0)
 		return true;
 
 	LOGE("psi: cpu node missing or access denied");
 	return false;
 }
 
-int psi_trigger_open(const char *path, int32_t threshold_us, int32_t window_us)
+int psi_open(const char *path, int32_t threshold_us, int32_t window_us)
 {
 	ssize_t res;
 	char payload[64];
@@ -64,7 +64,7 @@ int psi_trigger_open(const char *path, int32_t threshold_us, int32_t window_us)
 	return fd;
 }
 
-void psi_trigger_close(int fd)
+void psi_close(int fd)
 {
 	if (fd >= 0)
 		close(fd);
@@ -223,8 +223,8 @@ static inline void update_filter(struct psi_state *state,
 	metrics->nis = state->filter.nis;
 }
 
-int psi_read(struct psi_state *state, struct psi_sample *sample,
-	     const struct timespec *now)
+int psi_read_sample(struct psi_state *state, struct psi_sample *sample,
+		    const struct timespec *now)
 {
 	struct psi_metrics metrics = { 0 };
 	ssize_t res;

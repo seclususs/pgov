@@ -124,14 +124,12 @@ static int init_sensors_and_triggers(struct context *ctx)
 	sensor_init_battery(&ctx->battery, CAND_BAT_CAP);
 
 	if (!ctx->dormant) {
-		ctx->tfd = psi_trigger_open(PSI_CPU_PATH, PSI_THRESHOLD_US,
-					    PSI_WINDOW_US);
-
+		ctx->tfd = psi_open(PSI_CPU, PSI_THRESHOLD, PSI_WINDOW);
 		if (ctx->tfd < 0)
 			return ctx->tfd;
 	}
 
-	psi_init(&ctx->psi_state, PSI_CPU_PATH);
+	psi_init(&ctx->psi_state, PSI_CPU);
 
 	ctx->sfd = signal_init();
 	if (ctx->sfd < 0)
@@ -156,7 +154,7 @@ static void cleanup_context(struct context *ctx)
 #endif // NDK_BUILD
 
 	if (ctx->tfd >= 0)
-		psi_trigger_close(ctx->tfd);
+		psi_close(ctx->tfd);
 
 	if (ctx->sfd >= 0)
 		signal_close(ctx->sfd);

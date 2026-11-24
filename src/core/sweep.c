@@ -107,7 +107,7 @@ static bool check_interrupted(struct sweep_context *sctx)
 		return true;
 	}
 
-	if (psi_read_avg10(PSI_CPU_PATH, &avg10) == 0) {
+	if (psi_read_avg10(PSI_CPU, &avg10) == 0) {
 		if (avg10 > INT_TO_Q16(MAX_PSI)) {
 			sctx->interrupted = true;
 			return true;
