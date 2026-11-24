@@ -65,6 +65,8 @@ q16_t kalman_update(struct kalman_state *state, q16_t meas, q16_t dt_sec)
 	q32_t f_p10;
 	q32_t f_p11;
 	q32_t inv_a;
+	q32_t nis_q32;
+	q32_t nis_shift;
 	q32_t p00_pred;
 	q32_t p01_pred;
 	q32_t p10_pred;
@@ -171,7 +173,9 @@ q16_t kalman_update(struct kalman_state *state, q16_t meas, q16_t dt_sec)
 
 	r_y_q32 = Q16_TO_Q32(y);
 	r_y_sq = math_mul_q32(r_y_q32, r_y_q32);
-	state->nis = Q32_TO_Q16(math_mul_q32(r_y_sq, Q16_TO_Q32(inv_s)));
+	nis_q32 = math_mul_q32(r_y_sq, Q16_TO_Q32(inv_s));
+	nis_shift = nis_q32 >> Q16_SHIFT;
+	state->nis = (nis_shift > INT32_MAX) ? INT32_MAX : (q16_t)nis_shift;
 
 	return (state->x_pos > 0) ? state->x_pos : 0;
 }
