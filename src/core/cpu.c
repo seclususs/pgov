@@ -91,6 +91,7 @@ static inline q16_t calculate_damping(q16_t k_final, q16_t velocity,
 	q16_t c_stab;
 	q16_t c_therm;
 	q16_t clamped;
+	q32_t den;
 	q32_t num;
 	q32_t rate;
 	q16_t root;
@@ -109,7 +110,8 @@ static inline q16_t calculate_damping(q16_t k_final, q16_t velocity,
 	x_sq = math_mul_q32(x, x);
 	num = math_mul_q32(rate, x_sq);
 
-	c_req = (v_sq > 0) ? num / (v_sq >> Q16_SHIFT) : 0;
+	den = v_sq >> Q16_SHIFT;
+	c_req = (den > 0) ? num / den : 0;
 	c_max = math_mul_q16(c_base, INT_TO_Q16(4));
 
 	if (c_req >= c_max)
