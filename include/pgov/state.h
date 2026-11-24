@@ -4,13 +4,13 @@
 #ifndef PGOV_STATE_H
 #define PGOV_STATE_H
 
-#include "pgov/cpu.h"
+#include "pgov/math.h"
+#include "pgov/node.h"
 #include "pgov/poll.h"
 #include "pgov/psi.h"
+#include "pgov/sched.h"
 #include "pgov/sensor.h"
-#include "pgov/node.h"
 #include "pgov/thermal.h"
-#include "pgov/math.h"
 #include <stdbool.h>
 #include <time.h>
 
@@ -30,7 +30,7 @@ enum display_state {
  */
 struct ALIGNED(64) context {
 	struct psi_state psi_state;
-	struct cpu_state cpu_state;
+	struct sched_state sched_state;
 	struct poll_state poll_state;
 	struct thermal_state therm_state;
 	struct sensor_temp cpu_temp;

@@ -46,47 +46,47 @@ void tune_limits(void)
 	cap = calc_heuristic(core, freq_khz / 1000);
 
 	val = math_lerp(FLOAT_TO_Q16(384.0F), FLOAT_TO_Q16(1024.0F), cap);
-	param_sched.max_ucl =
+	limit_sched.max_ucl =
 		math_clamp(val, FLOAT_TO_Q16(384.0F), FLOAT_TO_Q16(1024.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(448.0F), FLOAT_TO_Q16(640.0F), cap);
-	param_sched.ucl_max =
+	limit_sched.ucl_max =
 		math_clamp(val, FLOAT_TO_Q16(448.0F), FLOAT_TO_Q16(640.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(320.0F), FLOAT_TO_Q16(448.0F), cap);
-	param_sched.susp_ucl =
+	limit_sched.susp_ucl =
 		math_clamp(val, FLOAT_TO_Q16(320.0F), FLOAT_TO_Q16(448.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(20.0F), FLOAT_TO_Q16(4.0F), cap);
-	param_sched.min_lat =
+	limit_sched.min_lat =
 		math_clamp(val, FLOAT_TO_Q16(4.0F), FLOAT_TO_Q16(20.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(25.0F), FLOAT_TO_Q16(12.0F), cap);
-	param_sched.max_lat =
+	limit_sched.max_lat =
 		math_clamp(val, FLOAT_TO_Q16(12.0F), FLOAT_TO_Q16(25.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(6.5F), FLOAT_TO_Q16(1.5F), cap);
-	param_sched.min_gran =
+	limit_sched.min_gran =
 		math_clamp(val, FLOAT_TO_Q16(1.5F), FLOAT_TO_Q16(6.5F));
 
 	val = math_lerp(FLOAT_TO_Q16(10.0F), FLOAT_TO_Q16(4.0F), cap);
-	param_sched.max_gran =
+	limit_sched.max_gran =
 		math_clamp(val, FLOAT_TO_Q16(4.0F), FLOAT_TO_Q16(10.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(3.0F), FLOAT_TO_Q16(1.0F), cap);
-	param_sched.min_wake =
+	limit_sched.min_wake =
 		math_clamp(val, FLOAT_TO_Q16(1.0F), FLOAT_TO_Q16(3.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(8.0F), FLOAT_TO_Q16(4.0F), cap);
-	param_sched.max_wake =
+	limit_sched.max_wake =
 		math_clamp(val, FLOAT_TO_Q16(4.0F), FLOAT_TO_Q16(8.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(0.6F), FLOAT_TO_Q16(0.2F), cap);
-	param_sched.min_mig =
+	limit_sched.min_mig =
 		math_clamp(val, FLOAT_TO_Q16(0.2F), FLOAT_TO_Q16(0.6F));
 
 	val = math_lerp(FLOAT_TO_Q16(1.2F), FLOAT_TO_Q16(0.6F), cap);
-	param_sched.max_mig =
+	limit_sched.max_mig =
 		math_clamp(val, FLOAT_TO_Q16(0.6F), FLOAT_TO_Q16(1.2F));
 }
 
@@ -127,32 +127,32 @@ static void calc_metrics(q16_t *RESTRICT rat, q16_t *RESTRICT rel,
 	*therm = math_clamp(*therm, 0, Q16_ONE);
 }
 
-static void set_cpu_params(q16_t rel, q16_t rat)
+static void set_sched_params(q16_t rel, q16_t rat)
 {
 	q16_t val;
 
 	val = math_lerp(FLOAT_TO_Q16(0.50F), FLOAT_TO_Q16(0.20F), rel);
-	param_cpu.lat_gran_rat =
+	param_sched.lat_gran_rat =
 		math_clamp(val, FLOAT_TO_Q16(0.20F), FLOAT_TO_Q16(0.50F));
 
 	val = math_lerp(FLOAT_TO_Q16(0.12F), FLOAT_TO_Q16(0.25F), rat);
-	param_cpu.uclamp_k =
+	param_sched.uclamp_k =
 		math_clamp(val, FLOAT_TO_Q16(0.12F), FLOAT_TO_Q16(0.25F));
 
 	val = math_lerp(FLOAT_TO_Q16(0.04F), FLOAT_TO_Q16(0.12F), rat);
-	param_cpu.sigmoid_k =
+	param_sched.sigmoid_k =
 		math_clamp(val, FLOAT_TO_Q16(0.04F), FLOAT_TO_Q16(0.12F));
 
 	val = math_lerp(FLOAT_TO_Q16(12.0F), FLOAT_TO_Q16(25.0F), rel);
-	param_cpu.surge_thresh =
+	param_sched.surge_thresh =
 		math_clamp(val, FLOAT_TO_Q16(12.0F), FLOAT_TO_Q16(25.0F));
 
 	val = math_lerp(FLOAT_TO_Q16(0.08F), FLOAT_TO_Q16(0.20F), rel);
-	param_cpu.trans_rate =
+	param_sched.trans_rate =
 		math_clamp(val, FLOAT_TO_Q16(0.08F), FLOAT_TO_Q16(0.20F));
 
 	val = math_lerp(FLOAT_TO_Q16(0.40F), FLOAT_TO_Q16(0.90F), rel);
-	param_cpu.trans_diff =
+	param_sched.trans_diff =
 		math_clamp(val, FLOAT_TO_Q16(0.40F), FLOAT_TO_Q16(0.90F));
 }
 
@@ -190,6 +190,6 @@ void tune_params(void)
 	q16_t therm = 0;
 
 	calc_metrics(&rat, &rel, &therm);
-	set_cpu_params(rel, rat);
+	set_sched_params(rel, rat);
 	set_thermal_params(therm);
 }

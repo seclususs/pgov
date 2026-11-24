@@ -3,7 +3,6 @@
 
 #include "pgov/gov.h"
 #include "pgov/compiler.h"
-#include "pgov/cpu.h"
 #include "pgov/epoll.h"
 #include "pgov/log.h"
 #include "pgov/math.h"
@@ -11,6 +10,7 @@
 #include "pgov/param.h"
 #include "pgov/poll.h"
 #include "pgov/psi.h"
+#include "pgov/sched.h"
 #include "pgov/sensor.h"
 #include "pgov/sweep.h"
 #include "pgov/thermal.h"
@@ -74,40 +74,40 @@ static inline void relax_sched_tunables(struct context *ctx)
 
 	if (ctx->sched_uclmax.active) {
 		val = math_sanitize_u64(
-			param_sched.susp_ucl,
-			(uint64_t)Q16_TO_INT(param_sched.susp_ucl));
+			limit_sched.susp_ucl,
+			(uint64_t)Q16_TO_INT(limit_sched.susp_ucl));
 
 		if (ctx->sched_uclmax.last != val)
 			node_update(&ctx->sched_uclmax, val, true, NULL);
 	}
 
 	if (ctx->sched_lat.active) {
-		val = math_quantize_u64(param_sched.max_lat,
-					param_sched.max_lat, quant);
+		val = math_quantize_u64(limit_sched.max_lat,
+					limit_sched.max_lat, quant);
 
 		if (ctx->sched_lat.last != val)
 			node_update(&ctx->sched_lat, val, true, NULL);
 	}
 
 	if (ctx->sched_gran.active) {
-		val = math_quantize_u64(param_sched.max_gran,
-					param_sched.max_gran, quant);
+		val = math_quantize_u64(limit_sched.max_gran,
+					limit_sched.max_gran, quant);
 
 		if (ctx->sched_gran.last != val)
 			node_update(&ctx->sched_gran, val, true, NULL);
 	}
 
 	if (ctx->sched_wake.active) {
-		val = math_quantize_u64(param_sched.max_wake,
-					param_sched.max_wake, quant);
+		val = math_quantize_u64(limit_sched.max_wake,
+					limit_sched.max_wake, quant);
 
 		if (ctx->sched_wake.last != val)
 			node_update(&ctx->sched_wake, val, true, NULL);
 	}
 
 	if (ctx->sched_mig.active) {
-		val = math_quantize_u64(param_sched.max_mig,
-					param_sched.min_mig, quant);
+		val = math_quantize_u64(limit_sched.max_mig,
+					limit_sched.min_mig, quant);
 
 		if (ctx->sched_mig.last != val)
 			node_update(&ctx->sched_mig, val, true, NULL);
@@ -115,8 +115,8 @@ static inline void relax_sched_tunables(struct context *ctx)
 
 	if (ctx->sched_walt.active) {
 		val = math_sanitize_u64(
-			param_sched.min_walt,
-			(uint64_t)Q16_TO_INT(param_sched.min_walt));
+			limit_sched.min_walt,
+			(uint64_t)Q16_TO_INT(limit_sched.min_walt));
 
 		if (ctx->sched_walt.last != val)
 			node_update(&ctx->sched_walt, val, true, NULL);
@@ -140,7 +140,7 @@ static inline bool update_display(struct context *ctx,
 	on = ((ret < 0) ? true : (brightness > 0)) != 0;
 
 	if (on && UNLIKELY(ctx->display_state != DISP_ON)) {
-		ctx->cpu_state.first_run = true;
+		ctx->sched_state.first_run = true;
 		kalman_reset(&ctx->psi_state.filter);
 		ctx->psi_state.initial = true;
 		ctx->display_state = DISP_ON;
@@ -285,8 +285,8 @@ static inline void calc_demand(struct context *ctx, const struct timespec *now,
 			       q16_t *RESTRICT therm_scale,
 			       q16_t *RESTRICT demand, q16_t *RESTRICT pressure)
 {
-	struct cpu_demand input;
-	struct cpu_efficiency *eff;
+	struct sched_demand input;
+	struct sched_efficiency *efficiency;
 	q16_t dt_real;
 	q16_t dt_safe;
 	q16_t integral;
@@ -299,19 +299,19 @@ static inline void calc_demand(struct context *ctx, const struct timespec *now,
 
 	*therm_scale = ctx->therm_scale;
 
-	eff = &ctx->cpu_state.efficiency;
-	cpu_update_efficiency(eff, ctx->level_bat, *therm_scale,
-			      sample->some.avg300);
+	efficiency = &ctx->sched_state.efficiency;
+	sched_update_efficiency(efficiency, ctx->level_bat, *therm_scale,
+				sample->some.avg300);
 
 	dt_real = time_dt_sec(&ctx->last_tick, now);
 	dt_safe = math_clamp(dt_real, 1, FLOAT_TO_Q16(0.1F));
 	ctx->last_tick = *now;
 
-	cpu_update_integral(&ctx->cpu_state, ctx->level_bat, dt_real, &integral,
-			    &integral_dt);
+	sched_update_integral(&ctx->sched_state, ctx->level_bat, dt_real,
+			      &integral, &integral_dt);
 
-	trend_factor = cpu_calc_trend_gain(sample->some.velocity);
-	struct_break = sample->some.nis > eff->nis_thresh;
+	trend_factor = sched_trend_gain(sample->some.velocity);
+	struct_break = sample->some.nis > efficiency->nis_thresh;
 
 	input.target_psi = sample->some.stall_rate;
 	input.velocity = sample->some.velocity;
@@ -322,8 +322,8 @@ static inline void calc_demand(struct context *ctx, const struct timespec *now,
 	input.integral_dt = integral_dt;
 	input.struct_break = struct_break;
 
-	*demand = cpu_calc_load_demand(&ctx->cpu_state, &input, &param_cpu);
-	*pressure = cpu_calc_effective_pressure(*demand, trend_factor, eff);
+	*demand = sched_load_demand(&ctx->sched_state, &input, &param_sched);
+	*pressure = sched_effective_pressure(*demand, trend_factor, efficiency);
 }
 
 static inline bool should_apply_mapping(struct context *ctx,
@@ -339,17 +339,17 @@ static inline bool should_apply_mapping(struct context *ctx,
 					    sample->some.velocity);
 	ctx->next_wake = next_wake;
 
-	moving = cpu_transient(&ctx->cpu_state, &param_cpu);
+	moving = sched_transient(&ctx->sched_state, &param_sched);
 	if (!moving && !ctx->remap_pending)
 		return false;
 
 	if (moving) {
-		trans_wake = Q16_TO_INT(param_cpu.trans_poll);
+		trans_wake = Q16_TO_INT(param_sched.trans_poll);
 		if (next_wake > trans_wake)
 			ctx->next_wake = trans_wake;
 	}
 
-	ctx->cpu_state.psi_ref = ctx->cpu_state.psi_val;
+	ctx->sched_state.psi_ref = ctx->sched_state.psi_val;
 	ctx->remap_pending = false;
 	return true;
 }
@@ -360,11 +360,11 @@ static inline void apply_mapping(struct context *ctx,
 				 q16_t pressure)
 {
 	const uint64_t quant = QUANT_NS;
-	struct cpu_efficiency *eff = &ctx->cpu_state.efficiency;
+	struct sched_efficiency *efficiency = &ctx->sched_state.efficiency;
 	uint64_t out_gran = 0;
 	uint64_t out_lat = 0;
 	uint64_t out_mig = 0;
-	uint64_t out_uclmax = CPU_UCLAMP_MAX_CEILING;
+	uint64_t out_uclmax = SCHED_UCLAMP_CEILING;
 	uint64_t out_uclmin = 0;
 	uint64_t out_wake = 0;
 	uint64_t out_walt = 0;
@@ -378,52 +378,52 @@ static inline void apply_mapping(struct context *ctx,
 	q16_t walt = 0;
 
 	if (ctx->sched_lat.active || ctx->sched_gran.active) {
-		therm_lat = cpu_calc_thermal_latency(therm_scale, &param_sched);
-		lat = cpu_calc_latency(pressure, demand, therm_lat, &param_cpu,
-				       eff, &param_sched);
+		therm_lat = sched_thermal_latency(therm_scale, &limit_sched);
+		lat = sched_latency(pressure, demand, therm_lat, &param_sched,
+				    efficiency, &limit_sched);
 	}
 
 	if (ctx->sched_lat.active)
-		out_lat = math_quantize_u64(lat, param_sched.max_lat, quant);
+		out_lat = math_quantize_u64(lat, limit_sched.max_lat, quant);
 
 	if (ctx->sched_gran.active) {
-		gran = cpu_calc_granularity(lat, &param_cpu, &param_sched);
-		out_gran = math_quantize_u64(gran, param_sched.max_gran, quant);
+		gran = sched_granularity(lat, &param_sched, &limit_sched);
+		out_gran = math_quantize_u64(gran, limit_sched.max_gran, quant);
 	}
 
 	if (ctx->sched_wake.active) {
-		wake = cpu_calc_wakeup(pressure, eff, &param_sched);
-		out_wake = math_quantize_u64(wake, param_sched.max_wake, quant);
+		wake = sched_wakeup(pressure, efficiency, &limit_sched);
+		out_wake = math_quantize_u64(wake, limit_sched.max_wake, quant);
 	}
 
 	if (ctx->sched_mig.active) {
-		mig = cpu_calc_migration(sample->some.velocity, pressure,
-					 &param_sched);
+		mig = sched_migration(sample->some.velocity, pressure,
+				      &limit_sched);
 
-		out_mig = math_quantize_u64(mig, param_sched.min_mig, quant);
+		out_mig = math_quantize_u64(mig, limit_sched.min_mig, quant);
 	}
 
 	if (ctx->sched_walt.active) {
-		walt = cpu_calc_walt(pressure, &param_sched);
+		walt = sched_walt(pressure, &limit_sched);
 
 		out_walt = math_sanitize_u64(
-			walt, (uint64_t)Q16_TO_INT(param_sched.min_walt));
+			walt, (uint64_t)Q16_TO_INT(limit_sched.min_walt));
 	}
 
 	if (ctx->sched_uclmax.active) {
-		uclmax = cpu_calc_uclamp_max(therm_scale, ctx->level_bat,
-					     &param_sched);
+		uclmax = sched_uclamp_max(therm_scale, ctx->level_bat,
+					  &limit_sched);
 
-		out_uclmax = math_sanitize_u64(
-			uclmax, (uint64_t)CPU_UCLAMP_MAX_CEILING);
+		out_uclmax = math_sanitize_u64(uclmax,
+					       (uint64_t)SCHED_UCLAMP_CEILING);
 	}
 
 	if (ctx->sched_uclmin.active) {
-		uclmin = cpu_calc_uclamp_min(pressure, therm_scale, &param_cpu,
-					     eff, &param_sched);
+		uclmin = sched_uclamp_min(pressure, therm_scale, &param_sched,
+					  efficiency, &limit_sched);
 
 		out_uclmin = math_sanitize_u64(
-			uclmin, (uint64_t)Q16_TO_INT(param_sched.min_ucl));
+			uclmin, (uint64_t)Q16_TO_INT(limit_sched.min_ucl));
 
 		if (ctx->sched_uclmax.active && out_uclmin > out_uclmax)
 			out_uclmin = out_uclmax;

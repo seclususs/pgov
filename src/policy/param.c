@@ -4,7 +4,7 @@
 #include "pgov/param.h"
 #include "pgov/math.h"
 
-struct cpu_limit param_sched = {
+struct sched_limit limit_sched = {
 	.min_lat = FLOAT_TO_Q16(8.0F),
 	.max_lat = FLOAT_TO_Q16(20.0F),
 	.min_gran = FLOAT_TO_Q16(2.5F),
@@ -21,7 +21,7 @@ struct cpu_limit param_sched = {
 	.susp_ucl = FLOAT_TO_Q16(384.0F),
 };
 
-struct cpu_param param_cpu = {
+struct sched_param param_sched = {
 	.lat_gran_rat = FLOAT_TO_Q16(0.34F),
 	.uclamp_k = FLOAT_TO_Q16(0.185F),
 	.sigmoid_k = FLOAT_TO_Q16(0.072F),

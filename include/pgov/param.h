@@ -4,11 +4,11 @@
 #ifndef PGOV_PARAM_H
 #define PGOV_PARAM_H
 
-#include "pgov/cpu.h"
+#include "pgov/sched.h"
 #include "pgov/thermal.h"
 
-extern struct cpu_limit param_sched;
-extern struct cpu_param param_cpu;
+extern struct sched_limit limit_sched;
+extern struct sched_param param_sched;
 extern struct thermal_param param_thermal;
 
 #endif // PGOV_PARAM_H

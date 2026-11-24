@@ -81,10 +81,10 @@ static inline void init_context_defaults(struct context *ctx)
 	ctx->next_wake = POLL_MIN_MS;
 	ctx->display_state = DISP_UNKNOWN;
 	ctx->therm_scale = Q16_ONE;
-	ctx->cpu_state.first_run = true;
-	ctx->cpu_state.psi_val = 0;
-	ctx->cpu_state.rate = 0;
-	ctx->cpu_state.prev_integral = 0;
+	ctx->sched_state.first_run = true;
+	ctx->sched_state.psi_val = 0;
+	ctx->sched_state.rate = 0;
+	ctx->sched_state.prev_integral = 0;
 	ctx->efd = -1;
 	ctx->sfd = -1;
 	ctx->tfd = -1;
