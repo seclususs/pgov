@@ -158,7 +158,8 @@ int task_set_uclamp(uint32_t util_max)
 	if (syscall(__NR_sched_setattr, 0, &attr, 0) == -1) {
 		err = errno;
 
-		if (err == E2BIG || err == ENOSYS || err == EINVAL) {
+		if (err == E2BIG || err == ENOSYS || err == EINVAL ||
+		    err == EOPNOTSUPP) {
 			uclamp_supported = false;
 			return 0;
 		}
