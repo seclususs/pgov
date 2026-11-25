@@ -532,14 +532,15 @@ static inline int read_temperature(struct sensor_temp *sensor, q16_t *temp,
 		return -EINVAL;
 	}
 
-	if (UNLIKELY(!sensor->calibrated)) {
+	if (UNLIKELY(!sensor->calibrated && val != 0)) {
 		if (val >= 10000 && val <= 150000)
 			sensor->scale = SCALE_MILLI;
 
 		else if (val >= 100 && val <= 1500)
 			sensor->scale = SCALE_DECI;
 
-		else if (val >= -30 && val <= 150)
+		else if (val >= -30 && val <= 150 &&
+			 sensor->scale != SCALE_DECI)
 			sensor->scale = 1;
 
 		sensor->calibrated = true;
