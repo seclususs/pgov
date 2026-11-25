@@ -5,10 +5,22 @@
 #####################
 chooseport() {
   local events="${TMPDIR:-/dev/tmp}/events"
+  local end_sec
+  local now_sec
+  local rem
   sleep 0.5
   timeout 0.2 /system/bin/getevent -l -c 1 > /dev/null 2>&1
+  now_sec="$(date +%s)"
+  end_sec=$((now_sec + 15))
   while true; do
-    timeout 15 /system/bin/getevent -l -c 1 > "${events}" 2> /dev/null
+    now_sec="$(date +%s)"
+    rem=$((end_sec - now_sec))
+    if [ "${rem}" -le 0 ]; then
+      rm -f "${events}"
+      ui_print "- Timeout: keeping existing conf"
+      return 0
+    fi
+    timeout "${rem}" /system/bin/getevent -l -c 1 > "${events}" 2> /dev/null
     if [ -s "${events}" ]; then
       if grep -qE "KEY_VOLUMEUP| 0073 " "${events}"; then
         rm -f "${events}"
