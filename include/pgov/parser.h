@@ -78,6 +78,7 @@ static ALWAYS_INLINE int32_t parse_i32(const uint8_t *RESTRICT buf, size_t len,
 	size_t i;
 	uint64_t val = 0;
 	uint8_t byte;
+	bool has_sign = false;
 
 	if (UNLIKELY(!buf || !valid)) {
 		if (valid)
@@ -99,8 +100,9 @@ static ALWAYS_INLINE int32_t parse_i32(const uint8_t *RESTRICT buf, size_t len,
 			continue;
 		}
 
-		if (byte == '-' && !(*valid)) {
+		if (byte == '-' && !(*valid) && !has_sign) {
 			sign = -1;
+			has_sign = true;
 			continue;
 		}
 
@@ -108,6 +110,11 @@ static ALWAYS_INLINE int32_t parse_i32(const uint8_t *RESTRICT buf, size_t len,
 		    byte == '\t') {
 			if (*valid)
 				break;
+
+			if (has_sign) {
+				*valid = false;
+				return 0;
+			}
 
 			continue;
 		}
@@ -132,6 +139,7 @@ static ALWAYS_INLINE uint64_t parse_u64(const uint8_t *RESTRICT buf, size_t len,
 {
 	size_t pos = start;
 	uint64_t val = 0;
+	uint64_t digit;
 	uint8_t byte;
 
 	if (UNLIKELY(!buf || !next)) {
@@ -147,8 +155,12 @@ static ALWAYS_INLINE uint64_t parse_u64(const uint8_t *RESTRICT buf, size_t len,
 		if (byte < '0' || byte > '9')
 			break;
 
-		if (val <= 1844674407370955161ULL)
-			val = (val * 10ULL) + (uint64_t)(byte - '0');
+		digit = (uint64_t)(byte - '0');
+
+		if (UNLIKELY(val > (UINT64_MAX - digit) / 10ULL))
+			val = UINT64_MAX;
+		else
+			val = (val * 10ULL) + digit;
 
 		pos++;
 	}
@@ -164,6 +176,7 @@ static ALWAYS_INLINE q16_t parse_q16(const uint8_t *RESTRICT buf, size_t len,
 	uint32_t frac_div = 1;
 	uint32_t frac_val = 0;
 	uint32_t int_val = 0;
+	uint32_t digit;
 	uint8_t byte;
 	bool frac = false;
 	q16_t frac_q16;
@@ -180,6 +193,9 @@ static ALWAYS_INLINE q16_t parse_q16(const uint8_t *RESTRICT buf, size_t len,
 		byte = buf[pos];
 
 		if (byte == '.') {
+			if (frac)
+				break;
+
 			frac = true;
 			pos++;
 			continue;
@@ -188,15 +204,21 @@ static ALWAYS_INLINE q16_t parse_q16(const uint8_t *RESTRICT buf, size_t len,
 		if (byte < '0' || byte > '9')
 			break;
 
+		digit = (uint32_t)(byte - '0');
+
 		if (!frac) {
-			int_val = (int_val * 10) + (byte - '0');
+			if (UNLIKELY(int_val > (32767U - digit) / 10U))
+				int_val = 32767U;
+			else
+				int_val = (int_val * 10U) + digit;
+
 			pos++;
 			continue;
 		}
 
 		if (LIKELY(frac_div < 1000000)) {
-			frac_val = (frac_val * 10) + (byte - '0');
-			frac_div *= 10;
+			frac_val = (frac_val * 10U) + digit;
+			frac_div *= 10U;
 		}
 
 		pos++;
