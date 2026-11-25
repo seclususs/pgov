@@ -434,8 +434,56 @@ static inline void apply_mapping(struct context *ctx,
 	node_update(&ctx->sched_wake, out_wake, false, &check_wake);
 	node_update(&ctx->sched_mig, out_mig, false, &check_mig);
 	node_update(&ctx->sched_walt, out_walt, false, &check_walt);
-	node_update(&ctx->sched_uclmin, out_uclmin, false, &check_ucl);
-	node_update(&ctx->sched_uclmax, out_uclmax, false, &check_ucl);
+
+	if (ctx->sched_uclmax.active && ctx->sched_uclmin.active) {
+		uint64_t cur_max;
+		uint64_t cur_min;
+
+		if (ctx->sched_uclmin.last != UINT64_MAX)
+			cur_min = ctx->sched_uclmin.last;
+		else if (ctx->sched_uclmin.has_base)
+			cur_min = ctx->sched_uclmin.base;
+		else
+			cur_min = 0;
+
+		if (ctx->sched_uclmax.last != UINT64_MAX)
+			cur_max = ctx->sched_uclmax.last;
+		else if (ctx->sched_uclmax.has_base)
+			cur_max = ctx->sched_uclmax.base;
+		else
+			cur_max = SCHED_UCLAMP_CEILING;
+
+		if (out_uclmax >= cur_min) {
+			bool force_max =
+				(ctx->sched_uclmax.last != UINT64_MAX &&
+				 out_uclmin > cur_max) != 0;
+
+			node_update(&ctx->sched_uclmax, out_uclmax, force_max,
+				    &check_ucl);
+
+			cur_max = (ctx->sched_uclmax.last != UINT64_MAX) ?
+					  ctx->sched_uclmax.last :
+					  cur_max;
+
+			if (out_uclmin <= cur_max)
+				node_update(&ctx->sched_uclmin, out_uclmin,
+					    false, &check_ucl);
+		} else {
+			node_update(&ctx->sched_uclmin, out_uclmin, true,
+				    &check_ucl);
+
+			cur_min = (ctx->sched_uclmin.last != UINT64_MAX) ?
+					  ctx->sched_uclmin.last :
+					  cur_min;
+
+			if (cur_min <= out_uclmax)
+				node_update(&ctx->sched_uclmax, out_uclmax,
+					    false, &check_ucl);
+		}
+	} else {
+		node_update(&ctx->sched_uclmin, out_uclmin, false, &check_ucl);
+		node_update(&ctx->sched_uclmax, out_uclmax, false, &check_ucl);
+	}
 }
 
 static inline void active_tick(struct context *ctx, const struct timespec *now)

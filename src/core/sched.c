@@ -103,11 +103,22 @@ void sched_snapshot(const struct context *ctx)
 void sched_restore(void)
 {
 	char buf[32];
+	uint32_t pending = 0;
 	size_t i;
 	size_t len;
 	ssize_t res;
 
 	for (i = 0; i < restore_count; i++) {
+		len = parse_fmt_u64(restore_table[i].base, buf);
+		res = pwrite(restore_table[i].fd, buf, len, 0);
+		if (res < 0)
+			pending |= (1U << i);
+	}
+
+	for (i = 0; i < restore_count && pending != 0; i++) {
+		if ((pending & (1U << i)) == 0)
+			continue;
+
 		len = parse_fmt_u64(restore_table[i].base, buf);
 		res = pwrite(restore_table[i].fd, buf, len, 0);
 		UNUSED(res);
@@ -121,8 +132,18 @@ static void restore_nodes(struct context *ctx)
 	node_restore(&ctx->sched_wake);
 	node_restore(&ctx->sched_mig);
 	node_restore(&ctx->sched_walt);
-	node_restore(&ctx->sched_uclmin);
-	node_restore(&ctx->sched_uclmax);
+
+	if (ctx->sched_uclmax.active && ctx->sched_uclmax.has_base &&
+	    ctx->sched_uclmin.active && ctx->sched_uclmin.has_base &&
+	    (ctx->sched_uclmin.last == UINT64_MAX ||
+	     ctx->sched_uclmax.base >= ctx->sched_uclmin.last)) {
+		node_restore(&ctx->sched_uclmax);
+		node_restore(&ctx->sched_uclmin);
+	} else {
+		node_restore(&ctx->sched_uclmin);
+		node_restore(&ctx->sched_uclmax);
+	}
+
 	restore_count = 0;
 	LOGD("sched: restored tunables");
 }
