@@ -42,15 +42,25 @@ bool prop_wait_boot(void)
 
 #ifdef NDK_BUILD
 
-void prop_init(struct prop_state *RESTRICT state, const char *RESTRICT name)
+void prop_init(struct prop_state *RESTRICT state, const char *RESTRICT key)
 {
-	if (UNLIKELY(!state || !name))
+	size_t len;
+
+	if (UNLIKELY(!state))
 		return;
 
-	strncpy(state->name, name, PROP_NAME_MAX - 1);
-	state->name[PROP_NAME_MAX - 1] = '\0';
+	state->key[0] = '\0';
 	state->val[0] = '\0';
 	state->modified = false;
+
+	if (UNLIKELY(!key))
+		return;
+
+	len = strlen(key);
+	if (UNLIKELY(len == 0 || len >= PROP_KEY_MAX))
+		return;
+
+	memcpy(state->key, key, len + 1);
 }
 
 int prop_set(struct prop_state *RESTRICT state, const char *RESTRICT val)
@@ -59,10 +69,10 @@ int prop_set(struct prop_state *RESTRICT state, const char *RESTRICT val)
 	int len;
 	bool was_mod;
 
-	if (UNLIKELY(!state || !val))
+	if (UNLIKELY(!state || !val || state->key[0] == '\0'))
 		return -EINVAL;
 
-	len = __system_property_get(state->name, os_val);
+	len = __system_property_get(state->key, os_val);
 	if (len <= 0)
 		os_val[0] = '\0';
 
@@ -76,9 +86,9 @@ int prop_set(struct prop_state *RESTRICT state, const char *RESTRICT val)
 		state->modified = true;
 	}
 
-	if (__system_property_set(state->name, val) != 0) {
+	if (__system_property_set(state->key, val) != 0) {
 		state->modified = was_mod;
-		LOGE("prop: failed to set %s to %s", state->name, val);
+		LOGE("prop: failed to set %s to %s", state->key, val);
 		return -EIO;
 	}
 
@@ -90,8 +100,8 @@ int prop_reset(struct prop_state *state)
 	if (UNLIKELY(!state || !state->modified))
 		return 0;
 
-	if (__system_property_set(state->name, state->val) != 0) {
-		LOGE("prop: failed to res %s to %s", state->name, state->val);
+	if (__system_property_set(state->key, state->val) != 0) {
+		LOGE("prop: failed to res %s to %s", state->key, state->val);
 		return -EIO;
 	}
 
@@ -107,7 +117,7 @@ void prop_cleanup(struct prop_state *state)
 	if (state->modified)
 		prop_reset(state);
 
-	state->name[0] = '\0';
+	state->key[0] = '\0';
 	state->val[0] = '\0';
 	state->modified = false;
 }

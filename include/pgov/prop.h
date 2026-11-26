@@ -10,13 +10,15 @@
 
 #if defined(NDK_BUILD)
 
+#define PROP_KEY_MAX 256
+
 struct prop_state {
-	char name[PROP_NAME_MAX];
+	char key[PROP_KEY_MAX];
 	char val[PROP_VALUE_MAX];
 	bool modified;
 };
 
-void prop_init(struct prop_state *RESTRICT state, const char *RESTRICT name);
+void prop_init(struct prop_state *RESTRICT state, const char *RESTRICT key);
 
 int prop_set(struct prop_state *RESTRICT state, const char *RESTRICT val);
 
