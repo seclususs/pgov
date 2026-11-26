@@ -502,7 +502,7 @@ void sensor_close_backlight(struct sensor_backlight *sensor)
 }
 
 static inline int read_temperature(struct sensor_temp *sensor, q16_t *temp,
-				   q16_t fallback)
+				   q16_t fallback, bool allow_milli)
 {
 	ssize_t res;
 	q32_t raw_q32;
@@ -553,6 +553,12 @@ static inline int read_temperature(struct sensor_temp *sensor, q16_t *temp,
 
 	raw_q32 = ((q32_t)val * Q16_ONE) / sensor->scale;
 
+	if (UNLIKELY(allow_milli && sensor->scale == SCALE_DECI &&
+		     val >= 10000 && val <= 150000)) {
+		sensor->scale = SCALE_MILLI;
+		raw_q32 = ((q32_t)val * Q16_ONE) / sensor->scale;
+	}
+
 	if (UNLIKELY(raw_q32 < (q32_t)INT_TO_Q16(-30) ||
 		     raw_q32 > (q32_t)INT_TO_Q16(150))) {
 		*temp = fallback;
@@ -565,12 +571,12 @@ static inline int read_temperature(struct sensor_temp *sensor, q16_t *temp,
 
 int sensor_read_cpu_temp(struct sensor_temp *sensor, q16_t *temp)
 {
-	return read_temperature(sensor, temp, FALLBACK_TEMP_CPU);
+	return read_temperature(sensor, temp, FALLBACK_TEMP_CPU, true);
 }
 
 int sensor_read_battery_temp(struct sensor_temp *sensor, q16_t *temp)
 {
-	return read_temperature(sensor, temp, FALLBACK_TEMP_BATTERY);
+	return read_temperature(sensor, temp, FALLBACK_TEMP_BATTERY, false);
 }
 
 int sensor_read_battery_capacity(struct sensor_battery *sensor, q16_t *capacity)
