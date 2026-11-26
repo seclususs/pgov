@@ -140,7 +140,8 @@ uint64_t poll_calc_next(struct poll_state *state, q16_t cur_pressure,
 		       (interval - state->cur_interval) :
 		       (state->cur_interval - interval);
 
-	if (interval < state->cur_interval || diff >= 200)
+	if (interval < state->cur_interval || diff >= 200 ||
+	    interval == POLL_MAX_MS)
 		state->cur_interval = (uint32_t)interval;
 
 	wait = jitter(state, state->cur_interval, POLL_MIN_MS, POLL_MAX_MS);
