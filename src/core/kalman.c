@@ -3,7 +3,18 @@
 
 #include "pgov/kalman.h"
 
-#define STALE_SEC 5
+#define STALE_SEC 15
+
+static inline q16_t clamp_q32(q32_t val, q16_t min, q16_t max)
+{
+	if (val < min)
+		return min;
+
+	if (val > max)
+		return max;
+
+	return (q16_t)val;
+}
 
 void kalman_init(struct kalman_state *state)
 {
@@ -37,18 +48,13 @@ void kalman_reset(struct kalman_state *state)
 q16_t kalman_update(struct kalman_state *state, q16_t meas, q16_t dt_sec)
 {
 	q16_t boost;
-	q16_t calc_r;
 	q16_t cy_q16;
 	q16_t dt;
 	q16_t excess;
-	q16_t inv_s;
 	q16_t k0;
 	q16_t k1;
 	q16_t next_q;
-	q16_t p00_q16;
 	q16_t q_pos;
-	q16_t s;
-	q16_t s_pred;
 	q16_t term_k0;
 	q16_t x_pos_pred;
 	q16_t x_vel_pred;
@@ -56,6 +62,7 @@ q16_t kalman_update(struct kalman_state *state, q16_t meas, q16_t dt_sec)
 	q16_t y_clamp;
 	q16_t z;
 	q32_t a_ema;
+	q32_t calc_r_q32;
 	q32_t dt2;
 	q32_t dt3;
 	q32_t dt4;
@@ -65,10 +72,13 @@ q16_t kalman_update(struct kalman_state *state, q16_t meas, q16_t dt_sec)
 	q32_t f_p10;
 	q32_t f_p11;
 	q32_t inv_a;
-	q32_t nis_q32;
+	q32_t k0_q32;
+	q32_t k1_q32;
 	q32_t nis_shift;
+	q32_t p00_16;
 	q32_t p00_pred;
 	q32_t p01_pred;
+	q32_t p10_16;
 	q32_t p10_pred;
 	q32_t p11_pred;
 	q32_t q00;
@@ -80,6 +90,7 @@ q16_t kalman_update(struct kalman_state *state, q16_t meas, q16_t dt_sec)
 	q32_t q_vel_q32;
 	q32_t r_y_q32;
 	q32_t r_y_sq;
+	q32_t s_16;
 	q32_t y_q32;
 	q32_t y_sq;
 
@@ -139,27 +150,34 @@ q16_t kalman_update(struct kalman_state *state, q16_t meas, q16_t dt_sec)
 		math_mul_q32(inv_a, state->cov_y) + math_mul_q32(a_ema, y_sq);
 
 	cy_q16 = Q32_TO_Q16(state->cov_y);
-	p00_q16 = Q32_TO_Q16(p00_pred);
+	p00_16 = p00_pred >> Q16_SHIFT;
 
-	calc_r = cy_q16 - p00_q16;
-	state->r_meas = math_clamp(calc_r, FLOAT_TO_Q16(0.1F), INT_TO_Q16(50));
+	calc_r_q32 = (q32_t)cy_q16 - p00_16;
+	state->r_meas =
+		clamp_q32(calc_r_q32, FLOAT_TO_Q16(0.1F), INT_TO_Q16(50));
 
-	s_pred = p00_q16 + state->r_meas;
+	s_16 = p00_16 + (q32_t)state->r_meas;
 	next_q = math_mul_q16(FLOAT_TO_Q16(0.95F), state->q_vel);
 
-	if (cy_q16 > s_pred) {
-		excess = cy_q16 - s_pred;
+	if ((q32_t)cy_q16 > s_16) {
+		excess = (q16_t)((q32_t)cy_q16 - s_16);
 		boost = math_mul_q16(FLOAT_TO_Q16(0.05F), excess);
 		next_q = state->q_vel + boost;
 	}
 
 	state->q_vel = math_clamp(next_q, FLOAT_TO_Q16(0.01F), INT_TO_Q16(20));
 
-	s = s_pred;
-	inv_s = (s > 0) ? math_div_q16(Q16_ONE, s) : 0;
+	p10_16 = p10_pred >> Q16_SHIFT;
+	if (s_16 > 0) {
+		k0_q32 = (p00_16 * Q16_ONE) / s_16;
+		k1_q32 = (p10_16 * Q16_ONE) / s_16;
+	} else {
+		k0_q32 = 0;
+		k1_q32 = 0;
+	}
 
-	k0 = math_mul_q16(p00_q16, inv_s);
-	k1 = math_mul_q16(Q32_TO_Q16(p10_pred), inv_s);
+	k0 = clamp_q32(k0_q32, INT32_MIN, INT32_MAX);
+	k1 = clamp_q32(k1_q32, INT32_MIN, INT32_MAX);
 
 	state->x_pos = x_pos_pred + math_mul_q16(k0, y);
 	state->x_vel = x_vel_pred + math_mul_q16(k1, y);
@@ -173,9 +191,8 @@ q16_t kalman_update(struct kalman_state *state, q16_t meas, q16_t dt_sec)
 
 	r_y_q32 = Q16_TO_Q32(y);
 	r_y_sq = math_mul_q32(r_y_q32, r_y_q32);
-	nis_q32 = math_mul_q32(r_y_sq, Q16_TO_Q32(inv_s));
-	nis_shift = nis_q32 >> Q16_SHIFT;
-	state->nis = (nis_shift > INT32_MAX) ? INT32_MAX : (q16_t)nis_shift;
+	nis_shift = (s_16 > 0) ? (r_y_sq / s_16) : INT32_MAX;
+	state->nis = clamp_q32(nis_shift, 0, INT32_MAX);
 
 	return (state->x_pos > 0) ? state->x_pos : 0;
 }
