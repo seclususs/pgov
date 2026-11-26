@@ -264,9 +264,6 @@ static inline void poll_thermal_metrics(struct context *ctx,
 		} else if (ctx->temp_fails < TEMP_FAIL_MAX) {
 			ctx->temp_fails++;
 			hold = true;
-
-		} else {
-			cpu_temp = 0;
 		}
 	}
 
